@@ -1,0 +1,48 @@
+{
+    // IntelliSense를 사용하여 가능한 특성에 대해 알아보세요.
+    // 기존 특성에 대한 설명을 보려면 가리킵니다.
+    // 자세한 내용을 보려면 https://go.microsoft.com/fwlink/?linkid=830387을(를) 방문하세요.
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "admin_web",
+            "cwd": "admin_web",
+            "request": "launch",
+            "type": "dart"
+        },
+        {
+            "name": "admin_web (profile mode)",
+            "cwd": "admin_web",
+            "request": "launch",
+            "type": "dart",
+            "flutterMode": "profile"
+        },
+        {
+            "name": "admin_web (release mode)",
+            "cwd": "admin_web",
+            "request": "launch",
+            "type": "dart",
+            "flutterMode": "release"
+        },
+        {
+            "name": "micro_divide",
+            "cwd": "micro_divide",
+            "request": "launch",
+            "type": "dart"
+        },
+        {
+            "name": "micro_divide (profile mode)",
+            "cwd": "micro_divide",
+            "request": "launch",
+            "type": "dart",
+            "flutterMode": "profile"
+        },
+        {
+            "name": "micro_divide (release mode)",
+            "cwd": "micro_divide",
+            "request": "launch",
+            "type": "dart",
+            "flutterMode": "release"
+        }
+    ]
+}
