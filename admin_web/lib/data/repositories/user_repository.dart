@@ -58,6 +58,19 @@ class UserRepository {
       rethrow;
     }
   }
+
+  // 💡 사용자 레벨을 수정하는 메소드
+  Future<void> updateUserLevel(String userId, int newLevel) async {
+    try {
+      await _supabaseAdmin
+          .from('profiles')
+          .update({'level': newLevel})
+          .eq('id', userId);
+    } catch (e) {
+      print('Error updating user level: $e');
+      rethrow;
+    }
+  }
 }
 
 final userRepositoryProvider = Provider((ref) => UserRepository());

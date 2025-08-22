@@ -21,10 +21,7 @@ final router = GoRouter(
       path: '/products',
       builder: (context, state) => const ProductManagementScreen(),
     ),
-    GoRoute(
-      path: '/products',
-      builder: (context, state) => const ProductManagementScreen(),
-    ),
+    
     // 💡 카테고리 경로 추가
     GoRoute(
       path: '/categories',

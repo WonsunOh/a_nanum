@@ -1,11 +1,45 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+
 import '../../../data/models/managed_group_buy_model.dart';
 import '../../../data/repositories/group_buy_admin_repository.dart';
 
-/// ## GroupBuy Management ViewModel Provider
-/// '공구 관리' 화면에 필요한 데이터 목록을 제공하는 FutureProvider입니다.
-final groupBuyManagementViewModelProvider = FutureProvider.autoDispose<List<ManagedGroupBuy>>((ref) {
-  // GroupBuyAdminRepository를 watch하여 데이터를 가져옵니다.
-  // 검색이나 필터 기능이 추가되면, 관련 Provider를 watch하여 repository에 전달할 수 있습니다.
-  return ref.watch(groupBuyAdminRepositoryProvider).fetchAllGroupBuys();
+final groupBuyManagementViewModelProvider = StateNotifierProvider.autoDispose<GroupBuyManagementViewModel, AsyncValue<List<ManagedGroupBuy>>>((ref) {
+  return GroupBuyManagementViewModel(ref.read(groupBuyAdminRepositoryProvider));
 });
+
+class GroupBuyManagementViewModel extends StateNotifier<AsyncValue<List<ManagedGroupBuy>>> {
+  final GroupBuyAdminRepository _repository;
+  GroupBuyManagementViewModel(this._repository) : super(const AsyncValue.loading()) {
+    fetchAllGroupBuys();
+  }
+
+  Future<void> fetchAllGroupBuys() async {
+    state = const AsyncValue.loading();
+    state = await AsyncValue.guard(() => _repository.fetchAllGroupBuys());
+  }
+
+  // 💡 updateStatus 메소드를 delete와 동일한 패턴으로 수정합니다.
+  Future<void> updateStatus(int id, String newStatus) async {
+    // 1. UI에 로딩 상태를 먼저 알립니다.
+    state = const AsyncValue.loading();
+    try {
+      // 2. 상태 업데이트 작업을 수행합니다.
+      await _repository.updateGroupBuyStatus(id, newStatus);
+      // 3. 작업이 성공하면, 전체 목록을 새로고침합니다.
+      await fetchAllGroupBuys();
+    } catch (e, s) {
+      // 4. 실패하면 에러 상태로 변경합니다.
+      state = AsyncValue.error(e, s);
+    }
+  }
+
+  Future<void> delete(int id) async {
+    state = const AsyncValue.loading();
+    try {
+      await _repository.deleteGroupBuy(id);
+      await fetchAllGroupBuys();
+    } catch (e, s) {
+      state = AsyncValue.error(e, s);
+    }
+  }
+}

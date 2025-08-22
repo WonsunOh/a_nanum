@@ -29,9 +29,16 @@ class GroupBuyAdminRepository {
       rethrow;
     }
   }
+// 💡 공구 상태를 수정하는 메소드
+  Future<void> updateGroupBuyStatus(int id, String newStatus) async {
+    await _supabaseAdmin.from('group_buys').update({'status': newStatus}).eq('id', id);
+  }
 
-  // TODO: 공구 상태를 강제로 변경하는 등의 관리자용 메소드 추가 가능
-  // Future<void> updateGroupBuyStatus(int id, String newStatus) async { ... }
+  // 💡 공구를 삭제하는 메소드
+  Future<void> deleteGroupBuy(int id) async {
+    await _supabaseAdmin.from('group_buys').delete().eq('id', id);
+  }
+  
 }
 
 /// ## GroupBuy Admin Repository Provider

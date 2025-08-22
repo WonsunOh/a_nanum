@@ -46,6 +46,7 @@ class OrderRepository {
       rethrow;
     }
   }
+  
 }
 
 final orderRepositoryProvider = Provider((ref) => OrderRepository());
