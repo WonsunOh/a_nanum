@@ -1,62 +1,51 @@
+// user_app/lib/core/router.dart (전체 교체)
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-
-import '../data/models/group_buy_model.dart';
+import '../features/commiunity/proposal/view/propose_group_buy_screen.dart';
+import '../features/group_buy/view/group_buy_detail_screen.dart';
+import '../features/group_buy/view/group_buy_list_screen.dart';
+import '../features/shop/view/shop_screen.dart';
 import '../features/user/auth/view/login_screen.dart';
 import '../features/user/auth/view/signup_screen.dart';
 import '../features/user/auth/view/splash_screen.dart';
-import '../features/group_buy/view/group_buy_detail_screen.dart';
-import '../features/group_buy/view/group_buy_list_screen.dart';
-import '../features/commiunity/proposal/view/propose_group_buy_screen.dart';
+import '../features/user/mypage/view/mypage_screen.dart';
 
-// 1. Splash, Login, SignUp, Home 화면에 대한 경로를 미리 정의합니다.
 enum AppRoute {
   splash,
   login,
   signup,
-  home, groupBuyDetail,
+  shop,
+  groupBuy,
+  groupBuyDetail,
+  propose,
+  mypage
 }
 
-// 2. Riverpod Provider를 사용하여 GoRouter 인스턴스를 생성합니다.
 final routerProvider = Provider<GoRouter>((ref) {
   final supabase = Supabase.instance.client;
 
   return GoRouter(
-    // 앱의 초기 경로 설정
     initialLocation: '/splash',
-
-    
-    
-    // 경로 정의
     routes: [
       GoRoute(
-        path: '/splash',
-        name: AppRoute.splash.name,
-        builder: (context, state) => const SplashScreen(), // 나중에 만들 SplashScreen
-      ),
+          path: '/splash',
+          builder: (context, state) => const SplashScreen()),
       GoRoute(
-        path: '/login',
-        name: AppRoute.login.name,
-        builder: (context, state) => const LoginScreen(), // 나중에 만들 LoginScreen
-      ),
+          path: '/login', builder: (context, state) => const LoginScreen()),
       GoRoute(
-        path: '/signup',
-        name: AppRoute.signup.name,
-        builder: (context, state) => const SignUpScreen(), // 나중에 만들 SignUpScreen
-      ),
+          path: '/signup', builder: (context, state) => const SignUpScreen()),
       GoRoute(
-        path: '/home',
-        name: AppRoute.home.name,
-        builder: (context, state) => const HomeScreen(),
-        // 💡 '/home'의 자식 경로로 상세 페이지를 추가합니다.
+          path: '/shop', builder: (context, state) => const ShopScreen()), // ⭐️ 새로운 홈
+      GoRoute(
+        path: '/group-buy', // ➡️ 기존 '/home'에서 변경
+        builder: (context, state) => const GroupBuyListScreen(),
         routes: [
           GoRoute(
-            path: 'group-buy-detail/:id', // URL에 /:id 파라미터를 받도록 설정
-            name: AppRoute.groupBuyDetail.name,
+            path: 'detail/:id',
             builder: (context, state) {
-              // extra를 통해 전달받은 GroupBuy 객체
               final groupBuyId = int.parse(state.pathParameters['id']!);
               return GroupBuyDetailScreen(groupBuyId: groupBuyId);
             },
@@ -64,44 +53,43 @@ final routerProvider = Provider<GoRouter>((ref) {
         ],
       ),
       GoRoute(
-      path: '/propose-group-buy', // 경로 추가
-      builder: (context, state) => const ProposeGroupBuyScreen(),
-    ),
+          path: '/propose',
+          builder: (context, state) => const ProposeGroupBuyScreen()),
+      GoRoute(
+          path: '/mypage', builder: (context, state) => const MyPageScreen()),
     ],
-    
-    // 3. 리디렉션 로직: 사용자의 인증 상태가 바뀔 때마다 실행됩니다.
     refreshListenable: GoRouterRefreshStream(supabase.auth.onAuthStateChange),
     redirect: (BuildContext context, GoRouterState state) {
       final session = supabase.auth.currentSession;
-      final isAuth = session != null; // 로그인 되어 있으면 true
+      final isAuthenticated = session != null;
+      final isAtSplash = state.matchedLocation == '/splash';
 
-      final isSplash = state.matchedLocation == '/splash';
-      if (isSplash) {
-        // 스플래시 화면에서는 잠시 대기 후 상태에 따라 이동시킵니다.
-        // 지금은 즉시 리디렉션 로직을 태웁니다.
-        return isAuth ? '/home' : '/login';
+      // 규칙 1: 스플래시에서는 무조건 '/shop'으로 이동
+      if (isAtSplash) {
+        return '/shop';
+      }
+      
+      final isGoingToAuthFlow =
+          state.matchedLocation == '/login' || state.matchedLocation == '/signup';
+
+      // 규칙 2: 로그인 사용자가 로그인/가입 페이지로 가면 '/shop'으로 이동
+      if (isAuthenticated && isGoingToAuthFlow) {
+        return '/shop';
       }
 
-      final isLoggingIn = state.matchedLocation == '/login' || state.matchedLocation == '/signup';
-
-      if (!isAuth && !isLoggingIn) {
-        // 로그인 안된 상태에서 로그인/회원가입 화면이 아니면 -> 로그인 화면으로
+      // 규칙 3: 로그인이 필요한 페이지 보호
+      final authRequiredRoutes = ['/propose', '/mypage'];
+      if (!isAuthenticated && authRequiredRoutes.contains(state.matchedLocation)) {
         return '/login';
       }
-      if (isAuth && isLoggingIn) {
-        // 로그인 된 상태에서 로그인/회원가입 화면에 있으면 -> 홈 화면으로
-        return '/home';
-      }
 
-      // 그 외의 경우는 리디렉션 없음
       return null;
     },
   );
 });
 
-// Supabase의 인증 상태 변경 Stream을 GoRouter가 이해할 수 있도록 변환해주는 클래스입니다.
 class GoRouterRefreshStream extends ChangeNotifier {
-  GoRouterRefreshStream(Stream<dynamic> stream) {
+  GoRouterRefreshStream(Stream<AuthState> stream) {
     notifyListeners();
     stream.asBroadcastStream().listen((_) => notifyListeners());
   }

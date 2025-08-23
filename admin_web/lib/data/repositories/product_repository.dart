@@ -1,77 +1,55 @@
-import 'dart:typed_data';
+// admin_web/lib/data/repositories/product_repository.dart (전체 교체)
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import 'package:flutter_dotenv/flutter_dotenv.dart';
+
 import '../models/product_model.dart';
 
+// ⭐️ Repository 인스턴스를 앱 전체에 제공하는 Provider
+final productRepositoryProvider = Provider<ProductRepository>((ref) {
+  return ProductRepository(Supabase.instance.client);
+});
+
 class ProductRepository {
-  final SupabaseClient _supabaseAdmin;
+  final SupabaseClient _client;
 
-  ProductRepository()
-      : _supabaseAdmin = SupabaseClient(
-          dotenv.env['SUPABASE_URL']!,
-          dotenv.env['SUPABASE_SERVICE_ROLE_KEY']!,
-        );
+  ProductRepository(this._client);
 
-  Future<List<Product>> fetchAllProducts() async {
-    final response = await _supabaseAdmin.from('products').select().order('created_at', ascending: false);
-    return (response as List).map((data) => Product.fromJson(data)).toList();
+  // 모든 상품 목록을 가져오는 기능
+  Future<List<ProductModel>> fetchProducts() async {
+    final data = await _client.from('products').select().order('created_at');
+    return data.map((item) => ProductModel.fromJson(item)).toList();
   }
 
-  Future<String> uploadProductImage(Uint8List imageBytes, String imageName) async {
-    final fileExt = imageName.split('.').last;
-    final fileName = '${DateTime.now().millisecondsSinceEpoch}.$fileExt';
-    await _supabaseAdmin.storage.from('products').uploadBinary(
-          fileName,
-          imageBytes,
-          fileOptions: FileOptions(contentType: 'image/$fileExt'),
-        );
-    return _supabaseAdmin.storage.from('products').getPublicUrl(fileName);
-  }
-
-  Future<void> createProduct({
+  // 상품을 추가하는 기능
+  Future<void> addProduct({
     required String name,
-    required int totalPrice,
-    String? description,
+    required String description,
+    required int price,
+    required int stockQuantity,
+    required int categoryId,
+    required bool isDisplayed,
     String? imageUrl,
-    int? categoryId,
-    String? externalProductId,
   }) async {
-    await _supabaseAdmin.from('products').insert({
+    await _client.from('products').insert({
       'name': name,
-      'total_price': totalPrice,
       'description': description,
-      'image_url': imageUrl,
+      'price': price,
+      'stock_quantity': stockQuantity,
       'category_id': categoryId,
-      'external_product_id': externalProductId,
+      'is_displayed': isDisplayed,
+      'image_url': imageUrl,
     });
   }
 
-  Future<void> updateProduct({
-    required int id,
-    required String name,
-    required int totalPrice,
-    String? description,
-    String? imageUrl,
-    int? categoryId,
-    String? externalProductId,
-  }) async {
-    final updates = {
-      'name': name,
-      'total_price': totalPrice,
-      'description': description,
-      'category_id': categoryId,
-      'external_product_id': externalProductId,
-    };
-    if (imageUrl != null) {
-      updates['image_url'] = imageUrl;
-    }
-    await _supabaseAdmin.from('products').update(updates).eq('id', id);
+  // 상품 정보를 업데이트하는 기능
+  Future<void> updateProduct(ProductModel product) async {
+    // ⭐️ ProductModel에 toJson() 메서드가 필요합니다!
+    await _client.from('products').update(product.toJson()).eq('id', product.id);
   }
 
+  // 상품을 삭제하는 기능
   Future<void> deleteProduct(int productId) async {
-    await _supabaseAdmin.from('products').delete().eq('id', productId);
+    await _client.from('products').delete().eq('id', productId);
   }
 }
-
-final productRepositoryProvider = Provider((ref) => ProductRepository());

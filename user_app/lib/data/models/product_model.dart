@@ -24,19 +24,17 @@ class ProductModel {
   });
 
   factory ProductModel.fromJson(Map<String, dynamic> json) {
-    // ⭐️ 어떤 필드가 null일 경우 에러를 던져서 명확하게 알려주는 로직 추가
-    if (json['id'] == null) throw FormatException('Product "id" is null.');
-    if (json['created_at'] == null) throw FormatException('Product "created_at" is null.');
-    
     return ProductModel(
-      id: json['id'] as int,
+      id: json['id'] as int, // id는 항상 존재해야 함
       createdAt: DateTime.parse(json['created_at'] as String),
       name: json['name'] as String? ?? '이름 없음',
-      description: json['description'] as String? ?? '설명 없음',
+      description: json['description'] as String? ?? '',
       price: json['price'] as int? ?? 0,
       imageUrl: json['image_url'] as String?,
       stockQuantity: json['stock_quantity'] as int? ?? 0,
-      categoryId: json['category_id'] as int? ?? 1, // 카테고리가 없으면 기본값 1
+      // ⭐️ category_id가 null일 경우, 기본값 1을 사용하도록 수정
+      //    (또는 다른 유효한 기본 카테고리 ID로 설정)
+      categoryId: json['category_id'] as int? ?? 1,
       isDisplayed: json['is_displayed'] as bool? ?? false,
     );
   }

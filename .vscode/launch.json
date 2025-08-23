@@ -25,21 +25,21 @@
             "flutterMode": "release"
         },
         {
-            "name": "micro_divide",
-            "cwd": "micro_divide",
+            "name": "user_app",
+            "cwd": "user_app",
             "request": "launch",
             "type": "dart"
         },
         {
-            "name": "micro_divide (profile mode)",
-            "cwd": "micro_divide",
+            "name": "user_app (profile mode)",
+            "cwd": "user_app",
             "request": "launch",
             "type": "dart",
             "flutterMode": "profile"
         },
         {
-            "name": "micro_divide (release mode)",
-            "cwd": "micro_divide",
+            "name": "user_app (release mode)",
+            "cwd": "user_app",
             "request": "launch",
             "type": "dart",
             "flutterMode": "release"

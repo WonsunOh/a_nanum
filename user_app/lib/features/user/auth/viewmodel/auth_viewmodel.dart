@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../data/repositories/auth_repository.dart';
 
@@ -37,7 +38,7 @@ class AuthViewModel extends StateNotifier<AsyncValue<void>> {
       await _repository.signOut();
     } catch (e) {
       // 에러가 발생하면 콘솔에 출력합니다.
-      print('로그아웃 에러: $e');
+      debugPrint('로그아웃 에러: $e');
     }
   }
 }

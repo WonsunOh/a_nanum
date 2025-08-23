@@ -1,98 +1,60 @@
-import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:image_picker/image_picker.dart';
-import '../../../../data/models/category_model.dart';
+// admin_web/lib/features/shop_management/products/viewmodel/product_viewmodel.dart (전체 교체)
+
+// ⭐️ 이 import 구문이 누락되어 있었습니다.
+import 'package:riverpod_annotation/riverpod_annotation.dart';
+
 import '../../../../data/models/product_model.dart';
-import '../../../../data/repositories/category_repository.dart';
 import '../../../../data/repositories/product_repository.dart';
 
-final categoriesProvider = StreamProvider.autoDispose<List<Category>>((ref) {
-  return ref.watch(categoryRepositoryProvider).watchAllCategories();
-});
+part 'product_viewmodel.g.dart';
 
-final productViewModelProvider = StateNotifierProvider.autoDispose<ProductViewModel, AsyncValue<List<Product>>>((ref) {
-  return ProductViewModel(ref.read(productRepositoryProvider));
-});
-
-class ProductViewModel extends StateNotifier<AsyncValue<List<Product>>> {
-  final ProductRepository _repository;
-
-  ProductViewModel(this._repository) : super(const AsyncValue.loading()) {
-    fetchAllProducts();
+@riverpod
+class ProductViewModel extends _$ProductViewModel {
+  @override
+  Future<List<ProductModel>> build() {
+    return ref.watch(productRepositoryProvider).fetchProducts();
   }
 
-  Future<void> fetchAllProducts() async {
-    state = const AsyncValue.loading();
-    state = await AsyncValue.guard(() => _repository.fetchAllProducts());
-  }
-
-  Future<bool> createProduct({
+  Future<void> addProduct({
     required String name,
-    required int totalPrice,
-    required XFile image,
-    String? description,
-    int? categoryId,
-    String? externalProductId,
+    required String description,
+    required int price,
+    required int stockQuantity,
+    required int categoryId,
+    required bool isDisplayed,
+    String? imageUrl,
   }) async {
+    final repo = ref.read(productRepositoryProvider);
     state = const AsyncValue.loading();
-    try {
-      final imageBytes = await image.readAsBytes();
-      final imageUrl = await _repository.uploadProductImage(imageBytes, image.name);
-      await _repository.createProduct(
+    state = await AsyncValue.guard(() async {
+      await repo.addProduct(
         name: name,
-        totalPrice: totalPrice,
         description: description,
-        imageUrl: imageUrl,
+        price: price,
+        stockQuantity: stockQuantity,
         categoryId: categoryId,
-        externalProductId: externalProductId,
+        isDisplayed: isDisplayed,
+        imageUrl: imageUrl,
       );
-      await fetchAllProducts();
-      return true;
-    } catch (e, s) {
-      state = AsyncValue.error(e, s);
-      return false;
-    }
+      return repo.fetchProducts();
+    });
   }
 
-  Future<bool> updateProduct({
-    required Product existingProduct,
-    required String name,
-    required int totalPrice,
-    String? description,
-    int? categoryId,
-    String? externalProductId,
-    XFile? image,
-  }) async {
+  Future<void> updateProduct(ProductModel product) async {
+    final repo = ref.read(productRepositoryProvider);
     state = const AsyncValue.loading();
-    try {
-      String? imageUrl = existingProduct.imageUrl;
-      if (image != null) {
-        final imageBytes = await image.readAsBytes();
-        imageUrl = await _repository.uploadProductImage(imageBytes, image.name);
-      }
-      await _repository.updateProduct(
-        id: existingProduct.id,
-        name: name,
-        totalPrice: totalPrice,
-        description: description,
-        imageUrl: imageUrl,
-        categoryId: categoryId,
-        externalProductId: externalProductId,
-      );
-      await fetchAllProducts();
-      return true;
-    } catch (e, s) {
-      state = AsyncValue.error(e, s);
-      return false;
-    }
+    state = await AsyncValue.guard(() async {
+      await repo.updateProduct(product);
+      return repo.fetchProducts();
+    });
   }
 
   Future<void> deleteProduct(int productId) async {
+    final repo = ref.read(productRepositoryProvider);
     state = const AsyncValue.loading();
-    try {
-      await _repository.deleteProduct(productId);
-      await fetchAllProducts();
-    } catch (e, s) {
-      state = AsyncValue.error(e, s);
-    }
+    state = await AsyncValue.guard(() async {
+      await repo.deleteProduct(productId);
+      return repo.fetchProducts();
+    });
   }
 }

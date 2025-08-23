@@ -42,12 +42,7 @@ class CreateGroupBuyViewModel extends StateNotifier<AsyncValue<void>> {
       state = const AsyncValue.data(null);
       return true;
     } catch (e, s) {
-      // --- 👇 여기가 핵심 수정 부분 ---
-      // 에러가 발생하면, 콘솔에 전체 내용을 출력합니다.
-      print('--- 공구 개설 에러 발생 ---');
-      print('에러 종류: $e');
-      print('에러 위치 (Stack Trace): $s');
-      // --- 👆 여기까지 ---
+      
 
       // state를 error로 변경하고 false를 반환합니다.
       state = AsyncValue.error(e, s);

@@ -1,3 +1,4 @@
+import 'package:flutter/material.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -32,7 +33,7 @@ class OrderRepository {
 
       return (response as List).map((data) => Order.fromJson(data)).toList();
     } catch (e) {
-      print('Error fetching successful orders: $e');
+      debugPrint('Error fetching successful orders: $e');
       rethrow;
     }
   }
@@ -42,7 +43,7 @@ class OrderRepository {
     try {
       await _supabaseAdmin.rpc('batch_update_tracking_numbers', params: {'updates': updates});
     } catch (e) {
-      print('Error batch updating tracking numbers: $e');
+      debugPrint('Error batch updating tracking numbers: $e');
       rethrow;
     }
   }

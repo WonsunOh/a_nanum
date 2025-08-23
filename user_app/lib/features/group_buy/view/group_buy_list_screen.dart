@@ -8,8 +8,8 @@ import '../viewmodel/home_viewmodel.dart';
 import '../widgets/product_card.dart';
 import 'select_product_screen.dart';
 
-class HomeScreen extends ConsumerWidget {
-  const HomeScreen({super.key});
+class GroupBuyListScreen extends ConsumerWidget {
+  const GroupBuyListScreen({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {

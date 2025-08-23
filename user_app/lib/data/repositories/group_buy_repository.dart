@@ -1,5 +1,6 @@
 import 'dart:typed_data';
 
+import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -46,7 +47,7 @@ class GroupBuyRepository {
       final publicUrl = _client.storage.from('products').getPublicUrl(fileName);
       return publicUrl;
     } catch (e) {
-      print('이미지 업로드 에러: $e');
+      debugPrint('이미지 업로드 에러: $e');
       rethrow;
     }
   }
@@ -82,7 +83,7 @@ class GroupBuyRepository {
         'p_external_product_id': externalProductId,
       });
     } catch (e) {
-      print('공동구매 생성 에러: $e');
+      debugPrint('공동구매 생성 에러: $e');
       rethrow;
     }
   }
@@ -97,7 +98,7 @@ class GroupBuyRepository {
           .single();
       return Product.fromJson(response);
     } catch (e) {
-      print('ID로 상품 가져오기 에러 $id: $e');
+      debugPrint('ID로 상품 가져오기 에러 $id: $e');
       rethrow;
     }
   }
@@ -118,7 +119,7 @@ class GroupBuyRepository {
         'p_quantity': quantity, // 💡 수량 전달
       });
     } catch (e) {
-      print('공동구매 참여 에러: $e');
+      debugPrint('공동구매 참여 에러: $e');
       rethrow;
     }
   }
@@ -135,7 +136,7 @@ class GroupBuyRepository {
       return (response as List).map((e) => e['user_id'] as String).toList();
 
     } catch(e) {
-      print('참여자 목록 가져오기 에러: $e');
+      debugPrint('참여자 목록 가져오기 에러: $e');
       rethrow;
     }
   }
@@ -148,7 +149,7 @@ class GroupBuyRepository {
           .update({'status': 'failed'})
           .eq('id', groupBuyId);
     } catch (e) {
-      print('공구 취소 에러: $e');
+      debugPrint('공구 취소 에러: $e');
       rethrow;
     }
   }
@@ -164,7 +165,7 @@ class GroupBuyRepository {
         'p_user_id': _client.auth.currentUser!.id,
       });
     } catch (e) {
-      print('참여 취소 에러: $e');
+      debugPrint('참여 취소 에러: $e');
       rethrow;
     }
   }
@@ -178,7 +179,7 @@ class GroupBuyRepository {
         'p_new_quantity': newQuantity,
       });
     } catch (e) {
-      print('수량 변경 에러: $e');
+      debugPrint('수량 변경 에러: $e');
       rethrow;
     }
   }
@@ -198,7 +199,7 @@ class GroupBuyRepository {
           .map((item) => MyParticipation.fromJson(item))
           .toList();
     } catch (e) {
-      print('내 참여 목록 조회 에러: $e');
+      debugPrint('내 참여 목록 조회 에러: $e');
       rethrow;
     }
   }

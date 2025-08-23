@@ -1,27 +1,27 @@
+// admin_web/lib/data/models/category_model.dart
 
-import 'package:equatable/equatable.dart';
-
-class Category extends Equatable {
+class CategoryModel {
   final int id;
   final String name;
-  final int? parentId; // 💡 이 필드를 추가
+  final DateTime createdAt;
 
-  const Category({
+  CategoryModel({
     required this.id,
     required this.name,
-    this.parentId, // 💡 생성자에 추가
+    required this.createdAt,
   });
 
-  factory Category.fromJson(Map<String, dynamic> json) {
-    return Category(
-      id: json['id'],
-      name: json['name'],
-      parentId: json['parent_id'], // 💡 fromJson 로직에 추가
+  factory CategoryModel.fromJson(Map<String, dynamic> json) {
+    return CategoryModel(
+      id: json['id'] as int,
+      name: json['name'] as String,
+      createdAt: DateTime.parse(json['created_at'] as String),
     );
   }
 
-  // 💡 Equatable을 사용하면 이 한 줄만 추가하면 됩니다.
-  @override
-  List<Object?> get props => [id];
-
+  Map<String, dynamic> toJson() {
+    return {
+      'name': name,
+    };
+  }
 }

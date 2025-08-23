@@ -1,3 +1,4 @@
+import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -21,7 +22,7 @@ class ProposalRepository {
         'reason': reason,
       });
     } catch (e) {
-      print('공구 신청 제출 에러: $e');
+      debugPrint('공구 신청 제출 에러: $e');
       rethrow;
     }
   }

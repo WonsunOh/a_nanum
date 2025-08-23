@@ -1,3 +1,4 @@
+import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
@@ -39,7 +40,7 @@ class UserRepository {
       
       return users;
     } catch (e) {
-      print('Error fetching users: $e');
+      debugPrint('Error fetching users: $e');
       rethrow;
     }
   }
@@ -54,7 +55,7 @@ class UserRepository {
       ).single();
       return UserDetail.fromJson(response);
     } catch (e) {
-      print('Error fetching user details: $e');
+      debugPrint('Error fetching user details: $e');
       rethrow;
     }
   }
@@ -67,7 +68,7 @@ class UserRepository {
           .update({'level': newLevel})
           .eq('id', userId);
     } catch (e) {
-      print('Error updating user level: $e');
+      debugPrint('Error updating user level: $e');
       rethrow;
     }
   }

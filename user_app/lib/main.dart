@@ -1,6 +1,7 @@
 import 'package:a_micro_divide/core/router.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
@@ -16,11 +17,13 @@ void main() async {
   await Firebase.initializeApp(
     options: DefaultFirebaseOptions.currentPlatform,
   );
-  // --- 👆 여기까지 ---
+  await dotenv.load(fileName: ".env");
 
+  // ⭐️ 2. Supabase 초기화 코드를 여기에 추가합니다.
+  // .env 파일에 저장된 URL과 ANON KEY를 사용하여 Supabase와 연결합니다.
   await Supabase.initialize(
-    url: 'https://oyoznvosuyxhgxmbfaow.supabase.co', // Supabase 프로젝트 URL
-    anonKey: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im95b3pudm9zdXl4aGd4bWJmYW93Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTU0Mzg4OTIsImV4cCI6MjA3MTAxNDg5Mn0.0BdGBHUK_Q64ZWhsyia_7toDwC42zM0xLzi7yPx6V4s', // Supabase Anon Key
+    url: dotenv.env['SUPABASE_URL']!,
+    anonKey: dotenv.env['SUPABASE_ANON_KEY']!,
   );
 
 

@@ -1,37 +1,24 @@
+// admin_web/lib/data/repositories/category_repository.dart
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import 'package:flutter_dotenv/flutter_dotenv.dart';
 import '../models/category_model.dart';
 
+// Repository 인스턴스를 제공하는 Provider
+final categoryRepositoryProvider = Provider<CategoryRepository>((ref) {
+  return CategoryRepository(Supabase.instance.client);
+});
+
 class CategoryRepository {
-  final SupabaseClient _supabaseAdmin;
+  final SupabaseClient _client;
 
-  CategoryRepository()
-      : _supabaseAdmin = SupabaseClient(
-          dotenv.env['SUPABASE_URL']!,
-          dotenv.env['SUPABASE_SERVICE_ROLE_KEY']!,
-        );
+  CategoryRepository(this._client);
 
-  Stream<List<Category>> watchAllCategories() {
-    return _supabaseAdmin
-        .from('categories')
-        .stream(primaryKey: ['id'])
-        .order('parent_id', ascending: true)
-        .map((listOfMaps) =>
-            listOfMaps.map((map) => Category.fromJson(map)).toList());
+  // 모든 카테고리 목록을 가져오는 기능
+  Future<List<CategoryModel>> fetchCategories() async {
+    final response = await _client.from('categories').select().order('name');
+    return response.map((item) => CategoryModel.fromJson(item)).toList();
   }
 
-  Future<void> createCategory({required String name, int? parentId}) async {
-    await _supabaseAdmin.from('categories').insert({'name': name, 'parent_id': parentId});
-  }
-
-  Future<void> updateCategory({required int id, required String name, int? parentId}) async {
-    await _supabaseAdmin.from('categories').update({'name': name, 'parent_id': parentId}).eq('id', id);
-  }
-
-  Future<void> deleteCategory(int categoryId) async {
-    await _supabaseAdmin.from('categories').delete().eq('id', categoryId);
-  }
+  // TODO: 나중에 카테고리 추가/수정/삭제 기능을 여기에 추가합니다.
 }
-
-final categoryRepositoryProvider = Provider((ref) => CategoryRepository());

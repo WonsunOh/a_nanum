@@ -1,105 +1,118 @@
+// admin_web/lib/core/main_layout.dart (전체 교체)
+
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
-
 import 'admin_menu_item.dart';
 
-// 💡 전체 메뉴 구조를 데이터로 정의
-final List<AdminMenuItem> menuItems = [
-  const AdminMenuItem(title: '대시보드', icon: Icons.dashboard, route: '/dashboard'),
-  const AdminMenuItem(
-    title: '상품 관리',
-    icon: Icons.shopping_bag,
-    route: '/products',
-    subItems: [
-      AdminMenuItem(title: '카테고리 관리', icon: Icons.category, route: '/categories'),
-      AdminMenuItem(title: '공구 관리', icon: Icons.groups, route: '/group-buys'),
-    ],
-  ),
-  const AdminMenuItem(title: '주문 관리', icon: Icons.receipt_long, route: '/orders'),
-  const AdminMenuItem(title: '회원 관리', icon: Icons.people_alt, route: '/users'),
-  const AdminMenuItem(
-    title: '고객 지원',
-    icon: Icons.support_agent,
-    route: '/inquiries',
-    subItems: [
-      AdminMenuItem(title: '답변 템플릿', icon: Icons.feed, route: '/inquiries/templates'),
-    ],
-  ),
-];
-
-class MainLayout extends StatelessWidget {
+class MainLayout extends StatefulWidget {
   final Widget child;
   const MainLayout({super.key, required this.child});
 
+  @override
+  State<MainLayout> createState() => _MainLayoutState();
+}
+
+class _MainLayoutState extends State<MainLayout> {
+  final List<AdminMenuItem> menuItems = [
+    AdminMenuItem(
+      title: '대시보드',
+      icon: Icons.dashboard_outlined,
+      route: '/dashboard',
+    ),
+    AdminMenuItem(
+      title: '쇼핑몰 관리',
+      icon: Icons.storefront_outlined,
+      children: [
+        AdminMenuItem(title: '상품 관리', route: '/shop/products'),
+        AdminMenuItem(title: '카테고리 관리', route: '/shop/categories'),
+      ],
+    ),
+    AdminMenuItem(
+      title: '공동구매 관리',
+      icon: Icons.group_work_outlined,
+      children: [
+        AdminMenuItem(title: '공동구매 현황', route: '/group-buy'),
+        AdminMenuItem(title: '주문 관리', route: '/orders'),
+      ],
+    ),
+    AdminMenuItem(
+      title: '회원 관리',
+      icon: Icons.people_outline,
+      route: '/users',
+    ),
+    AdminMenuItem(
+      title: '고객 지원',
+      icon: Icons.support_agent_outlined,
+      children: [
+        AdminMenuItem(title: '문의 내역', route: '/cs/inquiries'),
+        AdminMenuItem(title: '답변 템플릿', route: '/cs/templates'),
+      ],
+    ),
+  ];
 
   @override
   Widget build(BuildContext context) {
-    final currentRoute = GoRouterState.of(context).uri.toString();
+    // ⭐️ 1. 중복 메뉴 방지 로직을 다시 추가했습니다.
+    final hasOuterLayout =
+        context.findAncestorWidgetOfExactType<MainLayout>() != null;
 
-
-    // 1. 현재 경로가 어떤 최상위 메뉴에 속하는지 찾습니다.
-    AdminMenuItem? topLevelActiveItem;
-    for (final item in menuItems) {
-      if (currentRoute.startsWith(item.route)) {
-        topLevelActiveItem = item;
-        break;
-      }
-      // 하위 메뉴까지 확인
-      for (final subItem in item.subItems) {
-        if (currentRoute.startsWith(subItem.route)) {
-          topLevelActiveItem = item;
-          break;
-        }
-      }
-      if (topLevelActiveItem != null) break;
-    }
-
-    // 2. 현재 화면에 표시될 최종 메뉴 리스트를 구성합니다.
-    final List<AdminMenuItem> visibleMenuItems = [];
-    for (final item in menuItems) {
-      visibleMenuItems.add(item);
-      // 현재 활성화된 최상위 메뉴의 하위 메뉴들만 리스트에 추가합니다.
-      if (topLevelActiveItem != null && item.route == topLevelActiveItem.route) {
-        visibleMenuItems.addAll(item.subItems);
-      }
-    }
-
-    // 3. 최종 메뉴 리스트에서 현재 선택된 인덱스를 찾습니다.
-    int selectedIndex = visibleMenuItems.indexWhere((item) => item.route == currentRoute);
-    if (selectedIndex == -1) {
-      // 만약 정확히 일치하는 경로가 없다면(예: /products), 상위 메뉴를 선택된 것으로 처리
-      selectedIndex = visibleMenuItems.indexWhere((item) => item.route == topLevelActiveItem?.route);
-      if (selectedIndex == -1) selectedIndex = 0;
+    // 만약 바깥에 이미 MainLayout이 있다면, 메뉴 없이 내용물(child)만 보여줍니다.
+    if (hasOuterLayout) {
+      return widget.child;
     }
     
-    // 4. UI를 그립니다. (이하 로직은 이전과 거의 동일)
-    final destinations = visibleMenuItems.map((item) {
-      bool isSubItem = menuItems.any((mainItem) => mainItem.subItems.contains(item));
-      return NavigationRailDestination(
-        icon: isSubItem
-            ? Padding(padding: const EdgeInsets.only(left: 16.0), child: Icon(item.icon, size: 20))
-            : Icon(item.icon),
-        label: isSubItem ? Text('  ${item.title}') : Text(item.title),
-      );
-    }).toList();
+    // ⭐️ 2. 나머지 코드는 접이식 메뉴 기능을 그대로 유지합니다.
+    final currentRoute = GoRouterState.of(context).matchedLocation;
 
     return Scaffold(
       body: Row(
         children: [
-          NavigationRail(
-            extended: true,
-            selectedIndex: selectedIndex,
-            onDestinationSelected: (index) {
-              // 4. 최종 메뉴 리스트의 인덱스를 가지고 직접 경로로 이동합니다. (가장 단순하고 확실한 방법)
-              context.go(visibleMenuItems[index].route);
-            },
-            destinations: destinations,
+          SizedBox(
+            width: 250,
+            child: Drawer(
+              elevation: 1.0,
+              child: ListView.builder(
+                itemCount: menuItems.length,
+                itemBuilder: (context, index) {
+                  final item = menuItems[index];
+                  if (item.children.isEmpty) {
+                    return ListTile(
+                      leading: Icon(item.icon),
+                      title: Text(item.title),
+                      selected: currentRoute == item.route,
+                      onTap: () => context.go(item.route),
+                    );
+                  } else {
+                    bool isExpanded = item.children
+                        .any((child) => currentRoute.startsWith(child.route));
+                    return ExpansionTile(
+                      key: PageStorageKey(item.title),
+                      initiallyExpanded: isExpanded,
+                      leading: Icon(item.icon),
+                      title: Text(item.title),
+                      children: item.children.map((child) {
+                        return ListTile(
+                          title: Text(child.title),
+                          selected: currentRoute == child.route,
+                          onTap: () => context.go(child.route),
+                          contentPadding: const EdgeInsets.only(left: 40.0),
+                        );
+                      }).toList(),
+                    );
+                  }
+                },
+              ),
+            ),
           ),
-          const VerticalDivider(thickness: 1, width: 1),
+          const VerticalDivider(width: 1),
           Expanded(
-            child: child,
+            child: PageStorage(
+            key: PageStorageKey(GoRouterState.of(context).matchedLocation),
+            bucket: PageStorageBucket(),
+            child: widget.child,
           ),
-        ],
+        ),
+      ],
       ),
     );
   }

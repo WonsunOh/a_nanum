@@ -1,3 +1,4 @@
+import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../models/profile_model.dart';
 
@@ -17,7 +18,7 @@ class ProfileRepository {
           .single();
       return Profile.fromJson(response);
     } catch (e) {
-      print('프로필 정보 가져오기 실패: $e');
+      debugPrint('프로필 정보 가져오기 실패: $e');
       return null;
     }
   }

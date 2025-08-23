@@ -1,8 +1,9 @@
+import 'dart:ui';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-
 import 'core/router.dart';
 
 void main() async {
@@ -12,9 +13,15 @@ void main() async {
   
  // 💡 main 함수를 async로 변경하고, dotenv.load()를 호출합니다.
   await dotenv.load(fileName: ".env");
+
+  await Supabase.initialize(
+   url: dotenv.env['SUPABASE_URL']!,
+   anonKey: dotenv.env['SUPABASE_ANON_KEY']!,
+  );
   
   runApp(const ProviderScope(child: MyApp()));
 }
+
 
 class MyApp extends StatelessWidget {
   const MyApp({super.key});
@@ -24,9 +31,11 @@ class MyApp extends StatelessWidget {
     return MaterialApp.router(
       debugShowCheckedModeBanner: false,
       routerConfig: router,
-      title: '공동구매 관리자 페이지',
+    
+      title: '나눔 어드민',
       theme: ThemeData(
         primarySwatch: Colors.indigo,
+        scaffoldBackgroundColor: Colors.grey[50],
       ),
     );
   }
