@@ -4,12 +4,12 @@ import 'package:go_router/go_router.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../data/models/group_buy_model.dart';
-import '../features/auth/view/login_screen.dart';
-import '../features/auth/view/signup_screen.dart';
-import '../features/auth/view/splash_screen.dart';
+import '../features/user/auth/view/login_screen.dart';
+import '../features/user/auth/view/signup_screen.dart';
+import '../features/user/auth/view/splash_screen.dart';
 import '../features/group_buy/view/group_buy_detail_screen.dart';
-import '../features/group_buy/view/home_screen.dart';
-import '../features/proposals/view/propose_group_buy_screen.dart';
+import '../features/group_buy/view/group_buy_list_screen.dart';
+import '../features/commiunity/proposal/view/propose_group_buy_screen.dart';
 
 // 1. Splash, Login, SignUp, Home 화면에 대한 경로를 미리 정의합니다.
 enum AppRoute {

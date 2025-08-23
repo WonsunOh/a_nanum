@@ -5,8 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
 
-import '../../mypages/viewmodel/mypage_viewmodel.dart';
-import '../viewmodel/create_group_buy_viewmodel.dart';
+import '../viewmodel/configure_group_buy_viewmodel.dart';
 
 // 선택된 이미지 파일을 담아둘 Provider
 final selectedImageProvider = StateProvider.autoDispose<XFile?>((ref) => null);

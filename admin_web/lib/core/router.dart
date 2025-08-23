@@ -1,14 +1,14 @@
 import 'package:go_router/go_router.dart';
 
-import '../features/categories/view/category_management_screen.dart';
+import '../features/shop_management.dart/categories/view/category_management_screen.dart';
 import '../features/dashboard/view/dashboard_screen.dart';
-import '../features/group_buys/view/group_buy_management_screen.dart';
-import '../features/inquiries/view/inquiry_management_screen.dart';
-import '../features/orders/view/order_management_screen.dart';
-import '../features/products/view/product_management_screen.dart';
-import '../features/templates/view/reply_template_screen.dart';
-import '../features/users/view/user_detail_screen.dart';
-import '../features/users/view/user_management_screen.dart';
+import '../features/group_buy_management/view/group_buy_management_screen.dart';
+import '../features/cs_management.dart/inquiries/view/inquiry_management_screen.dart';
+import '../features/order_management/view/order_management_screen.dart';
+import '../features/shop_management.dart/products/view/product_management_screen.dart';
+import '../features/cs_management.dart/templates/view/reply_template_screen.dart';
+import '../features/user_management/view/user_detail_screen.dart';
+import '../features/user_management/view/user_management_screen.dart';
 
 final router = GoRouter(
   initialLocation: '/dashboard',
