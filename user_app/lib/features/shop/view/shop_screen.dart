@@ -15,16 +15,22 @@ class ShopScreen extends ConsumerWidget {
       appBar: AppBar(
         title: const Text('나눔 스토어'),
         actions: [
+          
+          IconButton(
+            onPressed: () => context.go('/shop/cart'),
+            icon: const Icon(Icons.shopping_cart_outlined),
+            tooltip: '장바구니',
+          ),
           IconButton(
             onPressed: () => context.go('/group-buy'), // 공동구매 목록으로 이동
             icon: const Icon(Icons.group_work_outlined),
             tooltip: '공동구매 보러가기',
           ),
           IconButton(
-            onPressed: () => context.go('/mypage'), // 마이페이지로 이동
+            onPressed: () => context.go('/shop/mypage'), // 마이페이지로 이동
             icon: const Icon(Icons.person_outline),
             tooltip: '마이페이지',
-          )
+          ),
         ],
       ),
       body: productsAsync.when(
@@ -46,7 +52,10 @@ class ShopScreen extends ConsumerWidget {
               itemBuilder: (context, index) {
                 final product = products[index];
                 return GestureDetector(
-                  onTap: () { /* TODO: 상품 상세 페이지 이동 */ },
+                  onTap: () {
+                    // 상품 ID를 사용하여 상세 페이지 경로로 이동합니다.
+                    context.go('/shop/${product.id}');
+                  },
                   child: ProductGridItem(product: product),
                 );
               },

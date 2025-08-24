@@ -22,6 +22,16 @@ void main() async {
   runApp(const ProviderScope(child: MyApp()));
 }
 
+// ⭐️ 모든 기기에서 드래그 스크롤을 가능하게 하는 클래스
+class MyCustomScrollBehavior extends MaterialScrollBehavior {
+  @override
+  Set<PointerDeviceKind> get dragDevices => {
+        PointerDeviceKind.touch,
+        PointerDeviceKind.mouse,
+        PointerDeviceKind.stylus,
+        PointerDeviceKind.trackpad,
+      };
+}
 
 class MyApp extends StatelessWidget {
   const MyApp({super.key});
@@ -31,7 +41,8 @@ class MyApp extends StatelessWidget {
     return MaterialApp.router(
       debugShowCheckedModeBanner: false,
       routerConfig: router,
-    
+      // ⭐️ 앱 전체에 새로운 스크롤 동작 적용
+      scrollBehavior: MyCustomScrollBehavior(),
       title: '나눔 어드민',
       theme: ThemeData(
         primarySwatch: Colors.indigo,

@@ -4,9 +4,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import '../features/cart/view/cart_screen.dart';
 import '../features/commiunity/proposal/view/propose_group_buy_screen.dart';
 import '../features/group_buy/view/group_buy_detail_screen.dart';
 import '../features/group_buy/view/group_buy_list_screen.dart';
+import '../features/order/view/checkout_screen.dart';
+import '../features/shop/view/product_detail_screen.dart';
 import '../features/shop/view/shop_screen.dart';
 import '../features/user/auth/view/login_screen.dart';
 import '../features/user/auth/view/signup_screen.dart';
@@ -38,7 +41,30 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
           path: '/signup', builder: (context, state) => const SignUpScreen()),
       GoRoute(
-          path: '/shop', builder: (context, state) => const ShopScreen()), // ⭐️ 새로운 홈
+          path: '/shop', builder: (context, state) => const ShopScreen(),
+          // ⭐️ 2. /shop 경로 안에 하위 경로를 추가합니다.
+        routes: [
+          GoRoute( path: '/cart', builder: (context, state) => const CartScreen(),
+          routes: [
+              GoRoute(
+                path: 'checkout', // 최종 경로: /shop/cart/checkout
+                builder: (context, state) => const CheckoutScreen(),
+              ),
+            ],
+          ),
+            
+          GoRoute( path: '/mypage', builder: (context, state) => const MyPageScreen()),
+          GoRoute(
+            path: ':productId', // 예: /shop/1, /shop/2 등
+            builder: (context, state) {
+              // 경로에서 productId를 추출하여 숫자로 변환합니다.
+              final productId = int.parse(state.pathParameters['productId']!);
+              return ProductDetailScreen(productId: productId);
+            },
+          ),
+          
+        ],
+          ), // ⭐️ 새로운 홈
       GoRoute(
         path: '/group-buy', // ➡️ 기존 '/home'에서 변경
         builder: (context, state) => const GroupBuyListScreen(),
@@ -52,11 +78,9 @@ final routerProvider = Provider<GoRouter>((ref) {
           ),
         ],
       ),
-      GoRoute(
-          path: '/propose',
-          builder: (context, state) => const ProposeGroupBuyScreen()),
-      GoRoute(
-          path: '/mypage', builder: (context, state) => const MyPageScreen()),
+      GoRoute( path: '/propose', builder: (context, state) => const ProposeGroupBuyScreen()),
+      
+      
     ],
     refreshListenable: GoRouterRefreshStream(supabase.auth.onAuthStateChange),
     redirect: (BuildContext context, GoRouterState state) {

@@ -1,18 +1,24 @@
 // admin_web/lib/core/main_layout.dart (전체 교체)
 
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
+import '../features/auth/provider/auth_provider.dart';
+import '../features/auth/viewmodel/auth_viewmodel.dart';
 import 'admin_menu_item.dart';
 
-class MainLayout extends StatefulWidget {
+class MainLayout extends ConsumerStatefulWidget {
   final Widget child;
   const MainLayout({super.key, required this.child});
 
   @override
-  State<MainLayout> createState() => _MainLayoutState();
+  // ⭐️ 3. State -> ConsumerState로 변경
+  ConsumerState<MainLayout> createState() => _MainLayoutState();
 }
 
-class _MainLayoutState extends State<MainLayout> {
+// ⭐️ 4. State -> ConsumerState로 변경
+class _MainLayoutState extends ConsumerState<MainLayout> {
   final List<AdminMenuItem> menuItems = [
     AdminMenuItem(
       title: '대시보드',
@@ -24,6 +30,8 @@ class _MainLayoutState extends State<MainLayout> {
       icon: Icons.storefront_outlined,
       children: [
         AdminMenuItem(title: '상품 관리', route: '/shop/products'),
+         AdminMenuItem(title: '할인상품 관리', route: '/shop/discount_products'),
+          AdminMenuItem(title: '프로모션 관리', route: '/shop/promotions'),
         AdminMenuItem(title: '카테고리 관리', route: '/shop/categories'),
       ],
     ),
@@ -52,6 +60,14 @@ class _MainLayoutState extends State<MainLayout> {
 
   @override
   Widget build(BuildContext context) {
+
+    ref.listen(authStateChangeProvider, (previous, next) {
+      // next.value를 사용하여 실제 AuthState 데이터에 접근합니다.
+      // next.value?.event를 사용하여 안전하게 'event' 속성에 접근합니다.
+      if (next.value?.event == AuthChangeEvent.signedOut) {
+        context.go('/login');
+      }
+    });
     // ⭐️ 1. 중복 메뉴 방지 로직을 다시 추가했습니다.
     final hasOuterLayout =
         context.findAncestorWidgetOfExactType<MainLayout>() != null;
@@ -71,36 +87,52 @@ class _MainLayoutState extends State<MainLayout> {
             width: 250,
             child: Drawer(
               elevation: 1.0,
-              child: ListView.builder(
-                itemCount: menuItems.length,
-                itemBuilder: (context, index) {
-                  final item = menuItems[index];
-                  if (item.children.isEmpty) {
-                    return ListTile(
-                      leading: Icon(item.icon),
-                      title: Text(item.title),
-                      selected: currentRoute == item.route,
-                      onTap: () => context.go(item.route),
-                    );
-                  } else {
-                    bool isExpanded = item.children
-                        .any((child) => currentRoute.startsWith(child.route));
-                    return ExpansionTile(
-                      key: PageStorageKey(item.title),
-                      initiallyExpanded: isExpanded,
-                      leading: Icon(item.icon),
-                      title: Text(item.title),
-                      children: item.children.map((child) {
-                        return ListTile(
-                          title: Text(child.title),
-                          selected: currentRoute == child.route,
-                          onTap: () => context.go(child.route),
-                          contentPadding: const EdgeInsets.only(left: 40.0),
-                        );
-                      }).toList(),
-                    );
-                  }
-                },
+              child: Column(
+                children: [
+                  Expanded(
+                    child: ListView.builder(
+                      itemCount: menuItems.length,
+                      itemBuilder: (context, index) {
+                        final item = menuItems[index];
+                        if (item.children.isEmpty) {
+                          return ListTile(
+                            leading: Icon(item.icon),
+                            title: Text(item.title),
+                            selected: currentRoute == item.route,
+                            onTap: () => context.go(item.route),
+                          );
+                        } else {
+                          bool isExpanded = item.children
+                              .any((child) => currentRoute.startsWith(child.route));
+                          return ExpansionTile(
+                            key: PageStorageKey(item.title),
+                            initiallyExpanded: isExpanded,
+                            leading: Icon(item.icon),
+                            title: Text(item.title),
+                            children: item.children.map((child) {
+                              return ListTile(
+                                title: Text(child.title),
+                                selected: currentRoute == child.route,
+                                onTap: () => context.go(child.route),
+                                contentPadding: const EdgeInsets.only(left: 40.0),
+                              );
+                            }).toList(),
+                          );
+                        }
+                      },
+                    ),
+                  ),
+
+                  // ⭐️ 로그아웃 버튼 추가
+                  ListTile(
+                    leading: const Icon(Icons.logout),
+                    title: const Text('로그아웃'),
+                    onTap: () {
+                      ref.read(authViewModelProvider.notifier).signOut();
+                    },
+                  ),
+                  const SizedBox(height: 20), // 하단 여백
+                ],
               ),
             ),
           ),

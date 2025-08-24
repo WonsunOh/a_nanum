@@ -14,35 +14,30 @@ class AuthRepository {
   User? get currentUser => _client.auth.currentUser;
   
   // 로그인
-  Future<void> signInWithEmail({
-    required String email,
-    required String password,
-  }) async {
-    try {
-      await _client.auth.signInWithPassword(
-        email: email,
-        password: password,
-      );
-    } catch (e) {
-      // 에러 처리는 ViewModel에서 담당하도록 rethrow 합니다.
-      rethrow;
-    }
+  // ⭐️ 1. 이메일/비밀번호 로그인 메서드 추가
+  Future<void> signInWithPassword(String email, String password) async {
+    await _client.auth.signInWithPassword(
+      email: email,
+      password: password,
+    );
   }
 
-  // 회원가입
-  Future<void> signUp({
-    required String email,
-    required String password,
-  }) async {
-    try {
-      await _client.auth.signUp(
-        email: email,
-        password: password,
-      );
-    } catch (e) {
-      rethrow;
-    }
-  }
+  // ⭐️ fullName과 nickname을 data 파라미터로 전달합니다.
+Future<void> signUp({
+  required String email,
+  required String password,
+  required String nickname,
+  required String fullName,
+}) async {
+  await _client.auth.signUp(
+    email: email,
+    password: password,
+    data: {
+      'full_name': fullName,
+      'nickname': nickname
+    },
+  );
+}
 
   // 로그아웃
   Future<void> signOut() async {
@@ -51,6 +46,15 @@ class AuthRepository {
     } catch (e) {
       rethrow;
     }
+  }
+
+  // ⭐️ 구글 소셜 로그인을 처리하는 메서드
+  Future<void> signInWithGoogle() async {
+    await _client.auth.signInWithOAuth(
+      OAuthProvider.google,
+      // redirectTo는 딥링크/앱링크가 설정된 후에 사용됩니다.
+      // redirectTo: 'io.supabase.flutterquickstart://login-callback/',
+    );
   }
 
   // 💡 카카오 로그인 메소드 추가

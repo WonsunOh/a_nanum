@@ -1,7 +1,9 @@
 // admin_web/lib/data/repositories/product_repository.dart (전체 교체)
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:path/path.dart' as p;
 
 import '../models/product_model.dart';
 
@@ -24,20 +26,24 @@ class ProductRepository {
   // 상품을 추가하는 기능
   Future<void> addProduct({
     required String name,
-    required String description,
+    String? description,
     required int price,
     required int stockQuantity,
     required int categoryId,
     required bool isDisplayed,
+    String? productCode,
+    String? relatedProductCode,
     String? imageUrl,
   }) async {
     await _client.from('products').insert({
       'name': name,
       'description': description,
-      'price': price,
+      'total_price': price,
       'stock_quantity': stockQuantity,
       'category_id': categoryId,
       'is_displayed': isDisplayed,
+      'product_code': productCode,
+      'related_product_code': relatedProductCode,
       'image_url': imageUrl,
     });
   }
@@ -51,5 +57,30 @@ class ProductRepository {
   // 상품을 삭제하는 기능
   Future<void> deleteProduct(int productId) async {
     await _client.from('products').delete().eq('id', productId);
+  }
+
+  // ⭐️ 이미지 파일을 Supabase Storage에 업로드하는 메서드
+  Future<String?> uploadImage(Uint8List imageBytes, String fileName) async {
+    try {
+      final fileExtension = p.extension(fileName); // 파일 확장자 추출
+      final uniqueFileName = '${DateTime.now().millisecondsSinceEpoch}$fileExtension';
+      const bucketName = 'products'; // Supabase Storage의 버킷 이름
+
+      // 1. 파일을 스토리지에 업로드합니다.
+      await _client.storage
+          .from(bucketName)
+          .uploadBinary(uniqueFileName, imageBytes);
+
+      // 2. 업로드된 파일의 공개 URL을 가져옵니다.
+      final url = _client.storage
+          .from(bucketName)
+          .getPublicUrl(uniqueFileName);
+          
+      return url;
+    } catch (e) {
+      debugPrint('--- 🚨 IMAGE UPLOAD ERROR 🚨 ---');
+      debugPrint('$e');
+      return null;
+    }
   }
 }

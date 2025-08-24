@@ -10,34 +10,40 @@ class ProductModel {
   final int stockQuantity;
   final int categoryId;
   final bool isDisplayed;
+  final String? productCode; // ⭐️ 상품 코드 (null 가능)
+  final String? relatedProductCode; // ⭐️ 연관 상품 코드 (null 가능)
+  final bool isSoldOut;
 
   ProductModel({
     required this.id,
     required this.createdAt,
     required this.name,
-    required this.description,
+    String? description,
     required this.price,
     this.imageUrl,
     required this.stockQuantity,
     required this.categoryId,
     required this.isDisplayed,
-  });
+    this.productCode,
+    this.relatedProductCode,
+    required this.isSoldOut,
+  }) : description = description ?? ''; // ⭐️ 만약 null이면 빈 문자열로 초기화
 
   factory ProductModel.fromJson(Map<String, dynamic> json) {
-    // ⭐️ 어떤 필드가 null일 경우 에러를 던져서 명확하게 알려주는 로직 추가
-    if (json['id'] == null) throw FormatException('Product "id" is null.');
-    if (json['created_at'] == null) throw FormatException('Product "created_at" is null.');
-    
+        
     return ProductModel(
       id: json['id'] as int,
       createdAt: DateTime.parse(json['created_at'] as String),
       name: json['name'] as String? ?? '이름 없음',
       description: json['description'] as String? ?? '설명 없음',
-      price: json['price'] as int? ?? 0,
+      price: json['total_price'] as int? ?? 0,
       imageUrl: json['image_url'] as String?,
       stockQuantity: json['stock_quantity'] as int? ?? 0,
       categoryId: json['category_id'] as int? ?? 1, // 카테고리가 없으면 기본값 1
       isDisplayed: json['is_displayed'] as bool? ?? false,
+      productCode: json['product_code'] as String?,
+      relatedProductCode: json['related_product_code'] as String?,
+      isSoldOut: json['is_sold_out'] as bool? ?? false,
     );
   }
 
@@ -45,11 +51,14 @@ class ProductModel {
     return {
       'name': name,
       'description': description,
-      'price': price,
+      'total_price': price,
       'image_url': imageUrl,
       'stock_quantity': stockQuantity,
       'category_id': categoryId,
       'is_displayed': isDisplayed,
+      'product_code': productCode,
+      'related_product_code': relatedProductCode,
+      'is_sold_out': isSoldOut,
     };
   }
 
@@ -63,6 +72,9 @@ class ProductModel {
     int? stockQuantity,
     int? categoryId,
     bool? isDisplayed,
+    String? productCode,
+    String? relatedProductCode,
+    bool? isSoldOut,
   }) {
     return ProductModel(
       id: id ?? this.id,
@@ -74,6 +86,9 @@ class ProductModel {
       stockQuantity: stockQuantity ?? this.stockQuantity,
       categoryId: categoryId ?? this.categoryId,
       isDisplayed: isDisplayed ?? this.isDisplayed,
+      productCode: productCode ?? this.productCode,
+      relatedProductCode: relatedProductCode ?? this.relatedProductCode,
+      isSoldOut: isSoldOut ?? this.isSoldOut,
     );
   }
 }

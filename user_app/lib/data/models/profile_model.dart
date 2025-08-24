@@ -1,22 +1,27 @@
-class Profile {
-  final String id;
-  final String username;
-  final int level; 
-  final int points; 
+// user_app/lib/data/models/profile_model.dart (전체 교체)
 
-  Profile({
+class ProfileModel {
+  final String id;
+  final String? fullName; // ⭐️ 이름 필드 추가
+  final String? nickname;
+  final String? phoneNumber;
+  final String? address;
+
+  ProfileModel({
     required this.id,
-    required this.username,
-    required this.level,
-    required this.points,
+    this.fullName, // ⭐️ 생성자에 추가
+    this.nickname,
+    this.phoneNumber,
+    this.address,
   });
 
-  factory Profile.fromJson(Map<String, dynamic> json) {
-    return Profile(
-      id: json['id'],
-      username: json['username'] ?? '이름 없음', 
-      level: json['level'] ?? 1, 
-      points: json['points'] ?? 0,
+  factory ProfileModel.fromJson(Map<String, dynamic> json) {
+    return ProfileModel(
+      id: json['id'] as String,
+      fullName: json['full_name'] as String?, // ⭐️ fromJson에 추가
+      nickname: json['nickname'] as String?,
+      phoneNumber: json['phone_number'] as String?,
+      address: json['address'] as String?,
     );
   }
 }

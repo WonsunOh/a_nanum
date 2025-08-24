@@ -42,6 +42,19 @@ class ProductRepository {
     }
   }
 
-  // TODO: 나중에 상품 상세 페이지에서 사용할 메서드
-  // Future<ProductModel> fetchProductById(int productId) async { ... }
+  // ⭐️ 특정 ID의 상품 하나만 가져오는 메서드
+  Future<ProductModel> fetchProductById(int productId) async {
+    try {
+      final response = await _client
+          .from('products')
+          .select()
+          .eq('id', productId)
+          .single(); // ⭐️ 단일 결과를 가져옵니다.
+
+      return ProductModel.fromJson(response);
+    } catch (e) {
+      print('--- 🚨 Error fetching product by id: $e ---');
+      rethrow;
+    }
+  }
 }

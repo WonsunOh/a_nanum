@@ -6,9 +6,9 @@ plugins {
 }
 
 android {
-    namespace = "com.example.a_micro_divide"
+    namespace = "com.example.nanumNnanum"
     compileSdk = flutter.compileSdkVersion
-    ndkVersion = flutter.ndkVersion
+    ndkVersion = "27.0.12077973"
 
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_11
@@ -28,6 +28,8 @@ android {
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
         versionName = flutter.versionName
+        // ⭐️ 이 부분을 수정합니다.
+        manifestPlaceholders["appAuthRedirectScheme"] = namespace
     }
 
     buildTypes {
