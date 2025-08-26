@@ -29,7 +29,7 @@ android {
         versionCode = flutter.versionCode
         versionName = flutter.versionName
         // ⭐️ 이 부분을 수정합니다.
-        manifestPlaceholders["appAuthRedirectScheme"] = namespace
+        manifestPlaceholders["appAuthRedirectScheme"] = namespace ?: ""
     }
 
     buildTypes {

@@ -53,7 +53,7 @@ class MyApp extends ConsumerWidget {
     return MaterialApp.router(
       debugShowCheckedModeBanner: false,
       routerConfig: router,
-      title: '소규모 공구 플랫폼',
+      title: '나눔 스토어',
       theme: ThemeData(
         primarySwatch: Colors.teal,
       ),

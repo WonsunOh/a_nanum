@@ -157,12 +157,12 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                     TextButton(
                       onPressed: () {
                         // TODO: 회원가입 페이지 경로 확인 및 이동
-                        // context.go('/signup');
-                        Navigator.of(context).push(
-                          MaterialPageRoute(
-                            builder: (_) => const SignUpScreen(),
-                          ),
-                        );
+                        context.go('/signup');
+                        // Navigator.of(context).push(
+                        //   MaterialPageRoute(
+                        //     builder: (_) => const SignupScreen(),
+                        //   ),
+                        // );
                       },
                       child: const Text('회원가입'),
                     ),

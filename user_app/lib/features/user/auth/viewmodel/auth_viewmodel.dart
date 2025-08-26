@@ -24,10 +24,20 @@ class AuthViewModel extends _$AuthViewModel {
   }
 
   // ⭐️ 3. signUp 메서드 추가
-  Future<void> signUp({required String email, required String password}) async {
+  Future<void> signUp({
+    required String email,
+    required String password,
+    required String nickname,
+    required String fullName,
+  }) async {
     state = const AsyncValue.loading();
     state = await AsyncValue.guard(() async {
-      await _authRepository.signUp(email: email, password: password);
+      await _authRepository.signUp(
+        email: email, 
+        password: password,
+        nickname: nickname, // ⭐️ repository에 전달
+        fullName: fullName,   // ⭐️ repository에 전달
+        );
     });
   }
 

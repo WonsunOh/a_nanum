@@ -9,12 +9,16 @@ import '../features/commiunity/proposal/view/propose_group_buy_screen.dart';
 import '../features/group_buy/view/group_buy_detail_screen.dart';
 import '../features/group_buy/view/group_buy_list_screen.dart';
 import '../features/order/view/checkout_screen.dart';
+import '../features/order/view/order_history_screen.dart';
+import '../features/post/view/my_posts_screen.dart';
 import '../features/shop/view/product_detail_screen.dart';
 import '../features/shop/view/shop_screen.dart';
 import '../features/user/auth/view/login_screen.dart';
 import '../features/user/auth/view/signup_screen.dart';
 import '../features/user/auth/view/splash_screen.dart';
 import '../features/user/mypage/view/mypage_screen.dart';
+import '../features/wishlist/view/wishlist_screen.dart';
+import 'widgets/main_layout.dart';
 
 enum AppRoute {
   splash,
@@ -24,7 +28,7 @@ enum AppRoute {
   groupBuy,
   groupBuyDetail,
   propose,
-  mypage
+  mypage,
 }
 
 final routerProvider = Provider<GoRouter>((ref) {
@@ -33,38 +37,71 @@ final routerProvider = Provider<GoRouter>((ref) {
   return GoRouter(
     initialLocation: '/splash',
     routes: [
+      GoRoute( path: '/splash', builder: (context, state) => const SplashScreen(), ),
+      GoRoute(path: '/login', builder: (context, state) => const LoginScreen()),
       GoRoute(
-          path: '/splash',
-          builder: (context, state) => const SplashScreen()),
-      GoRoute(
-          path: '/login', builder: (context, state) => const LoginScreen()),
-      GoRoute(
-          path: '/signup', builder: (context, state) => const SignUpScreen()),
-      GoRoute(
-          path: '/shop', builder: (context, state) => const ShopScreen(),
-          // ⭐️ 2. /shop 경로 안에 하위 경로를 추가합니다.
+        path: '/signup',
+        builder: (context, state) => const SignupScreen(),
+      ),
+
+      // ⭐️ 새로운 홈
+      ShellRoute(
+        builder: (context, state, child) {
+          return MainLayout(child: child);
+        },
         routes: [
-          GoRoute( path: '/cart', builder: (context, state) => const CartScreen(),
-          routes: [
+          GoRoute(
+            path: '/shop',
+            builder: (context, state) => const ShopScreen(),
+            routes: [
               GoRoute(
-                path: 'checkout', // 최종 경로: /shop/cart/checkout
-                builder: (context, state) => const CheckoutScreen(),
+                path: 'cart',
+                builder: (context, state) => const CartScreen(),
+                routes: [
+                  GoRoute(
+                    path: 'checkout', // 최종 경로: /shop/cart/checkout
+                    builder: (context, state) => const CheckoutScreen(),
+                  ),
+                ],
+              ),
+              GoRoute(
+                path: 'mypage',
+                builder: (context, state) => const MyPageScreen(),
+                routes: [
+                  GoRoute(
+                    path: 'wishlist', // 최종 경로: /shop/mypage/wishlist
+                    builder: (context, state) => const WishlistScreen(),
+                  ),
+                  GoRoute(
+                    path: 'orders',
+                    builder: (context, state) => const OrderHistoryScreen(),
+                  ),
+                  GoRoute(
+                    path: 'posts',
+                    builder: (context, state) => const MyPostsScreen(),
+                  ),
+                ],
+              ),
+              GoRoute(
+                path: ':productId',
+                builder: (context, state) {
+                  // 'cart', 'mypage'가 아닌 경우에만 상품 ID로 간주
+                  if (state.pathParameters['productId'] != 'cart' &&
+                      state.pathParameters['productId'] != 'mypage') {
+                    final productId = int.parse(
+                      state.pathParameters['productId']!,
+                    );
+                    return ProductDetailScreen(productId: productId);
+                  }
+                  // 일치하는 경로가 없을 경우 에러 페이지 또는 홈으로 리디렉션 (옵션)
+                  return const SizedBox.shrink();
+                },
               ),
             ],
           ),
-            
-          GoRoute( path: '/mypage', builder: (context, state) => const MyPageScreen()),
-          GoRoute(
-            path: ':productId', // 예: /shop/1, /shop/2 등
-            builder: (context, state) {
-              // 경로에서 productId를 추출하여 숫자로 변환합니다.
-              final productId = int.parse(state.pathParameters['productId']!);
-              return ProductDetailScreen(productId: productId);
-            },
-          ),
-          
         ],
-          ), // ⭐️ 새로운 홈
+      ),
+
       GoRoute(
         path: '/group-buy', // ➡️ 기존 '/home'에서 변경
         builder: (context, state) => const GroupBuyListScreen(),
@@ -78,33 +115,35 @@ final routerProvider = Provider<GoRouter>((ref) {
           ),
         ],
       ),
-      GoRoute( path: '/propose', builder: (context, state) => const ProposeGroupBuyScreen()),
-      
-      
+      GoRoute(
+        path: '/propose',
+        builder: (context, state) => const ProposeGroupBuyScreen(),
+      ),
     ],
+
     refreshListenable: GoRouterRefreshStream(supabase.auth.onAuthStateChange),
     redirect: (BuildContext context, GoRouterState state) {
       final session = supabase.auth.currentSession;
       final isAuthenticated = session != null;
       final isAtSplash = state.matchedLocation == '/splash';
+      final isGoingToLogin = state.matchedLocation == '/login';
 
-      // 규칙 1: 스플래시에서는 무조건 '/shop'으로 이동
+      // ⭐️ 규칙 1: 스플래시 화면에 있다면, 무조건 '/shop'으로 이동시킨다.
       if (isAtSplash) {
         return '/shop';
       }
-      
-      final isGoingToAuthFlow =
-          state.matchedLocation == '/login' || state.matchedLocation == '/signup';
 
-      // 규칙 2: 로그인 사용자가 로그인/가입 페이지로 가면 '/shop'으로 이동
-      if (isAuthenticated && isGoingToAuthFlow) {
-        return '/shop';
-      }
+            // 로그인이 필요한 페이지 목록
+      final authRequiredRoutes = ['/shop/mypage', '/shop/cart', '/shop/cart/checkout'];
 
-      // 규칙 3: 로그인이 필요한 페이지 보호
-      final authRequiredRoutes = ['/propose', '/mypage'];
+// 로그인 안 된 사용자가 보호된 경로로 가려고 하면 -> 로그인 페이지로
       if (!isAuthenticated && authRequiredRoutes.contains(state.matchedLocation)) {
-        return '/login';
+        return '/login?from=${state.matchedLocation}';
+      }
+      
+      // 로그인 된 사용자가 로그인 페이지로 가려고 하면 -> 쇼핑몰 홈으로
+      if (isAuthenticated && isGoingToLogin) {
+        return '/shop';
       }
 
       return null;

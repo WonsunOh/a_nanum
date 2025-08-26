@@ -1,11 +1,11 @@
+import 'package:a_micro_divide/data/models/profile_model.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import '../data/models/profile_model.dart';
 import '../data/repositories/profile_repository.dart';
 
 // 💡 1. StreamProvider로 변경하여 Supabase 인증 상태를 직접 구독합니다.
-final userProvider = StreamProvider<Profile?>((ref) {
-  final profileRepository = ProfileRepository();
+final userProvider = StreamProvider<ProfileModel?>((ref) {
+  final profileRepository = ref.watch(profileRepositoryProvider);
   
   // 💡 2. Supabase의 onAuthStateChange Stream을 가져옵니다.
   final authStream = Supabase.instance.client.auth.onAuthStateChange;

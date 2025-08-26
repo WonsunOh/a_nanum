@@ -6,6 +6,7 @@ class ProfileModel {
   final String? nickname;
   final String? phoneNumber;
   final String? address;
+  final int level;
 
   ProfileModel({
     required this.id,
@@ -13,6 +14,7 @@ class ProfileModel {
     this.nickname,
     this.phoneNumber,
     this.address,
+    required this.level,
   });
 
   factory ProfileModel.fromJson(Map<String, dynamic> json) {
@@ -22,6 +24,7 @@ class ProfileModel {
       nickname: json['nickname'] as String?,
       phoneNumber: json['phone_number'] as String?,
       address: json['address'] as String?,
+      level: json['level'] as int? ?? 1,
     );
   }
 }
