@@ -9,7 +9,7 @@ on:
 
 jobs:
   build-and-deploy:
-    ermissions:
+    permissions:
       contents: write
     runs-on: ubuntu-latest
 
