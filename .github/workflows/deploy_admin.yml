@@ -9,6 +9,8 @@ on:
 
 jobs:
   build-and-deploy:
+    ermissions:
+      contents: write
     runs-on: ubuntu-latest
 
     steps:
