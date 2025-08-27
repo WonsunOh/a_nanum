@@ -37,7 +37,7 @@ jobs:
         run: |
           cd nanum_admin
           flutter pub get
-          flutter build web --release --base-href /${{ github.event.repository.name }}/
+          flutter build web --release --base-href /a_nanum/
         
       - name: Deploy
         uses: peaceiris/actions-gh-pages@v3
