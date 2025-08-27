@@ -5,21 +5,21 @@
     "version": "0.2.0",
     "configurations": [
         {
-            "name": "admin_web",
-            "cwd": "admin_web",
+            "name": "nanum_admin",
+            "cwd": "nanum_admin",
             "request": "launch",
             "type": "dart"
         },
         {
-            "name": "admin_web (profile mode)",
-            "cwd": "admin_web",
+            "name": "nanum_admin (profile mode)",
+            "cwd": "nanum_admin",
             "request": "launch",
             "type": "dart",
             "flutterMode": "profile"
         },
         {
-            "name": "admin_web (release mode)",
-            "cwd": "admin_web",
+            "name": "nanum_admin (release mode)",
+            "cwd": "nanum_admin",
             "request": "launch",
             "type": "dart",
             "flutterMode": "release"

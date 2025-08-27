@@ -34,6 +34,16 @@ class _AddEditProductScreenState extends ConsumerState<AddEditProductScreen> {
   late TextEditingController _stockController;
   late TextEditingController _productCodeController;
   late TextEditingController _relatedProductCodeController;
+  late TextEditingController _shippingFeeController;
+
+  // ⭐️ 태그 상태를 관리할 맵
+  Map<String, bool> _tags = {
+    'is_hit': false,
+    'is_recommended': false,
+    'is_new': false,
+    'is_popular': false,
+    'is_discount': false,
+  };
 
   XFile? _selectedImageFile;
   Uint8List? _selectedImageBytes;
@@ -70,6 +80,11 @@ class _AddEditProductScreenState extends ConsumerState<AddEditProductScreen> {
     _isDisplayed = widget.productToEdit?.isDisplayed ?? true;
     _isSoldOut = widget.productToEdit?.isSoldOut ?? false;
 
+    _shippingFeeController = TextEditingController(text: widget.productToEdit?.shippingFee.toString() ?? '3000');
+    if (widget.productToEdit != null) {
+      _tags = widget.productToEdit!.tags;
+    }
+
     
 // ⭐️ 수정 모드일 경우, 기존 옵션과 조합 정보를 불러옵니다.
   if (_isEditMode) {
@@ -104,6 +119,8 @@ class _AddEditProductScreenState extends ConsumerState<AddEditProductScreen> {
       _optionValueControllers.add(TextEditingController());
       _optionValueFocusNodes.add(FocusNode());
     });
+
+    
   }
 
   void _removeOptionGroup(int index) {
@@ -122,7 +139,7 @@ class _AddEditProductScreenState extends ConsumerState<AddEditProductScreen> {
     _stockController.dispose();
     _productCodeController.dispose();
     _relatedProductCodeController.dispose();
-    super.dispose();
+    _shippingFeeController.dispose();
     // ⭐️ 동적으로 생성된 컨트롤러와 포커스 노드 모두 정리
     for (var controller in _optionValueControllers) {
       controller.dispose();
@@ -204,6 +221,8 @@ class _AddEditProductScreenState extends ConsumerState<AddEditProductScreen> {
           isSoldOut: _isSoldOut,
           productCode: _productCodeController.text.trim(),
           relatedProductCode: _relatedProductCodeController.text.trim(),
+          shippingFee: int.parse(_shippingFeeController.text),
+          tags: _tags,
         );
         viewModel.updateProductWithOptions(
           updatedProduct,
@@ -225,6 +244,8 @@ class _AddEditProductScreenState extends ConsumerState<AddEditProductScreen> {
           relatedProductCode: _relatedProductCodeController.text.trim(),
           optionGroups: _optionGroups,
           variants: _variants,
+          shippingFee: int.parse(_shippingFeeController.text),
+          tags: _tags,
         );
       }
       context.go('/shop/products');
@@ -279,6 +300,14 @@ class _AddEditProductScreenState extends ConsumerState<AddEditProductScreen> {
   }
 
   Widget _buildForm(List<CategoryModel> allCategories) {
+
+    final Map<String, String> tagMap = {
+      'is_hit': '히트',
+      'is_recommended': '추천',
+      'is_new': '신상',
+      'is_popular': '인기',
+      'is_discount': '할인',
+    };
     return Form(
       key: _formKey,
       child: Column(
@@ -343,6 +372,14 @@ class _AddEditProductScreenState extends ConsumerState<AddEditProductScreen> {
           const SizedBox(height: 16),
           TextFormField(controller: _priceController, decoration: const InputDecoration(labelText: '가격'), keyboardType: TextInputType.number, validator: (v) => v!.isEmpty ? '필수 항목입니다.' : null),
           const SizedBox(height: 16),
+          // ⭐️ 배송비 입력 필드 추가
+          TextFormField(
+            controller: _shippingFeeController,
+            decoration: const InputDecoration(labelText: '배송비'),
+            keyboardType: TextInputType.number,
+            validator: (v) => v!.isEmpty ? '필수 항목입니다.' : null,
+          ),
+          const SizedBox(height: 16),
           TextFormField(controller: _stockController, decoration: const InputDecoration(labelText: '재고 (옵션이 없을 경우)'), keyboardType: TextInputType.number, validator: (v) => v!.isEmpty && _optionGroups.isEmpty ? '필수 항목입니다.' : null),
           const SizedBox(height: 16),
           TextFormField(controller: _descController, decoration: const InputDecoration(labelText: '상세 설명 (선택)')),
@@ -350,6 +387,34 @@ class _AddEditProductScreenState extends ConsumerState<AddEditProductScreen> {
           TextFormField(controller: _productCodeController, decoration: const InputDecoration(labelText: '상품 코드 (선택)')),
           const SizedBox(height: 16),
           TextFormField(controller: _relatedProductCodeController, decoration: const InputDecoration(labelText: '연관 상품 코드 (선택)')),
+          const Divider(height: 48),
+          // ⭐️ 3. 상품 태그 설정 UI를 Wrap 위젯으로 변경합니다.
+          Text('상품 태그 설정', style: Theme.of(context).textTheme.titleLarge),
+          const SizedBox(height: 8),
+          Wrap(
+            spacing: 8.0, // 가로 간격
+            runSpacing: 4.0, // 세로 간격
+            children: tagMap.entries.map((entry) {
+              final key = entry.key;
+              final title = entry.value;
+              return Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Checkbox(
+                    value: _tags[key] ?? false,
+                    onChanged: (bool? value) {
+                      setState(() {
+                        _tags[key] = value ?? false;
+                      });
+                    },
+                  ),
+                  Text(title),
+                ],
+              );
+            }).toList(),
+          ),
+          
+
           const Divider(height: 48),
           _buildOptionDefinitionUI(),
           const SizedBox(height: 24),
@@ -369,6 +434,9 @@ class _AddEditProductScreenState extends ConsumerState<AddEditProductScreen> {
     );
   }
 
+  
+
+  
   Widget _buildCategoryDropdown({
     required String hint,
     required int? value,

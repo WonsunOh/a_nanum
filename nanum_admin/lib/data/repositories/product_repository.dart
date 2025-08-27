@@ -39,6 +39,8 @@ class ProductRepository {
     String? productCode,
     String? relatedProductCode,
     String? imageUrl,
+    required int shippingFee, // ⭐️ 1. shippingFee 파라미터 추가
+    Map<String, bool>? tags, // ⭐️ 2. tags 파라미터 추가
   }) async {
     final newProduct = await _client.from('products').insert({
       'name': name,
@@ -51,6 +53,8 @@ class ProductRepository {
       'product_code': productCode,
       'related_product_code': relatedProductCode,
       'image_url': imageUrl,
+      'shipping_fee': shippingFee, // ⭐️ 3. insert 구문에 추가
+    'tags': tags,
     }).select().single();
 
     final newProductId = newProduct['id'];

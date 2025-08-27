@@ -33,6 +33,8 @@ class ProductViewModel extends _$ProductViewModel {
     XFile? imageFile,
     List<OptionGroup>? optionGroups,
     List<ProductVariant>? variants,
+    required int shippingFee,
+    Map<String, bool>? tags,
   }) async {
     state = const AsyncValue.loading();
     state = await AsyncValue.guard(() async {
@@ -55,6 +57,8 @@ class ProductViewModel extends _$ProductViewModel {
         imageUrl: imageUrl,
         optionGroups: optionGroups,
         variants: variants,
+        shippingFee: shippingFee,
+        tags: tags,
       );
       return _repository.fetchProducts();
     });

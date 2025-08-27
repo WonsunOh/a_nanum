@@ -1,5 +1,6 @@
 // user_app/lib/features/shop/view/product_detail_screen.dart (전체 교체)
 
+import 'package:collection/collection.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -7,6 +8,7 @@ import 'package:intl/intl.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../../data/models/product_model.dart';
+import '../../../data/models/product_variant_model.dart';
 import '../../cart/viewmodel/cart_viewmodel.dart';
 import '../viewmodel/product_detail_viewmodel.dart';
 
@@ -21,6 +23,13 @@ class ProductDetailScreen extends ConsumerStatefulWidget {
 class _ProductDetailScreenState extends ConsumerState<ProductDetailScreen> {
   int _quantity = 1;
   bool _isFavorited = false;
+
+  // ⭐️ 1. 아래의 새로운 상태 변수들을 추가해주세요.
+  // Key: 옵션 그룹명 (예: "색상"), Value: 선택된 옵션 값 (예: "레드")
+  Map<String, String> _selectedOptions = {};
+  // 선택된 최종 조합(Variant) 정보를 저장
+  ProductVariant? _selectedVariant;
+  
 
   @override
   Widget build(BuildContext context) {
@@ -37,7 +46,7 @@ class _ProductDetailScreenState extends ConsumerState<ProductDetailScreen> {
       }
     });
 
-    final productAsync = ref.watch(productDetailProvider(widget.productId));
+    final productDetailAsync = ref.watch(productDetailProvider(widget.productId));
     final currencyFormat = NumberFormat.currency(locale: 'ko_KR', symbol: '₩');
 
     return Scaffold(
@@ -65,19 +74,36 @@ class _ProductDetailScreenState extends ConsumerState<ProductDetailScreen> {
           ),
         ],
       ),
-      body: productAsync.when(
-        data: (product) {
-          final hasDiscount = product.discountPrice != null && product.discountPrice! < product.price;
-          final priceToShow = hasDiscount ? product.discountPrice! : product.price;
-          // final totalPrice = (priceToShow * _quantity) + product.shippingFee;
+      body: productDetailAsync.when(
+        data: (productDetailState) {
+         // ⭐️ 2. productDetailState에서 각 데이터를 추출합니다.
+        final product = productDetailState.product;
+        final optionGroups = productDetailState.optionGroups;
+        final variants = productDetailState.variants;
+
+        // ⭐️ 3. 옵션 선택 로직을 여기에 추가합니다.
+        // 모든 옵션 그룹에 대해 선택이 완료되었는지 확인
+        bool allOptionsSelected = _selectedOptions.length == optionGroups.length;
+
+        if (allOptionsSelected) {
+          // 선택된 옵션들로 조합 이름 생성 (예: "레드 / S")
+          final selectedCombinationName = optionGroups
+              .map((group) => _selectedOptions[group.name])
+              .join(' / ');
+          
+          // 일치하는 조합(Variant) 찾기
+          _selectedVariant = variants.firstWhereOrNull(
+              (v) => v.name == selectedCombinationName,
+            );
+        }
 
           return LayoutBuilder(
           builder: (context, constraints) {
             bool isWideScreen = constraints.maxWidth > 768;
               return SingleChildScrollView(
                 child: isWideScreen
-                  ? _buildWideLayout(context, product) // 넓은 화면 UI
-                  : _buildNarrowLayout(context, product), // 좁은 화면 UI
+                  ? _buildWideLayout(context, productDetailState) // 넓은 화면 UI
+                  : _buildNarrowLayout(context, productDetailState), // 좁은 화면 UI
             );
           },
         );
@@ -91,8 +117,8 @@ class _ProductDetailScreenState extends ConsumerState<ProductDetailScreen> {
         if (constraints.maxWidth > 768) {
           return const SizedBox.shrink(); // 넓은 화면에서는 숨김
         }
-        return productAsync.when(
-          data: (product) => _buildBottomBar(context, product),
+        return productDetailAsync.when(
+          data: (productDetailState) => _buildBottomBar(context, productDetailState.product),
           loading: () => const SizedBox.shrink(),
           error: (_, __) => const SizedBox.shrink(),
         );
@@ -102,18 +128,19 @@ class _ProductDetailScreenState extends ConsumerState<ProductDetailScreen> {
 }
 
   // 좁은 화면(모바일)용 레이아웃
-  Widget _buildNarrowLayout(BuildContext context, ProductModel product) {
+  Widget _buildNarrowLayout(BuildContext context, ProductDetailState productDetailState) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        _buildProductImage(product),
-        _buildProductInfo(context, product),
+        _buildProductImage(productDetailState.product),
+        _buildProductInfo(context, productDetailState),
       ],
     );
   }
 
   // ⭐️ 넓은 화면(웹/태블릿)용 레이아웃 수정
-Widget _buildWideLayout(BuildContext context, ProductModel product) {
+Widget _buildWideLayout(BuildContext context, ProductDetailState productDetailState) {
+  final product = productDetailState.product;
   return Padding(
     padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 48),
     child: Column(
@@ -127,7 +154,7 @@ Widget _buildWideLayout(BuildContext context, ProductModel product) {
             const SizedBox(width: 48),
             Expanded(
               flex: 3, // ⭐️ 정보 영역의 비율을 늘립니다.
-              child: _buildProductInfo(context, product, showDescription: false),
+              child: _buildProductInfo(context, productDetailState, showDescription: false),
             ),
           ],
         ),
@@ -142,10 +169,16 @@ Widget _buildWideLayout(BuildContext context, ProductModel product) {
 }
 
 // ⭐️ 상품 정보 위젯 수정 (설명을 보여줄지 여부를 선택하는 파라미터 추가)
-Widget _buildProductInfo(BuildContext context, ProductModel product, {bool showDescription = true}) {
+Widget _buildProductInfo(BuildContext context, ProductDetailState productDetailState, {bool showDescription = true}) {
   final currencyFormat = NumberFormat.currency(locale: 'ko_KR', symbol: '₩');
+  final product = productDetailState.product;
   final hasDiscount = product.discountPrice != null && product.discountPrice! < product.price;
-  final priceToShow = hasDiscount ? product.discountPrice! : product.price;
+  final priceToShow = hasDiscount ? product.discountPrice! : product.price; 
+  final optionGroups = productDetailState.optionGroups;
+
+  // ⭐️ 최종 가격 계산 로직
+  final basePrice = hasDiscount ? product.discountPrice! : product.price;
+  final finalPrice = basePrice + (_selectedVariant?.additionalPrice ?? 0);
 
   return Column(
     crossAxisAlignment: CrossAxisAlignment.start,
@@ -154,7 +187,7 @@ Widget _buildProductInfo(BuildContext context, ProductModel product, {bool showD
       const SizedBox(height: 24),
       if (hasDiscount)
         Text(currencyFormat.format(product.price), style: Theme.of(context).textTheme.titleLarge?.copyWith(decoration: TextDecoration.lineThrough, color: Colors.grey)),
-      Text(currencyFormat.format(priceToShow), style: Theme.of(context).textTheme.headlineMedium?.copyWith(fontWeight: FontWeight.bold)),
+      Text(currencyFormat.format(finalPrice), style: Theme.of(context).textTheme.headlineMedium?.copyWith(fontWeight: FontWeight.bold)),
       const Divider(height: 48),
       _buildInfoRow('배송비', currencyFormat.format(product.shippingFee)),
       const SizedBox(height: 24),

@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../models/product_model.dart';
+import '../models/product_variant_model.dart';
 
 // ⭐️ 이 부분이 shop_viewmodel.dart에서 찾고 있던 Provider의 정의입니다.
 final productRepositoryProvider = Provider<ProductRepository>((ref) {
@@ -57,4 +58,25 @@ class ProductRepository {
       rethrow;
     }
   }
+
+  // ⭐️ 특정 상품의 모든 옵션과 조합을 계층 구조로 불러오는 메서드
+Future<(List<OptionGroup>, List<ProductVariant>)> fetchProductOptionsAndVariants(int productId) async {
+  // 1. 옵션 그룹 조회
+  final groupsResponse = await _client.from('product_option_groups').select().eq('product_id', productId);
+  final List<OptionGroup> optionGroups = [];
+
+  // 2. 각 그룹에 속한 값들 조회
+  for (final groupData in groupsResponse) {
+    final groupId = groupData['id'];
+    final valuesResponse = await _client.from('product_option_values').select().eq('option_group_id', groupId);
+    final optionValues = valuesResponse.map((valueData) => OptionValue.fromJson(valueData)).toList();
+    optionGroups.add(OptionGroup(id: groupId, name: groupData['name'], values: optionValues));
+  }
+
+  // 3. 최종 조합(Variant)들 조회
+  final variantsResponse = await _client.from('product_variants').select().eq('product_id', productId);
+  final List<ProductVariant> variants = variantsResponse.map((variantData) => ProductVariant.fromJson(variantData)).toList();
+
+  return (optionGroups, variants);
+}
 }

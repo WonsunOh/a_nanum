@@ -15,7 +15,10 @@ class ProductModel {
   final String? productCode; // ⭐️ 상품 코드 (null 가능)
   final String? relatedProductCode; // ⭐️ 연관 상품 코드 (null 가능)
   final bool isSoldOut;
-   final List<ProductOption> options;
+  final List<ProductOption> options;
+  final int shippingFee; // ⭐️ 배송비 필드 추가
+  final Map<String, bool> tags;
+   
 
   ProductModel({
     required this.id,
@@ -31,6 +34,8 @@ class ProductModel {
     this.relatedProductCode,
     required this.isSoldOut,
     this.options = const [],
+    required this.shippingFee,
+    required this.tags,
   }) : description = description ?? ''; // ⭐️ 만약 null이면 빈 문자열로 초기화
 
   factory ProductModel.fromJson(Map<String, dynamic> json) {
@@ -48,6 +53,8 @@ class ProductModel {
       productCode: json['product_code'] as String?,
       relatedProductCode: json['related_product_code'] as String?,
       isSoldOut: json['is_sold_out'] as bool? ?? false,
+      shippingFee: json['shipping_fee'] as int? ?? 3000,
+      tags: Map<String, bool>.from(json['tags'] ?? {}),
     );
   }
 
@@ -63,6 +70,8 @@ class ProductModel {
       'product_code': productCode,
       'related_product_code': relatedProductCode,
       'is_sold_out': isSoldOut,
+      'shipping_fee': shippingFee,
+      'tags': tags,
     };
   }
 
@@ -79,6 +88,8 @@ class ProductModel {
     String? productCode,
     String? relatedProductCode,
     bool? isSoldOut,
+    int? shippingFee,
+    Map<String, bool>? tags,
   }) {
     return ProductModel(
       id: id ?? this.id,
@@ -93,6 +104,8 @@ class ProductModel {
       productCode: productCode ?? this.productCode,
       relatedProductCode: relatedProductCode ?? this.relatedProductCode,
       isSoldOut: isSoldOut ?? this.isSoldOut,
+      shippingFee: shippingFee ?? this.shippingFee,
+      tags: tags ?? this.tags,
     );
   }
 }
