@@ -19,6 +19,12 @@ jobs:
         uses: subosito/flutter-action@v2
         with:
           channel: 'stable'
+      # ⭐️ 1. GitHub Secrets를 사용하여 .env 파일을 동적으로 생성하는 단계 추가
+      - name: Create .env file
+        run: |
+          cd nanum_admin
+          echo "SUPABASE_URL=${{ secrets.SUPABASE_URL }}" >> .env
+          echo "SUPABASE_ANON_KEY=${{ secrets.SUPABASE_ANON_KEY }}" >> .env
       
       # ⭐️ 1. (디버깅용) 현재 폴더의 모든 파일 목록을 출력합니다.
       - name: List files
