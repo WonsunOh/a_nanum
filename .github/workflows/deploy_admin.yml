@@ -1,8 +1,7 @@
-# a_nanum/.github/workflows/deploy_admin.yml
+# a_nanum/.github/workflows/deploy_admin.yml (전체 교체)
 
 name: Deploy Admin Web to GitHub Pages
 
-# main 브랜치에 코드가 push될 때마다 이 워크플로우를 실행합니다.
 on:
   push:
     branches:
@@ -10,29 +9,31 @@ on:
 
 jobs:
   build-and-deploy:
-    runs-on: ubuntu-latest # 가상 머신 환경
+    runs-on: ubuntu-latest
 
     steps:
-      # 1. 저장소의 코드를 가상 머신으로 가져옵니다.
       - name: Checkout
         uses: actions/checkout@v3
 
-      # 2. Flutter 개발 환경을 설정합니다.
       - name: Setup Flutter
         uses: subosito/flutter-action@v2
         with:
           channel: 'stable'
+      
+      # ⭐️ 1. (디버깅용) 현재 폴더의 모든 파일 목록을 출력합니다.
+      - name: List files
+        run: ls -R
 
-      # 3. nanum_admin 폴더로 이동하여 웹사이트 파일을 빌드합니다.
+      # ⭐️ 2. nanum_admin 폴더로 이동하여 빌드합니다.
       - name: Build Admin Web
         run: |
           cd nanum_admin
           flutter pub get
           flutter build web --release --base-href /${{ github.event.repository.name }}/
         
-      # 4. 빌드된 결과물(nanum_admin/build/web)을 gh-pages 브랜치에 배포합니다.
       - name: Deploy
         uses: peaceiris/actions-gh-pages@v3
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
+          # ⭐️ 3. 배포할 폴더 경로도 nanum_admin으로 수정합니다.
           publish_dir: ./nanum_admin/build/web
