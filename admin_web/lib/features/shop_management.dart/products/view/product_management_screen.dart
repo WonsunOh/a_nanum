@@ -2,11 +2,11 @@
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
 import '../../../../data/models/product_model.dart';
 import '../../categories/viewmodel/category_viewmodel.dart';
 import '../viewmodel/product_viewmodel.dart';
-import '../widgets/add_edit_product_dialog.dart';
 
 class ProductManagementScreen extends ConsumerStatefulWidget {
   const ProductManagementScreen({super.key});
@@ -30,39 +30,7 @@ class _ProductManagementScreenState extends ConsumerState<ProductManagementScree
     final productsAsync = ref.watch(productViewModelProvider);
     final categoriesAsync = ref.watch(categoriesProvider);
 
-     void showProductDialog({ProductModel? product}) {
-
-      // ⭐️ when을 사용하여 로딩, 데이터, 에러 상태를 명확하게 구분합니다.
-      categoriesAsync.when(
-        data: (categories) {
-          // 데이터가 성공적으로 로드되었을 때만 다이얼로그를 보여줍니다.
-          showDialog(
-            context: context,
-            builder: (_) => AddEditProductDialog(
-              categories: categories,
-              productToEdit: product,
-            ),
-          );
-        },
-        loading: () {
-          // 아직 로딩 중일 때
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('카테고리 목록을 로딩 중입니다. 잠시 후 다시 시도해주세요.')),
-          );
-        },
-        error: (error, stackTrace) {
-          // 에러가 발생했을 때
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('카테고리 로딩 중 오류가 발생했습니다: $error'),
-              backgroundColor: Colors.red,
-            ),
-          );
-          
-        },
-      );
-    }
-
+     
     void showDeleteConfirmDialog(ProductModel product) {
       showDialog(
         context: context,
@@ -101,7 +69,7 @@ class _ProductManagementScreenState extends ConsumerState<ProductManagementScree
           IconButton(
             icon: const Icon(Icons.add_circle_outline),
             tooltip: '새 상품 등록',
-            onPressed: () => showProductDialog(),
+            onPressed: () => context.go('/shop/products/new'),
           ),
         ],
       ),
@@ -157,26 +125,33 @@ class _ProductManagementScreenState extends ConsumerState<ProductManagementScree
                           value: product.isSoldOut,
                           onChanged: (value) {
                             final updatedProduct = product.copyWith(isSoldOut: value);
-                            ref.read(productViewModelProvider.notifier).updateProduct(updatedProduct);
+                            ref.read(productViewModelProvider.notifier).updateProductDetails(updatedProduct);
                           },
                         )),
                         DataCell(Switch(
                           value: product.isDisplayed,
                           onChanged: (value) {
                             final updatedProduct = product.copyWith(isDisplayed: value);
-                            ref.read(productViewModelProvider.notifier).updateProduct(updatedProduct);
+                            ref.read(productViewModelProvider.notifier).updateProductDetails(updatedProduct);
                           },
                         )),
                           DataCell(Row(
                             children: [
                               IconButton(
                                 icon: const Icon(Icons.edit_outlined),
-                                onPressed: () => showProductDialog(product: product),
-                              ),
+                                tooltip: '수정',
+                            // ⭐️ 이 부분을 수정합니다.
+                            onPressed: () {
+                              // '상품 수정' 페이지로 이동하면서,
+                              // extra에 현재 상품 데이터를 담아 전달합니다.
+                              context.go('/shop/products/edit/${product.id}', extra: product);
+                            },
+                          ),
                               IconButton(
-                                icon: const Icon(Icons.delete_outline, color: Colors.redAccent),
-                                onPressed: () => showDeleteConfirmDialog(product),
-                              ),
+                            icon: const Icon(Icons.delete_outline, color: Colors.redAccent),
+                            tooltip: '삭제',
+                            onPressed: () => showDeleteConfirmDialog(product),
+                          ),
                             ],
                           )),
                         ]);

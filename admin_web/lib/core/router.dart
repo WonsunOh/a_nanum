@@ -5,11 +5,13 @@ import 'package:go_router/go_router.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 // ⭐️ 새로운 파일 경로에 맞게 import 문을 수정했습니다.
+import '../data/models/product_model.dart';
 import '../features/auth/view/login_screen.dart';
 import '../features/cs_management.dart/inquiries/view/inquiry_management_screen.dart';
 import '../features/cs_management.dart/templates/view/reply_template_screen.dart';
 import '../features/dashboard/view/dashboard_screen.dart';
 import '../features/shop_management.dart/categories/view/category_management_screen.dart';
+import '../features/shop_management.dart/products/view/add_edit_product_screen.dart';
 import '../features/shop_management.dart/products/view/product_management_screen.dart';
 import '../features/group_buy_management/view/group_buy_management_screen.dart';
 import '../features/order_management/view/order_management_screen.dart';
@@ -60,6 +62,22 @@ final router = GoRouter(
         GoRoute(
           path: '/shop/products',
           builder: (context, state) => const ProductManagementScreen(),
+           routes: [
+            // 새 상품 등록 경로
+            GoRoute(
+              path: 'new', // 최종 경로: /shop/products/new
+              builder: (context, state) => const AddEditProductScreen(),
+            ),
+            // 기존 상품 수정 경로
+            GoRoute(
+              path: 'edit/:productId', // 최종 경로: /shop/products/edit/123
+              builder: (context, state) {
+                // ⭐️ extra를 통해 전달받은 ProductModel 객체를 화면에 넘겨줍니다.
+                final product = state.extra as ProductModel;
+                return AddEditProductScreen(productToEdit: product);
+              },
+            ),
+          ],
         ),
         GoRoute(
           path: '/shop/discount_products',

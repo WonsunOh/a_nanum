@@ -5,15 +5,19 @@ import 'package:image_picker/image_picker.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 import '../../../../data/models/product_model.dart';
+import '../../../../data/models/product_option_model.dart';
+import '../../../../data/models/product_variant_model.dart';
 import '../../../../data/repositories/product_repository.dart';
 
 part 'product_viewmodel.g.dart';
 
 @riverpod
 class ProductViewModel extends _$ProductViewModel {
+   late final ProductRepository _repository;
   @override
   Future<List<ProductModel>> build() {
-    return ref.watch(productRepositoryProvider).fetchProducts();
+    _repository = ref.watch(productRepositoryProvider);
+    return _repository.fetchProducts();
   }
 
   Future<void> addProduct({
@@ -23,54 +27,72 @@ class ProductViewModel extends _$ProductViewModel {
     required int stockQuantity,
     required int categoryId,
     required bool isDisplayed,
+    required bool isSoldOut,
     String? productCode,
     String? relatedProductCode,
     XFile? imageFile,
+    List<OptionGroup>? optionGroups,
+    List<ProductVariant>? variants,
   }) async {
-    final repo = ref.read(productRepositoryProvider);
     state = const AsyncValue.loading();
     state = await AsyncValue.guard(() async {
       String? imageUrl;
       // ⭐️ 이미지 파일이 있다면 먼저 업로드합니다.
       if (imageFile != null) {
         final imageBytes = await imageFile.readAsBytes();
-        imageUrl = await repo.uploadImage(imageBytes, imageFile.name);
+        imageUrl = await _repository.uploadImage(imageBytes, imageFile.name);
       }
-      await repo.addProduct(
+      await _repository.addProduct(
         name: name,
         description: description,
         price: price,
         stockQuantity: stockQuantity,
         categoryId: categoryId,
         isDisplayed: isDisplayed,
+        isSoldOut: isSoldOut,
         productCode: productCode,
         relatedProductCode: relatedProductCode,
         imageUrl: imageUrl,
+        optionGroups: optionGroups,
+        variants: variants,
       );
-      return repo.fetchProducts();
+      return _repository.fetchProducts();
     });
   }
 
-  Future<void> updateProduct(ProductModel productToUpdate, {XFile? newImageFile}) async {
-  final repo = ref.read(productRepositoryProvider);
-  state = const AsyncValue.loading();
-  state = await AsyncValue.guard(() async {
-    ProductModel finalProduct = productToUpdate;
+  // ⭐️ 1. 상품의 '기본 정보'만 업데이트하는 메서드 (목록의 스위치에서 사용)
+  Future<void> updateProductDetails(ProductModel product) async {
+    // 전체 목록을 로딩 상태로 바꾸지 않고, 개별 항목만 업데이트되도록 UI를 최적화
+    state = await AsyncValue.guard(() async {
+      await _repository.updateProductDetails(product);
+      return _repository.fetchProducts();
+    });
+  }
 
-    // ⭐️ 새로운 이미지 파일이 있다면, 업로드하고 URL을 교체합니다.
-    if (newImageFile != null) {
-      final imageBytes = await newImageFile.readAsBytes();
-      final imageUrl = await repo.uploadImage(imageBytes, newImageFile.name);
-      
-      // ⭐️ 업로드된 URL로 최종 상품 데이터를 업데이트합니다.
-      finalProduct = productToUpdate.copyWith(imageUrl: imageUrl);
-    }
-    
-    // ⭐️ 모든 변경사항이 적용된 최종본을 저장합니다.
-    await repo.updateProduct(finalProduct);
-    return repo.fetchProducts();
-  });
-}
+  // ⭐️ 2. 상품 정보와 '옵션'을 모두 업데이트하는 메서드 (등록/수정 페이지에서 사용)
+  Future<void> updateProductWithOptions(
+    ProductModel product, {
+    List<OptionGroup>? optionGroups, // ⭐️ Nullable로 변경
+    List<ProductVariant>? variants,   // ⭐️ Nullable로 변경
+    XFile? newImageFile,
+  }) async {
+    state = const AsyncValue.loading();
+    state = await AsyncValue.guard(() async {
+      String? imageUrl = product.imageUrl;
+      if (newImageFile != null) {
+        final imageBytes = await newImageFile.readAsBytes();
+        imageUrl = await _repository.uploadImage(imageBytes, newImageFile.name);
+      }
+
+      final finalProduct = product.copyWith(imageUrl: imageUrl);
+      await _repository.updateProductWithOptions(
+        finalProduct,
+        optionGroups: optionGroups,
+        variants: variants,
+      );
+      return _repository.fetchProducts();
+    });
+  }
 
   Future<void> deleteProduct(int productId) async {
     final repo = ref.read(productRepositoryProvider);

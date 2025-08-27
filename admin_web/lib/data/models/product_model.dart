@@ -1,5 +1,7 @@
 // admin_web/lib/data/models/product_model.dart (전체 교체)
 
+import 'product_option_model.dart';
+
 class ProductModel {
   final int id;
   final DateTime createdAt;
@@ -13,6 +15,7 @@ class ProductModel {
   final String? productCode; // ⭐️ 상품 코드 (null 가능)
   final String? relatedProductCode; // ⭐️ 연관 상품 코드 (null 가능)
   final bool isSoldOut;
+   final List<ProductOption> options;
 
   ProductModel({
     required this.id,
@@ -27,6 +30,7 @@ class ProductModel {
     this.productCode,
     this.relatedProductCode,
     required this.isSoldOut,
+    this.options = const [],
   }) : description = description ?? ''; // ⭐️ 만약 null이면 빈 문자열로 초기화
 
   factory ProductModel.fromJson(Map<String, dynamic> json) {
