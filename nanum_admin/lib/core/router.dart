@@ -6,10 +6,12 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 // ⭐️ 새로운 파일 경로에 맞게 import 문을 수정했습니다.
 import '../data/models/product_model.dart';
+import '../data/repositories/order_repository.dart';
 import '../features/auth/view/login_screen.dart';
 import '../features/cs_management.dart/inquiries/view/inquiry_management_screen.dart';
 import '../features/cs_management.dart/templates/view/reply_template_screen.dart';
 import '../features/dashboard/view/dashboard_screen.dart';
+import '../features/settings/view/settings_screen.dart';
 import '../features/shop_management.dart/categories/view/category_management_screen.dart';
 import '../features/shop_management.dart/products/view/add_edit_product_screen.dart';
 import '../features/shop_management.dart/products/view/product_management_screen.dart';
@@ -95,9 +97,15 @@ final router = GoRouter(
           builder: (context, state) => const GroupBuyManagementScreen(),
         ),
         GoRoute(
-          path: '/orders',
-          builder: (context, state) => const OrderManagementScreen(),
-        ),
+      path: '/orders/shop',
+      builder: (context, state) =>
+          const OrderManagementScreen(orderType: OrderType.shop), // ⭐️ 파라미터 전달
+    ),
+    GoRoute(
+      path: '/orders/group-buy',
+      builder: (context, state) =>
+          const OrderManagementScreen(orderType: OrderType.groupBuy), // ⭐️ 파라미터 전달
+    ),
         GoRoute(
           path: '/users',
           builder: (context, state) => const UserManagementScreen(),
@@ -119,6 +127,11 @@ final router = GoRouter(
           path: '/cs/templates',
           builder: (context, state) => const ReplyTemplateScreen(),
         ),
+         // ⭐️ 아래 내용 추가
+    GoRoute(
+      path: '/settings',
+      builder: (context, state) => const SettingsScreen(),
+    ),
       ],
     ),
   ],

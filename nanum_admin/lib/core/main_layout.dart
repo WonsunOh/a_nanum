@@ -43,7 +43,14 @@ class _MainLayoutState extends ConsumerState<MainLayout> {
       icon: Icons.group_work_outlined,
       children: [
         AdminMenuItem(title: '공동구매 현황', route: '/group-buy'),
-        AdminMenuItem(title: '주문 관리', route: '/orders'),
+      ],
+    ),
+    AdminMenuItem(
+      title: '주문 관리',
+      icon: Icons.receipt_long_outlined, // 새로운 아이콘
+      children: [
+        AdminMenuItem(title: '쇼핑몰 주문내역', route: '/orders/shop'),
+        AdminMenuItem(title: '공동구매 주문내역', route: '/orders/group-buy'),
       ],
     ),
     AdminMenuItem(
@@ -59,6 +66,11 @@ class _MainLayoutState extends ConsumerState<MainLayout> {
         AdminMenuItem(title: '답변 템플릿', route: '/cs/templates'),
       ],
     ),
+    AdminMenuItem(
+    title: '환경설정',
+    icon: Icons.settings_outlined,
+    route: '/settings',
+  ),
   ];
 
   @override

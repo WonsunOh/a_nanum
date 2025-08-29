@@ -1,3 +1,5 @@
+// nanum_admin/lib/features/order_management/view/order_management_screen.dart (전체 수정)
+
 import 'package:file_picker/file_picker.dart';
 import 'package:web/web.dart' as web;
 import 'package:excel/excel.dart';
@@ -6,13 +8,16 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/main_layout.dart';
 import '../../../data/models/order_model.dart';
+import '../../../data/repositories/order_repository.dart'; // ⭐️ OrderType enum을 위해 import
 import '../viewmodel/order_viewmodel.dart';
 
-import 'dart:js_interop'; // 💡 JSArray 변환을 위해 import
-import 'dart:typed_data'; // 💡 Uint8List를 위해 import
+import 'dart:js_interop';
+import 'dart:typed_data';
 
 class OrderManagementScreen extends ConsumerWidget {
-  const OrderManagementScreen({super.key});
+  // ⭐️ 1. 어떤 종류의 주문을 표시할지 외부에서 받습니다.
+  final OrderType orderType;
+  const OrderManagementScreen({super.key, required this.orderType});
 
   // 엑셀 내보내기 함수
   void _exportToExcel(List<Order> orders) {
@@ -28,6 +33,8 @@ class OrderManagementScreen extends ConsumerWidget {
         '구매자',
         '연락처',
         '주소',
+        // ⭐️ 쇼핑몰 주문에는 송장번호가 없을 수 있으므로, 공동구매일 때만 추가
+        if (orderType == OrderType.groupBuy) '송장번호',
       ].map((e) => TextCellValue(e)).toList(),
     );
 
@@ -45,46 +52,50 @@ class OrderManagementScreen extends ConsumerWidget {
 
     final bytes = excel.save();
     if (bytes != null) {
-      // 💡 1. List<int>를 Uint8List로, 다시 JSUint8Array로 변환
       final blob = web.Blob(
         [Uint8List.fromList(bytes).toJS].toJS,
-        web.BlobPropertyBag(type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'),
+        web.BlobPropertyBag(
+            type:
+                'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'),
       );
-      // 💡 2. 메소드 이름을 createObjectURL로 변경
       final url = web.URL.createObjectURL(blob);
       final anchor = web.HTMLAnchorElement()
         ..href = url
         ..style.display = 'none'
-        ..download = 'orders_${DateTime.now().toIso8601String().substring(0, 10)}.xlsx';
-      
+        ..download =
+            'orders_${orderType.name}_${DateTime.now().toIso8601String().substring(0, 10)}.xlsx';
+
       web.document.body?.append(anchor);
       anchor.click();
-      
+
       web.URL.revokeObjectURL(url);
       anchor.remove();
     }
   }
 
-  // 💡 파일 선택 및 업로드 로직을 처리하는 함수
+  // 파일 선택 및 업로드 함수
   void _pickAndUploadExcel(WidgetRef ref) async {
-    // 1. 파일 선택기 열기
     FilePickerResult? result = await FilePicker.platform.pickFiles(
       type: FileType.custom,
       allowedExtensions: ['xlsx'],
-      withData: true, // 웹에서는 이 옵션으로 파일 데이터를 바로 얻을 수 있음
+      withData: true,
     );
 
     if (result != null && result.files.single.bytes != null) {
-      // 2. 파일 데이터를 ViewModel으로 전달
-      await ref.read(orderViewModelProvider.notifier).uploadAndProcessExcel(result.files.single.bytes!);
-    } else {
-      // 파일 선택이 취소된 경우
+      // ⭐️ orderType에 맞는 ViewModel을 호출합니다.
+      await ref
+          .read(orderViewModelProvider(orderType).notifier)
+          .uploadAndProcessExcel(result.files.single.bytes!);
     }
   }
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final ordersAsync = ref.watch(orderViewModelProvider);
+    // ⭐️ 2. orderType에 맞는 ViewModel을 watch합니다.
+    final ordersAsync = ref.watch(orderViewModelProvider(orderType));
+    // ⭐️ 3. orderType에 따라 동적으로 제목을 설정합니다.
+    final title =
+        orderType == OrderType.shop ? '쇼핑몰 주문내역' : '공동구매 주문내역';
 
     return MainLayout(
       child: Padding(
@@ -96,26 +107,30 @@ class OrderManagementScreen extends ConsumerWidget {
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 Text(
-                  '주문/배송 관리',
+                  title, // ⭐️ 동적으로 설정된 제목 사용
                   style: Theme.of(context).textTheme.headlineSmall,
                 ),
                 ordersAsync.when(
                   data: (orders) => Row(
                     children: [
-                      // 💡 송장 업로드 버튼 추가
-                    ElevatedButton.icon(
-                      icon: const Icon(Icons.upload),
-                      label: const Text('송장 일괄 업로드'),
-                      style: ElevatedButton.styleFrom(backgroundColor: Colors.orange),
-                      onPressed: ordersAsync.isLoading ? null : () => _pickAndUploadExcel(ref),
-                    ),
-                    const SizedBox(width: 16),
+                      // ⭐️ 공동구매 주문일 때만 송장 업로드 버튼을 보여줍니다.
+                      if (orderType == OrderType.groupBuy) ...[
+                        ElevatedButton.icon(
+                          icon: const Icon(Icons.upload),
+                          label: const Text('송장 일괄 업로드'),
+                          style: ElevatedButton.styleFrom(
+                              backgroundColor: Colors.orange),
+                          onPressed: ordersAsync.isLoading
+                              ? null
+                              : () => _pickAndUploadExcel(ref),
+                        ),
+                        const SizedBox(width: 16),
+                      ],
                       ElevatedButton.icon(
                         icon: const Icon(Icons.download),
                         label: const Text('엑셀로 내보내기'),
-                        onPressed: orders.isEmpty
-                            ? null
-                            : () => _exportToExcel(orders),
+                        onPressed:
+                            orders.isEmpty ? null : () => _exportToExcel(orders),
                       ),
                     ],
                   ),
@@ -136,15 +151,16 @@ class OrderManagementScreen extends ConsumerWidget {
                   return SingleChildScrollView(
                     scrollDirection: Axis.horizontal,
                     child: DataTable(
-                      // --- 👇 이 부분을 채워넣습니다 ---
-                      columns: const [
-                        DataColumn(label: Text('주문번호')),
-                        DataColumn(label: Text('상품명')),
-                        DataColumn(label: Text('수량')),
-                        DataColumn(label: Text('구매자')),
-                        DataColumn(label: Text('연락처')),
-                        DataColumn(label: Text('배송지')),
-                        DataColumn(label: Text('송장번호')),
+                      columns: [
+                        const DataColumn(label: Text('주문번호')),
+                        const DataColumn(label: Text('상품명')),
+                        const DataColumn(label: Text('수량')),
+                        const DataColumn(label: Text('구매자')),
+                        const DataColumn(label: Text('연락처')),
+                        const DataColumn(label: Text('배송지')),
+                        // ⭐️ 공동구매 주문일 때만 송장번호 컬럼을 보여줍니다.
+                        if (orderType == OrderType.groupBuy)
+                          const DataColumn(label: Text('송장번호')),
                       ],
                       rows: orders.map((order) {
                         return DataRow(cells: [
@@ -154,10 +170,11 @@ class OrderManagementScreen extends ConsumerWidget {
                           DataCell(Text(order.userName ?? '-')),
                           DataCell(Text(order.userPhone ?? '-')),
                           DataCell(Text(order.deliveryAddress)),
-                          DataCell(
-                            // TODO: 송장번호 입력 기능 구현
-                            Text('아직 없음'),
-                          ),
+                          if (orderType == OrderType.groupBuy)
+                            DataCell(
+                              // TODO: 송장번호 입력 기능 구현
+                              Text('아직 없음'),
+                            ),
                         ]);
                       }).toList(),
                     ),
