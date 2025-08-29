@@ -19,6 +19,9 @@ class MainLayout extends ConsumerStatefulWidget {
 
 // ⭐️ 4. State -> ConsumerState로 변경
 class _MainLayoutState extends ConsumerState<MainLayout> {
+
+  bool _isMenuExpanded = true;
+  
   final List<AdminMenuItem> menuItems = [
     AdminMenuItem(
       title: '대시보드',
@@ -83,68 +86,112 @@ class _MainLayoutState extends ConsumerState<MainLayout> {
     return Scaffold(
       body: Row(
         children: [
-          SizedBox(
-            width: 250,
+          AnimatedContainer(
+            duration: const Duration(milliseconds: 200),
+            width: _isMenuExpanded ? 250 : 80,
             child: Drawer(
               elevation: 1.0,
               child: Column(
                 children: [
+                  // --- 💡 여기가 핵심 수정 부분입니다! ---
+                  // 햄버거 버튼을 Drawer 내부의 오른쪽 상단으로 이동
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(0, 8, 8, 0),
+                    child: Align(
+                      alignment: Alignment.topRight,
+                      child: IconButton(
+                        icon: Icon(
+                            _isMenuExpanded ? Icons.menu_open : Icons.menu),
+                        tooltip: _isMenuExpanded ? '메뉴 축소' : '메뉴 확장',
+                        onPressed: () {
+                          setState(() {
+                            _isMenuExpanded = !_isMenuExpanded;
+                          });
+                        },
+                      ),
+                    ),
+                  ),
+                  // ------------------------------------
+
                   Expanded(
                     child: ListView.builder(
                       itemCount: menuItems.length,
                       itemBuilder: (context, index) {
                         final item = menuItems[index];
-                        if (item.children.isEmpty) {
-                          return ListTile(
-                            leading: Icon(item.icon),
-                            title: Text(item.title),
-                            selected: currentRoute == item.route,
-                            onTap: () => context.go(item.route),
-                          );
+                        if (_isMenuExpanded) {
+                          if (item.children.isEmpty) {
+                            return ListTile(
+                              leading: Icon(item.icon),
+                              title: Text(item.title),
+                              selected: currentRoute == item.route,
+                              onTap: () => context.go(item.route),
+                            );
+                          } else {
+                            bool isExpanded = item.children.any((child) =>
+                                currentRoute.startsWith(child.route));
+                            return ExpansionTile(
+                              key: PageStorageKey(item.title),
+                              initiallyExpanded: isExpanded,
+                              leading: Icon(item.icon),
+                              title: Text(item.title),
+                              children: item.children.map((child) {
+                                return ListTile(
+                                  title: Text(child.title),
+                                  selected: currentRoute == child.route,
+                                  onTap: () => context.go(child.route),
+                                  contentPadding:
+                                      const EdgeInsets.only(left: 40.0),
+                                );
+                              }).toList(),
+                            );
+                          }
                         } else {
-                          bool isExpanded = item.children
-                              .any((child) => currentRoute.startsWith(child.route));
-                          return ExpansionTile(
-                            key: PageStorageKey(item.title),
-                            initiallyExpanded: isExpanded,
-                            leading: Icon(item.icon),
-                            title: Text(item.title),
-                            children: item.children.map((child) {
-                              return ListTile(
-                                title: Text(child.title),
-                                selected: currentRoute == child.route,
-                                onTap: () => context.go(child.route),
-                                contentPadding: const EdgeInsets.only(left: 40.0),
-                              );
-                            }).toList(),
+                          // 축소 상태 UI
+                          return Tooltip(
+                            message: item.title,
+                            child: ListTile(
+                              leading: Icon(item.icon),
+                              selected: GoRouterState.of(context)
+                                  .matchedLocation
+                                  .startsWith(item.route),
+                              onTap: () {
+                                if (item.children.isNotEmpty) {
+                                  setState(() => _isMenuExpanded = true);
+                                } else {
+                                  context.go(item.route);
+                                }
+                              },
+                            ),
                           );
                         }
                       },
                     ),
                   ),
-
-                  // ⭐️ 로그아웃 버튼 추가
+                  const Divider(),
                   ListTile(
                     leading: const Icon(Icons.logout),
-                    title: const Text('로그아웃'),
+                    title: _isMenuExpanded ? const Text('로그아웃') : null,
                     onTap: () {
                       ref.read(authViewModelProvider.notifier).signOut();
                     },
                   ),
-                  const SizedBox(height: 20), // 하단 여백
+                  const SizedBox(height: 20),
                 ],
               ),
             ),
           ),
           const VerticalDivider(width: 1),
+          // --- 💡 여기도 수정되었습니다! ---
+          // 불필요한 Column을 제거하고 widget.child가 바로 공간을 차지하도록 변경
           Expanded(
             child: PageStorage(
-            key: PageStorageKey(GoRouterState.of(context).matchedLocation),
-            bucket: PageStorageBucket(),
-            child: widget.child,
+              key: PageStorageKey(GoRouterState.of(context).matchedLocation),
+              bucket: PageStorageBucket(),
+              child: widget.child,
+            ),
           ),
-        ),
-      ],
+          // ---------------------------
+        ],
       ),
     );
   }
