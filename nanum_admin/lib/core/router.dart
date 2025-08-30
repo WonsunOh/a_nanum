@@ -32,16 +32,16 @@ final router = GoRouter(
   // 개발 중에는 이 redirect 부분을 주석 처리하여 매번 로그인하는 번거로움을 피하세요.
   // 실제 배포 전에는 반드시 주석을 해제하여 보안을 활성화해야 합니다!
   
-  redirect: (BuildContext context, GoRouterState state) {
-    final session = Supabase.instance.client.auth.currentSession;
-    final isAuthenticated = session != null;
-    final isLoggingIn = state.matchedLocation == '/login';
+  // redirect: (BuildContext context, GoRouterState state) {
+  //   final session = Supabase.instance.client.auth.currentSession;
+  //   final isAuthenticated = session != null;
+  //   final isLoggingIn = state.matchedLocation == '/login';
 
-    if (!isAuthenticated && !isLoggingIn) return '/login';
-    if (isAuthenticated && isLoggingIn) return '/dashboard';
+  //   if (!isAuthenticated && !isLoggingIn) return '/login';
+  //   if (isAuthenticated && isLoggingIn) return '/dashboard';
 
-    return null;
-  },
+  //   return null;
+  // },
   
   // =================================================================
   

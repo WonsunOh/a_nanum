@@ -163,9 +163,11 @@ class _MainLayoutState extends ConsumerState<MainLayout> {
                             message: item.title,
                             child: ListTile(
                               leading: Icon(item.icon),
-                              selected: GoRouterState.of(context)
-                                  .matchedLocation
-                                  .startsWith(item.route),
+                              selected: item.children.isNotEmpty
+      // 하위 메뉴가 있다면, 그 중 하나라도 현재 경로와 일치하는지 확인
+      ? item.children.any((child) => GoRouterState.of(context).matchedLocation.startsWith(child.route))
+      // 하위 메뉴가 없다면, 기존 로직 사용
+      : GoRouterState.of(context).matchedLocation.startsWith(item.route),
                               onTap: () {
                                 if (item.children.isNotEmpty) {
                                   setState(() => _isMenuExpanded = true);
