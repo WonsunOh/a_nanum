@@ -1,10 +1,11 @@
-// nanum_admin/lib/features/shop_management/products/view/product_management_screen.dart (전체 수정)
+// admin_web/lib/features/shop_management/products/view/product_management_screen.dart (전체 교체)
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-
 import 'package:go_router/go_router.dart';
+import 'package:image_picker/image_picker.dart';
 import '../../../../data/models/product_model.dart';
+import '../../categories/viewmodel/category_viewmodel.dart';
 import '../viewmodel/product_viewmodel.dart';
 
 class ProductManagementScreen extends ConsumerStatefulWidget {
@@ -18,21 +19,18 @@ class ProductManagementScreen extends ConsumerStatefulWidget {
 class _ProductManagementScreenState extends ConsumerState<ProductManagementScreen> {
   final ScrollController _horizontalController = ScrollController();
 
-  final TextEditingController _searchController = TextEditingController();
-
   @override
   void dispose() {
     _horizontalController.dispose();
-    _searchController.dispose();
     super.dispose();
-
   }
 
   @override
   Widget build(BuildContext context) {
     final productsAsync = ref.watch(productViewModelProvider);
-    
-    // 삭제 확인 다이얼로그
+    final categoriesAsync = ref.watch(categoriesProvider);
+
+     
     void showDeleteConfirmDialog(ProductModel product) {
       showDialog(
         context: context,
@@ -53,6 +51,17 @@ class _ProductManagementScreenState extends ConsumerState<ProductManagementScree
       );
     }
 
+    /// 이미지 미리보기 위젯
+  Widget _buildImagePreview(XFile? localImage, ProductModel? existingProduct) {
+    if (localImage != null) {
+      return Image.network(localImage.path, fit: BoxFit.cover);
+    }
+    if (existingProduct?.imageUrl != null) {
+      return Image.network(existingProduct!.imageUrl!, fit: BoxFit.cover);
+    }
+    return const Center(child: Text('이미지 선택'));
+  }
+
     return Scaffold(
       appBar: AppBar(
         title: const Text('상품 관리'),
@@ -64,157 +73,101 @@ class _ProductManagementScreenState extends ConsumerState<ProductManagementScree
           ),
         ],
       ),
-      body: Column(
-        children: [
-          Center(
-            child: ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: 1200), 
-              child: Row(
-                children: [
-                  Expanded(
-                    child: TextField(
-                      controller: _searchController,
-                      decoration: const InputDecoration(
-                        hintText: '상품명으로 검색...',
-                        border: OutlineInputBorder(),
-                        contentPadding: EdgeInsets.symmetric(horizontal: 12),
-                      ),
-                      onSubmitted: (value) {
-                         ref.read(productViewModelProvider.notifier).searchProducts(value);
-                      },
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  ElevatedButton.icon(
-                    icon: const Icon(Icons.search),
-                    label: const Text('검색'),
-                    onPressed: () {
-                      ref.read(productViewModelProvider.notifier).searchProducts(_searchController.text);
-                    },
-                    style: ElevatedButton.styleFrom(padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 16)),
-                  ),
-                  const SizedBox(width: 8),
-                  TextButton(
-                    onPressed: () {
-                      _searchController.clear();
-                      ref.read(productViewModelProvider.notifier).fetchAllProducts();
-                    },
-                    child: const Text('전체보기'),
-                  ),
-                ],
-              ),
-            ),
-          ),
-          const SizedBox(height: 16),
-          Expanded(
-            child: RefreshIndicator(
-              onRefresh: () => ref.refresh(productViewModelProvider.future),
-              child: productsAsync.when(
-                data: (products) {
-                  if (products.isEmpty) {
-                    return const Center(child: Text('등록된 상품이 없습니다.'));
-                  }
-                  return Scrollbar(
-                    controller: _horizontalController,
-                    thumbVisibility: true,
-                    child: SingleChildScrollView(
-                      controller: _horizontalController,
-                      scrollDirection: Axis.horizontal,
-                      padding: const EdgeInsets.all(16.0),
-                      // ⭐️ 더 이상 categoriesProvider를 watch할 필요가 없습니다.
-                      child: DataTable(
-                        columns: const [
-                          DataColumn(label: Text('상품코드')),
-                          DataColumn(label: Text('연관상품코드')),
-                          DataColumn(label: Text('이미지')),
-                          DataColumn(label: Text('카테고리')), // 컬럼은 그대로 유지
-                          DataColumn(label: Text('상품명')),
-                          DataColumn(label: Text('가격')),
-                          DataColumn(label: Text('품절')),
-                          DataColumn(label: Text('진열')),
-                          DataColumn(label: Text('관리')),
-                        ],
-                        rows: products.map((product) {
-                          return DataRow(cells: [
-                            DataCell(Text(product.productCode ?? '-')),
-                            DataCell(Text(product.relatedProductCode ?? '-')),
-                            DataCell(
-                              Padding(
-                                padding: const EdgeInsets.symmetric(vertical: 4.0),
-                                child: (product.imageUrl != null && product.imageUrl!.isNotEmpty)
-                                    ? Image.network(product.imageUrl!, width: 40, height: 40, fit: BoxFit.cover)
-                                    : const Icon(Icons.image_not_supported, size: 24),
-                              ),
-                            ),
-                            // ⭐️ product.categoryName을 직접 사용하여 카테고리 이름을 표시합니다.
-                            DataCell(Text(product.categoryPath ?? '미지정')),
-                            DataCell(Text(product.name)),
-                            DataCell(
-            (product.discountPrice != null && product.discountPrice! > 0)
-                ? Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Text(
-                        '${product.price}원',
-                        style: const TextStyle(
-                          decoration: TextDecoration.lineThrough,
-                          color: Colors.grey,
+      body: RefreshIndicator(
+        onRefresh: () => ref.refresh(productViewModelProvider.future),
+        child: productsAsync.when(
+          data: (products) {
+            if (products.isEmpty) {
+              return const Center(child: Text('등록된 상품이 없습니다.'));
+            }
+            return Scrollbar(
+              controller: _horizontalController,
+              thumbVisibility: true,
+              child: SingleChildScrollView(
+                controller: _horizontalController,
+                scrollDirection: Axis.horizontal,
+                padding: const EdgeInsets.all(16.0),
+                child: categoriesAsync.when(
+                data: (categories) {
+                  // 카테고리 ID를 이름으로 변환하기 위한 맵 생성
+                  final categoryMap = {for (var cat in categories) cat.id: cat.name};
+
+                    return DataTable(
+                      columns: const [
+                        DataColumn(label: Text('상품코드')),
+                      DataColumn(label: Text('연관상품코드')),
+                      DataColumn(label: Text('이미지')),
+                      DataColumn(label: Text('카테고리')),
+                      DataColumn(label: Text('상품명')),
+                      DataColumn(label: Text('가격')),
+                      DataColumn(label: Text('품절')),
+                      DataColumn(label: Text('진열')),
+                      DataColumn(label: Text('관리')),
+                      ],
+                      rows: products.map((product) {
+                        return DataRow(cells: [
+                          DataCell(Text(product.productCode ?? '-')),
+                        DataCell(Text(product.relatedProductCode ?? '-')),
+                        DataCell(
+                          Padding(
+                            padding: const EdgeInsets.symmetric(vertical: 4.0),
+                            child: (product.imageUrl != null && product.imageUrl!.isNotEmpty)
+                                ? Image.network(product.imageUrl!, width: 40, height: 40, fit: BoxFit.cover)
+                                : const Icon(Icons.image_not_supported, size: 24),
+                          ),
                         ),
-                      ),
-                      Text(
-                        '${product.discountPrice}원',
-                        style: const TextStyle(
-                          color: Colors.red,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                    ],
-                  )
-                : Text('${product.price}원'),
-                ),
-                            DataCell(Switch(
-                              value: product.isSoldOut,
-                              onChanged: (value) {
-                                final updatedProduct = product.copyWith(isSoldOut: value);
-                                ref.read(productViewModelProvider.notifier).updateProductDetails(updatedProduct);
-                              },
-                            )),
-                            DataCell(Switch(
-                              value: product.isDisplayed,
-                              onChanged: (value) {
-                                final updatedProduct = product.copyWith(isDisplayed: value);
-                                ref.read(productViewModelProvider.notifier).updateProductDetails(updatedProduct);
-                              },
-                            )),
-                            DataCell(Row(
-                              children: [
-                                IconButton(
-                                  icon: const Icon(Icons.edit_outlined),
-                                  tooltip: '수정',
-                                  onPressed: () {
-                                    context.go('/shop/products/edit/${product.id}', extra: product);
-                                  },
-                                ),
-                                IconButton(
-                                  icon: const Icon(Icons.delete_outline, color: Colors.redAccent),
-                                  tooltip: '삭제',
-                                  onPressed: () => showDeleteConfirmDialog(product),
-                                ),
-                              ],
-                            )),
-                          ]);
-                        }).toList(),
-                      ),
-                    ),
-                  );
-                },
+                        // ⭐️ 카테고리 ID를 이름으로 표시
+                        DataCell(Text(categoryMap[product.categoryId] ?? '미지정')),
+                        DataCell(Text(product.name)),
+                        DataCell(Text('${product.price}원')),
+                        // ⭐️ '품절' 체크 스위치 추가
+                        DataCell(Switch(
+                          value: product.isSoldOut,
+                          onChanged: (value) {
+                            final updatedProduct = product.copyWith(isSoldOut: value);
+                            ref.read(productViewModelProvider.notifier).updateProductDetails(updatedProduct);
+                          },
+                        )),
+                        DataCell(Switch(
+                          value: product.isDisplayed,
+                          onChanged: (value) {
+                            final updatedProduct = product.copyWith(isDisplayed: value);
+                            ref.read(productViewModelProvider.notifier).updateProductDetails(updatedProduct);
+                          },
+                        )),
+                          DataCell(Row(
+                            children: [
+                              IconButton(
+                                icon: const Icon(Icons.edit_outlined),
+                                tooltip: '수정',
+                            // ⭐️ 이 부분을 수정합니다.
+                            onPressed: () {
+                              // '상품 수정' 페이지로 이동하면서,
+                              // extra에 현재 상품 데이터를 담아 전달합니다.
+                              context.go('/shop/products/edit/${product.id}', extra: product);
+                            },
+                          ),
+                              IconButton(
+                            icon: const Icon(Icons.delete_outline, color: Colors.redAccent),
+                            tooltip: '삭제',
+                            onPressed: () => showDeleteConfirmDialog(product),
+                          ),
+                            ],
+                          )),
+                        ]);
+                      }).toList(),
+                    );
+                  },
+                  // 카테고리 로딩 중/에러 시 처리
                 loading: () => const Center(child: CircularProgressIndicator()),
-                error: (e, st) => Center(child: Text('오류: $e')),
+                error: (e, st) => Center(child: Text('카테고리 로딩 실패: $e')),
+                ),
               ),
-            ),
-          ),
-        ],
+            );
+          },
+          loading: () => const Center(child: CircularProgressIndicator()),
+          error: (e, st) => Center(child: Text('오류: $e')),
+        ),
       ),
     );
   }

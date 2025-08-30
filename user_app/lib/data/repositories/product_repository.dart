@@ -20,11 +20,10 @@ class ProductRepository {
   // 쇼핑몰에 진열된 모든 상품 목록을 가져오는 메서드
   Future<List<ProductModel>> fetchProducts() async {
     try {
-      // ⭐️ .from('products')를 .from('products_with_category_path')로 변경!
       final response = await _client
-          .from('products_with_category_path')
-          .select('*')
-          .eq('is_displayed', true)
+          .from('products')
+          .select()
+          .eq('is_displayed', true) // '진열됨' 상태인 상품만 필터링
           .order('created_at', ascending: false);
 
       final List<ProductModel> products = [];

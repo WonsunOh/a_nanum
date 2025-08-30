@@ -6,7 +6,11 @@ part of 'product_viewmodel.dart';
 // RiverpodGenerator
 // **************************************************************************
 
+<<<<<<< HEAD
 String _$productViewModelHash() => r'0138707d6d62b1b4de9d66ffb12afa29d55a61e3';
+=======
+String _$productViewModelHash() => r'3bd935edc116839df3df9e3f4fab68dc86fc50c4';
+>>>>>>> parent of d38c0e3 (할인상품 메뉴 추가)
 
 /// See also [ProductViewModel].
 @ProviderFor(ProductViewModel)
