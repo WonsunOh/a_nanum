@@ -81,14 +81,11 @@ class OrderManagementScreen extends ConsumerWidget {
       withData: true,
     );
 
-    final fileBytes = result?.files.single.bytes;
-
-
-    if (fileBytes != null) {
-      // ⭐️ 3. 이제 fileBytes는 절대 null이 아니므로 ! 연산자 없이 안전하게 사용합니다.
+    if (result != null && result.files.single.bytes != null) {
+      // ⭐️ orderType에 맞는 ViewModel을 호출합니다.
       await ref
           .read(orderViewModelProvider(orderType).notifier)
-          .uploadAndProcessExcel(fileBytes);
+          .uploadAndProcessExcel(result.files.single.bytes!);
     }
   }
 

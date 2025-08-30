@@ -3,9 +3,13 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../data/models/managed_group_buy_model.dart';
 import '../../../data/repositories/group_buy_admin_repository.dart';
 
+<<<<<<< HEAD
 final groupBuyManagementViewModelProvider = StateNotifierProvider.autoDispose<GroupBuyManagementViewModel, 
 AsyncValue<List<ManagedGroupBuy>>>((ref) {
   
+=======
+final groupBuyManagementViewModelProvider = StateNotifierProvider.autoDispose<GroupBuyManagementViewModel, AsyncValue<List<ManagedGroupBuy>>>((ref) {
+>>>>>>> parent of 9efadbe (에러해결확인01)
   return GroupBuyManagementViewModel(ref.read(groupBuyAdminRepositoryProvider));
 });
 
