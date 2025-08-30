@@ -6,7 +6,7 @@ part of 'user_viewmodel.dart';
 // RiverpodGenerator
 // **************************************************************************
 
-String _$userViewModelHash() => r'79f73a8a2b1254c46bc95e7528dcfee47c856672';
+String _$userViewModelHash() => r'a2696db7d659248832c1a44c524d36adb6bac161';
 
 /// See also [UserViewModel].
 @ProviderFor(UserViewModel)
@@ -38,7 +38,7 @@ final userSearchQueryProvider =
     );
 
 typedef _$UserSearchQuery = AutoDisposeNotifier<String>;
-String _$userDetailHash() => r'6acd32946c4539e7dfe54904684670da17224ada';
+String _$userDetailHash() => r'edaf666cd6e362d225a7b71acbf46dfac569738b';
 
 /// Copied from Dart SDK
 class _SystemHash {
