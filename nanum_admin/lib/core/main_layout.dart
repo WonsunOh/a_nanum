@@ -80,7 +80,13 @@ class _MainLayoutState extends ConsumerState<MainLayout> {
       // next.value를 사용하여 실제 AuthState 데이터에 접근합니다.
       // next.value?.event를 사용하여 안전하게 'event' 속성에 접근합니다.
       if (next.value?.event == AuthChangeEvent.signedOut) {
-        context.go('/login');
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          
+          // 위젯이 화면에 여전히 존재하는지 확인한 후(mounted), 안전하게 페이지를 이동합니다.
+          if (mounted) {
+            context.go('/login');
+          }
+        });
       }
     });
     // ⭐️ 1. 중복 메뉴 방지 로직을 다시 추가했습니다.
