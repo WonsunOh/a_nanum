@@ -18,13 +18,14 @@ class Inquiry {
   });
 
   factory Inquiry.fromJson(Map<String, dynamic> json) {
+    final profileData = json['profiles'] as Map<String, dynamic>?;
     return Inquiry(
       id: json['id'],
       title: json['title'],
       content: json['content'],
       status: json['status'],
       reply: json['reply'],
-      authorName: json['profiles']?['username'] ?? '알 수 없음',
+      authorName: profileData?['username'] as String? ?? '알 수 없음', 
       createdAt: DateTime.parse(json['created_at']),
     );
   }
