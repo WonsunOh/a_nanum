@@ -47,13 +47,13 @@ class UserRepository {
 
 
   // 💡 사용자 상세 정보를 가져오는 메소드
-  Future<UserDetail> fetchUserDetails(String userId) async {
+  Future<UserDetailModel> fetchUserDetails(String userId) async {
     try {
       final response = await _supabaseAdmin.rpc(
         'get_user_details',
         params: {'p_user_id': userId},
       ).single();
-      return UserDetail.fromJson(response);
+      return UserDetailModel.fromJson(response);
     } catch (e) {
       debugPrint('Error fetching user details: $e');
       rethrow;

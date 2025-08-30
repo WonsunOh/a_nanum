@@ -6,25 +6,11 @@ import '../../../core/main_layout.dart';
 import '../../../data/models/app_user_model.dart';
 import '../viewmodel/user_viewmodel.dart';
 
-class UserManagementScreen extends ConsumerStatefulWidget {
+class UserManagementScreen extends ConsumerWidget {
   const UserManagementScreen({super.key});
 
   @override
-  ConsumerState<UserManagementScreen> createState() => _UserManagementScreenState();
-}
-
-class _UserManagementScreenState extends ConsumerState<UserManagementScreen> {
-
-  @override
-  void initState() {
-    super.initState();
-    // 위젯이 빌드된 후 첫 프레임에서 안전하게 데이터를 불러옵니다.
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      ref.read(userViewModelProvider.notifier).fetchAllUsers();
-    });
-  }
-  @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final usersAsync = ref.watch(userViewModelProvider);
 
     return MainLayout(

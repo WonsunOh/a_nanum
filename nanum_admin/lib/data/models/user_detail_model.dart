@@ -1,13 +1,13 @@
 import 'app_user_model.dart';
 
-class UserDetail {
+class UserDetailModel {
   final AppUser profile;
   final List<UserParticipation> participations;
 
-  UserDetail({required this.profile, required this.participations});
+  UserDetailModel({required this.profile, required this.participations});
 
-  factory UserDetail.fromJson(Map<String, dynamic> json) {
-    return UserDetail(
+  factory UserDetailModel.fromJson(Map<String, dynamic> json) {
+    return UserDetailModel(
       // 💡 AppUser.fromJson(json['profile']) 대신 아래와 같이 수정합니다.
       //    Supabase의 User 객체 구조는 조금 다르므로, 직접 필드를 매핑해줍니다.
       profile: AppUser(
