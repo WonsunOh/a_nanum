@@ -19,14 +19,19 @@ class UserRepository {
     try {
       final List<User> response = await _supabaseAdmin.auth.admin.listUsers();
       
-      final profilesResponse = await _supabaseAdmin.from('profiles').select('id, username');
-      final profilesMap = {for (var p in profilesResponse) p['id']: p['username']};
+      final profilesResponse = await _supabaseAdmin.from('profiles').select('id, username, level');
+      final profilesMap = {
+      for (var p in profilesResponse)
+        p['id']: {'username': p['username'], 'level': p['level']}
+    };
 
       // 💡 2. 실제 사용자 목록은 response 객체 안의 'users' 리스트에 들어있습니다.
       List<AppUser> users = response.map((user) {
+        final userProfile = profilesMap[user.id];
         return AppUser.fromUser(
           user,
-          username: profilesMap[user.id],
+          username: userProfile?['username'],
+        level: userProfile?['level'],
         );
       }).toList();
 

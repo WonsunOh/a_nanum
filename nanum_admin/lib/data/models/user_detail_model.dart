@@ -7,14 +7,21 @@ class UserDetailModel {
   UserDetailModel({required this.profile, required this.participations});
 
   factory UserDetailModel.fromJson(Map<String, dynamic> json) {
+
+     final profileData = json['profile'] as Map<String, dynamic>? ?? {};
     return UserDetailModel(
-      // 💡 AppUser.fromJson(json['profile']) 대신 아래와 같이 수정합니다.
-      //    Supabase의 User 객체 구조는 조금 다르므로, 직접 필드를 매핑해줍니다.
       profile: AppUser(
-        id: json['profile']['id'],
-        email: json['profile']['raw_user_meta_data']?['email'] ?? '정보 없음',
-        username: json['profile']['username'] ?? '프로필 없음',
-        createdAt: DateTime.parse(json['profile']['created_at']),
+        id: profileData['id'] ?? '알 수 없는 ID',
+        email: profileData['raw_user_meta_data']?['email'] ?? '정보 없음',
+        username: profileData['username'] ?? '프로필 없음',
+        
+        // ⭐️ 1. level이 null일 경우 기본값으로 0을 사용하도록 수정합니다.
+        level: profileData['level'] ?? 0, 
+
+        // ⭐️ 2. createdAt도 null일 수 있으므로 안전하게 처리합니다.
+        createdAt: profileData['created_at'] != null
+            ? DateTime.parse(profileData['created_at'])
+            : DateTime.now(),
       ),
       participations: (json['participations'] as List? ?? [])
           .map((p) => UserParticipation.fromJson(p))

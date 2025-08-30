@@ -46,10 +46,13 @@ class UserManagementScreen extends ConsumerWidget {
                       columns: const [
                         DataColumn(label: Text('이름')),
                         DataColumn(label: Text('이메일')),
+                        DataColumn(label: Text('레벨')),
                         DataColumn(label: Text('가입일')),
                         DataColumn(label: Text('관리')),
                       ],
                       rows: users.map((user) {
+                        // ⭐️ 모든 필드의 값을 화면에 표시하기 전에 안전한 기본값으로 미리 처리합니다.
+    
                         return DataRow(
                           // 💡 onSelectChanged를 사용하여 행 클릭 이벤트 처리
     onSelectChanged: (isSelected) {
@@ -58,9 +61,10 @@ class UserManagementScreen extends ConsumerWidget {
       }
     },
                           cells: [
-                          DataCell(Text(user.username ?? '이름 없음')),
-                          DataCell(Text(user.email ?? '이메일 없음')),
-                          DataCell(Text(DateFormat('yyyy-MM-dd').format(user.createdAt)),
+                          DataCell(Text(user.username)),
+                          DataCell(Text(user.email)),
+                          DataCell(Text(user.level.toString())),
+                          DataCell(Text(DateFormat('yyyy-MM-dd').format(user.createdAt!)),
             ),
                           DataCell(
                             Row(
