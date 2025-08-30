@@ -1,3 +1,4 @@
+// nanum_admin/lib/features/user_management/view/user_management_screen.dart
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -57,8 +58,8 @@ class UserManagementScreen extends ConsumerWidget {
       }
     },
                           cells: [
-                          DataCell(Text(user.username)),
-                          DataCell(Text(user.email)),
+                          DataCell(Text(user.username ?? '이름 없음')),
+                          DataCell(Text(user.email ?? '이메일 없음')),
                           DataCell(Text(DateFormat('yyyy-MM-dd').format(user.createdAt)),
             ),
                           DataCell(
