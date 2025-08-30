@@ -37,7 +37,7 @@ class GroupBuyManagementScreen extends ConsumerWidget {
                     rows: groupBuys.map((gb) {
                       return DataRow(cells: [
                         DataCell(Text(gb.productName)),
-                        DataCell(Text(gb.hostName)),
+                        DataCell(Text(gb.hostName ?? '정보 없음')),
                         DataCell(Text('${gb.currentParticipants} / ${gb.targetParticipants}')),
                         DataCell(Text(gb.status)),
                         DataCell(
