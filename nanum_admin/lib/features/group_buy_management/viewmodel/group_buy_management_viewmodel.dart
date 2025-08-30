@@ -3,24 +3,21 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../data/models/managed_group_buy_model.dart';
 import '../../../data/repositories/group_buy_admin_repository.dart';
 
-<<<<<<< HEAD
-final groupBuyManagementViewModelProvider = StateNotifierProvider.autoDispose<GroupBuyManagementViewModel, 
-AsyncValue<List<ManagedGroupBuy>>>((ref) {
-<<<<<<< HEAD
-  
-=======
-final groupBuyManagementViewModelProvider = StateNotifierProvider.autoDispose<GroupBuyManagementViewModel, AsyncValue<List<ManagedGroupBuy>>>((ref) {
->>>>>>> parent of 9efadbe (에러해결확인01)
-=======
-   // 👇 이 코드를 추가!
-  print("✅ productsProvider가 실행되었습니다!"); 
->>>>>>> parent of efff87f (에러해결확인02)
-  return GroupBuyManagementViewModel(ref.read(groupBuyAdminRepositoryProvider));
-});
+final groupBuyManagementViewModelProvider =
+    StateNotifierProvider.autoDispose<
+      GroupBuyManagementViewModel,
+      AsyncValue<List<ManagedGroupBuy>>
+    >((ref) {
+      return GroupBuyManagementViewModel(
+        ref.read(groupBuyAdminRepositoryProvider),
+      );
+    });
 
-class GroupBuyManagementViewModel extends StateNotifier<AsyncValue<List<ManagedGroupBuy>>> {
+class GroupBuyManagementViewModel
+    extends StateNotifier<AsyncValue<List<ManagedGroupBuy>>> {
   final GroupBuyAdminRepository _repository;
-  GroupBuyManagementViewModel(this._repository) : super(const AsyncValue.loading()) {
+  GroupBuyManagementViewModel(this._repository)
+    : super(const AsyncValue.loading()) {
     fetchAllGroupBuys();
   }
 
