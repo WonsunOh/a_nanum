@@ -59,7 +59,8 @@ class UserManagementScreen extends ConsumerWidget {
                           cells: [
                           DataCell(Text(user.username)),
                           DataCell(Text(user.email)),
-                          DataCell(Text(DateFormat('yyyy-MM-dd').format(user.createdAt))),
+                          DataCell(Text(DateFormat('yyyy-MM-dd').format(user.createdAt)),
+            ),
                           DataCell(
                             Row(
                               children: [
