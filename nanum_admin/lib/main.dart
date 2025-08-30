@@ -2,6 +2,8 @@ import 'dart:ui';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
+import 'package:flutter_quill/flutter_quill.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'core/router.dart';
@@ -33,21 +35,33 @@ class MyCustomScrollBehavior extends MaterialScrollBehavior {
       };
 }
 
-class MyApp extends StatelessWidget {
+class MyApp extends ConsumerWidget {
   const MyApp({super.key});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     return MaterialApp.router(
       debugShowCheckedModeBanner: false,
       routerConfig: router,
       // ⭐️ 앱 전체에 새로운 스크롤 동작 적용
       scrollBehavior: MyCustomScrollBehavior(),
-      title: '나눔 어드민',
+      title: '나눔 관리자',
       theme: ThemeData(
-        primarySwatch: Colors.indigo,
-        scaffoldBackgroundColor: Colors.grey[50],
+        primarySwatch: Colors.blue,
+        fontFamily: 'Pretendard',
       ),
+      // ⭐️ 2. localizationsDelegates에 FlutterQuillLocalizations.delegate를 추가합니다.
+      localizationsDelegates: const [
+        GlobalMaterialLocalizations.delegate,
+        GlobalWidgetsLocalizations.delegate,
+        GlobalCupertinoLocalizations.delegate,
+        FlutterQuillLocalizations.delegate, // 이 줄 추가
+      ],
+      supportedLocales: const [
+        Locale('ko', 'KR'), // 한국어 지원
+        Locale('en', 'US'), // 영어 지원 (기본)
+      ],
+      locale: const Locale('ko'), // 기본 언어를 한국어로 설정
     );
   }
 }

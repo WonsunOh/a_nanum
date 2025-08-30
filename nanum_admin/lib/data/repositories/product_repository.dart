@@ -19,17 +19,25 @@ class ProductRepository {
 
   ProductRepository(this._client);
 
-  // 모든 상품 목록을 가져오는 기능
+  // 관리자 페이지의 모든 상품 목록을 가져오는 기능
   Future<List<ProductModel>> fetchProducts() async {
-    final data = await _client.from('products').select().order('created_at');
+    // ⭐️ .from('products')를 .from('products_with_category_path')로 변경!
+    final data = await _client
+        .from('products_with_category_path')
+        .select('*') // 이제 모든 정보가 포함되어 있으므로 '*'로 충분합니다.
+        .order('created_at', ascending: false);
+        
     return data.map((item) => ProductModel.fromJson(item)).toList();
   }
-
   // 상품을 추가하는 기능
   Future<void> addProduct({
     required String name,
     String? description,
     required int price,
+    int? discountPrice,
+    DateTime? discountStartDate,
+    DateTime? discountEndDate,
+
     required int stockQuantity,
     required int categoryId,
     required bool isDisplayed,
@@ -39,13 +47,17 @@ class ProductRepository {
     String? productCode,
     String? relatedProductCode,
     String? imageUrl,
-    required int shippingFee, // ⭐️ 1. shippingFee 파라미터 추가
-    Map<String, bool>? tags, // ⭐️ 2. tags 파라미터 추가
+    required int shippingFee, 
+    Map<String, bool>? tags, 
+    
   }) async {
-    final newProduct = await _client.from('products').insert({
+    final Map<String, dynamic> productData =({
       'name': name,
       'description': description,
       'total_price': price,
+      'discount_price': discountPrice,
+      'discount_start_date': discountStartDate?.toIso8601String(), // ⭐️ 4. insert 구문에 추가
+     'discount_end_date': discountEndDate?.toIso8601String(),
       'stock_quantity': stockQuantity,
       'category_id': categoryId,
       'is_displayed': isDisplayed,
@@ -55,14 +67,38 @@ class ProductRepository {
       'image_url': imageUrl,
       'shipping_fee': shippingFee, // ⭐️ 3. insert 구문에 추가
     'tags': tags,
-    }).select().single();
+    
+    
+    });
 
+    // ⭐️ [데이터 추적 3단계] Repository에서 DB로 데이터를 보내기 직전 최종 값 확인
+    debugPrint('--- [REPOSITORY] Inserting Data to Supabase ---');
+    debugPrint(productData.toString());
+    debugPrint('------------------------------------------------');
+
+  final newProduct = await _client.from('products').insert(productData).select().single();
     final newProductId = newProduct['id'];
 
   // ⭐️ 옵션 데이터가 있을 때만 저장 로직을 실행
   if (optionGroups != null && variants != null) {
     await _saveFullOptions(newProductId, optionGroups, variants);
   }
+  }
+
+  // ⭐️ 가격 정보만 업데이트하는 효율적인 메서드 추가
+  Future<void> updateProductPrice({
+    required int productId,
+    required int price,
+    int? discountPrice,
+    DateTime? discountStartDate,
+    DateTime? discountEndDate,
+  }) async {
+    await _client.from('products').update({
+      'total_price': price,
+      'discount_price': discountPrice,
+      'discount_start_date': discountStartDate?.toIso8601String(),
+      'discount_end_date': discountEndDate?.toIso8601String(),
+    }).eq('id', productId);
   }
 
   // ⭐️ 조합형 옵션을 저장하는 비공개 헬퍼 메서드
@@ -74,6 +110,7 @@ Future<void> _saveFullOptions(int productId, List<OptionGroup> optionGroups, Lis
     final newGroup = await _client.from('product_option_groups').insert({
       'product_id': productId,
       'name': group.name,
+      
     }).select().single();
     final newGroupId = newGroup['id'];
 
@@ -107,12 +144,34 @@ Future<void> _saveFullOptions(int productId, List<OptionGroup> optionGroups, Lis
 // ⭐️ 상품 수정 메서드 수정
 Future<void> updateProductWithOptions(ProductModel product, {List<OptionGroup>? optionGroups, List<ProductVariant>? variants}) async {
   // 1. 상품 기본 정보 업데이트
-  await _client.from('products').update(product.toJson()).eq('id', product.id);
+  final Map<String, dynamic> productData =({
+      'name': product.name,
+      'description': product.description,
+      'total_price': product.price,
+      'stock_quantity': product.stockQuantity,
+      'category_id': product.categoryId,
+      'is_displayed': product.isDisplayed,
+      'is_sold_out': product.isSoldOut,
+      'product_code': product.productCode,
+      'related_product_code': product.relatedProductCode,
+      'shipping_fee': product.shippingFee,
+      'tags': product.tags,
+      'image_url': product.imageUrl,
+      'discount_price': product.discountPrice,
+      // ⭐️ 6. 누락되었던 날짜 필드를 여기에 추가합니다.
+      'discount_start_date': product.discountStartDate?.toIso8601String(),
+      'discount_end_date': product.discountEndDate?.toIso8601String(),
+    });
 
-  // 2. 기존 옵션 관련 정보 깨끗하게 삭제
-  await _client.from('product_variants').delete().eq('product_id', product.id);
-  await _client.from('product_option_groups').delete().eq('product_id', product.id);
+  // ⭐️ [데이터 추적 3단계] Repository에서 DB로 데이터를 보내기 직전 최종 값 확인
+    debugPrint('--- [REPOSITORY] Updating Data to Supabase ---');
+    debugPrint(productData.toString());
+    debugPrint('-----------------------------------------------');
 
+  await _client.from('products').update(productData).eq('id', product.id);
+
+    await _client.from('product_variants').delete().eq('product_id', product.id);
+    await _client.from('product_option_groups').delete().eq('product_id', product.id);
   // 3. 새로운 옵션 데이터가 있을 때만 저장
   if (optionGroups != null && variants != null) {
     await _saveFullOptions(product.id, optionGroups, variants);
@@ -209,4 +268,26 @@ Future<(List<OptionGroup>, List<ProductVariant>)> fetchOptionsAndVariants(int pr
 
     return (optionGroups, variants);
 }
+
+// 할인 중인 상품 목록만 가져오는 기능
+  Future<List<ProductModel>> fetchDiscountedProducts() async {
+    final data = await _client
+        .from('products_with_category_path') // 기존 VIEW 재사용
+        .select('*')
+        .not('discount_price', 'is', null) // discount_price가 null이 아니고
+        .gt('discount_price', 0) // 0보다 큰 상품만
+        .order('created_at', ascending: false);
+        
+    return data.map((item) => ProductModel.fromJson(item)).toList();
+  }
+Future<List<ProductModel>> searchProducts(String query) async {
+    final data = await _client
+        .from('products_with_category_path')
+        .select('*')
+        // 'name' 컬럼에서 query를 포함하는 모든 데이터를 대소문자 구분 없이 검색
+        .ilike('name', '%$query%')
+        .order('created_at', ascending: false);
+        
+    return data.map((item) => ProductModel.fromJson(item)).toList();
+  }
 }
