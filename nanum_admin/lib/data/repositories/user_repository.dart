@@ -5,36 +5,39 @@ import '../models/app_user_model.dart';
 import '../models/user_detail_model.dart';
 
 class UserRepository {
-  final SupabaseClient _supabaseAdmin;
+  // 생성자에서 SupabaseClient를 직접 받도록 수정
+  final SupabaseClient _client;
+  UserRepository(this._client);
 
-  UserRepository(this._supabaseAdmin);
-  
   // 모든 사용자 목록을 가져옵니다.
   Future<List<AppUser>> fetchAllUsers({String? searchQuery}) async {
     try {
-      final List<User> response = await _supabaseAdmin.auth.admin.listUsers();
+      // 이제 관리자 클라이언트가 아닌, 안전한 전역 클라이언트를 사용합니다.
+      // 이 API는 관리자 권한이 필요하므로, Supabase 대시보드에서 RLS 정책으로 제어해야 합니다.
+      final List<User> response = await _client.auth.admin.listUsers();
       
-      final profilesResponse = await _supabaseAdmin.from('profiles').select('id, username, level');
+      final profilesResponse = await _client.from('profiles').select('id, username, level');
       final profilesMap = {
-      for (var p in profilesResponse)
-        p['id']: {'username': p['username'], 'level': p['level']}
-    };
+        for (var p in profilesResponse)
+          p['id']: {'username': p['username'], 'level': p['level']}
+      };
 
-      // 💡 2. 실제 사용자 목록은 response 객체 안의 'users' 리스트에 들어있습니다.
       List<AppUser> users = response.map((user) {
         final userProfile = profilesMap[user.id];
         return AppUser.fromUser(
           user,
           username: userProfile?['username'],
-        level: userProfile?['level'],
+          level: userProfile?['level'],
         );
       }).toList();
 
       if (searchQuery != null && searchQuery.isNotEmpty) {
         users = users.where((user) {
           final query = searchQuery.toLowerCase();
+          // 💡 버그 수정: user.username이 아닌, profiles에서 가져온 username으로 검색
+          final username = user.username.toLowerCase() ?? '';
           return user.email.toLowerCase().contains(query) ||
-                 user.username.toLowerCase().contains(query);
+                 username.contains(query);
         }).toList();
       }
       
@@ -45,11 +48,10 @@ class UserRepository {
     }
   }
 
-
-  // 💡 사용자 상세 정보를 가져오는 메소드
+  // 사용자 상세 정보를 가져오는 메소드
   Future<UserDetailModel> fetchUserDetails(String userId) async {
     try {
-      final response = await _supabaseAdmin.rpc(
+      final response = await _client.rpc(
         'get_user_details',
         params: {'p_user_id': userId},
       ).single();
@@ -60,10 +62,10 @@ class UserRepository {
     }
   }
 
-  // 💡 사용자 레벨을 수정하는 메소드
+  // 사용자 레벨을 수정하는 메소드
   Future<void> updateUserLevel(String userId, int newLevel) async {
     try {
-      await _supabaseAdmin
+      await _client
           .from('profiles')
           .update({'level': newLevel})
           .eq('id', userId);
