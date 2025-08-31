@@ -1,7 +1,6 @@
 // nanum_admin/lib/data/repositories/order_repository.dart (전체 수정)
 
 import 'package:flutter/material.dart';
-import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
@@ -11,18 +10,15 @@ import '../models/order_model.dart';
 enum OrderType { shop, groupBuy }
 
 class OrderRepository {
-  final SupabaseClient _supabaseAdmin;
+  final SupabaseClient _client;
 
-  OrderRepository()
-      : _supabaseAdmin = SupabaseClient(
-          dotenv.env['SUPABASE_URL']!,
-          dotenv.env['SUPABASE_SERVICE_ROLE_KEY']!,
-        );
+  OrderRepository(this._client);
+     
 
   // ⭐️ 2. 기존 함수를 '공동구매' 주문 전용으로 변경합니다.
   Future<List<Order>> fetchGroupBuyOrders() async {
     try {
-      final response = await _supabaseAdmin
+      final response = await _client
           .from('participants')
           .select('''
             id,
@@ -48,7 +44,7 @@ class OrderRepository {
   //    기존 Order 모델과 형식을 맞추기 위해 SQL 쿼리를 조정합니다.
   Future<List<Order>> fetchShopOrders() async {
     try {
-      final response = await _supabaseAdmin
+      final response = await _client
           .from('order_items')
           .select('''
             id,
@@ -83,7 +79,7 @@ class OrderRepository {
   // 송장 번호 일괄 업데이트 RPC를 호출하는 메소드 (기존 코드 유지)
   Future<void> batchUpdateTrackingNumbers(List<Map<String, dynamic>> updates) async {
     try {
-      await _supabaseAdmin.rpc('batch_update_tracking_numbers', params: {'updates': updates});
+      await _client.rpc('batch_update_tracking_numbers', params: {'updates': updates});
     } catch (e) {
       debugPrint('Error batch updating tracking numbers: $e');
       rethrow;
@@ -91,4 +87,6 @@ class OrderRepository {
   }
 }
 
-final orderRepositoryProvider = Provider((ref) => OrderRepository());
+final orderRepositoryProvider = Provider((ref) {
+  return OrderRepository(Supabase.instance.client);
+});
