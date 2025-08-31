@@ -1,23 +1,22 @@
+// dashboard_repository.dart
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-
-import 'package:flutter_dotenv/flutter_dotenv.dart';
 import '../models/dashboard_metrics_model.dart';
 
 class DashboardRepository {
-  final SupabaseClient _supabaseAdmin;
+  // 생성자에서 SupabaseClient를 직접 받도록 수정
+  final SupabaseClient _client;
+  DashboardRepository(this._client);
 
-  DashboardRepository()
-      : _supabaseAdmin = SupabaseClient(
-          dotenv.env['SUPABASE_URL']!,
-          dotenv.env['SUPABASE_SERVICE_ROLE_KEY']!,
-        );
-  
   Future<DashboardMetrics> fetchMetrics() async {
-    // .rpc() 호출 시 .single()을 붙여주면 단일 JSON 객체를 반환받습니다.
-    final response = await _supabaseAdmin.rpc('get_dashboard_metrics').single();
+    // 이제 안전한 전역 클라이언트를 사용합니다.
+    final response = await _client.rpc('get_dashboard_metrics').single();
     return DashboardMetrics.fromJson(response);
   }
 }
 
-final dashboardRepositoryProvider = Provider((ref) => DashboardRepository());
+final dashboardRepositoryProvider = Provider((ref) {
+  // main.dart에서 초기화된 전역 클라이언트를 주입합니다.
+  return DashboardRepository(Supabase.instance.client);
+});

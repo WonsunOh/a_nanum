@@ -18,6 +18,7 @@ import '../features/shop_management.dart/products/view/discount_product_screen.d
 import '../features/shop_management.dart/products/view/product_management_screen.dart';
 import '../features/group_buy_management/view/group_buy_management_screen.dart';
 import '../features/order_management/view/order_management_screen.dart';
+import '../features/shop_management.dart/promotions/view/promotion_management_screen.dart';
 import '../features/user_management/view/user_management_screen.dart';
 import '../features/user_management/view/user_detail_screen.dart';
 import 'main_layout.dart';
@@ -87,7 +88,7 @@ final router = GoRouter(
           builder: (context, state) => const DiscountProductScreen(),
         ),GoRoute(
           path: '/shop/promotions',
-          builder: (context, state) => const ProductManagementScreen(),
+          builder: (context, state) => const PromotionManagementScreen(),
         ),
         GoRoute(
           path: '/shop/categories',
