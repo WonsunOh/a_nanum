@@ -1,18 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import 'package:flutter_dotenv/flutter_dotenv.dart';
 import '../models/app_user_model.dart';
 import '../models/user_detail_model.dart';
 
 class UserRepository {
   final SupabaseClient _supabaseAdmin;
 
-  UserRepository()
-      : _supabaseAdmin = SupabaseClient(
-          dotenv.env['SUPABASE_URL']!,
-          dotenv.env['SUPABASE_SERVICE_ROLE_KEY']!,
-        );
+  UserRepository(this._supabaseAdmin);
   
   // 모든 사용자 목록을 가져옵니다.
   Future<List<AppUser>> fetchAllUsers({String? searchQuery}) async {
@@ -79,4 +74,7 @@ class UserRepository {
   }
 }
 
-final userRepositoryProvider = Provider((ref) => UserRepository());
+final userRepositoryProvider = Provider((ref) {
+  // main.dart에서 초기화된 전역 클라이언트를 주입합니다.
+  return UserRepository(Supabase.instance.client);
+});
