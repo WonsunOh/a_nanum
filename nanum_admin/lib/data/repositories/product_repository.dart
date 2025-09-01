@@ -223,7 +223,7 @@ Future<void> _saveOptions(int productId, List<ProductOption> options) async {
   Future<String?> uploadImage(Uint8List imageBytes, String fileName) async {
     try {
       final fileExtension = p.extension(fileName); // 파일 확장자 추출
-      final uniqueFileName = '${DateTime.now().millisecondsSinceEpoch}$fileExtension';
+      final uniqueFileName = 'public/${DateTime.now().millisecondsSinceEpoch}$fileExtension';
       const bucketName = 'products'; // Supabase Storage의 버킷 이름
 
       // 1. 파일을 스토리지에 업로드합니다.
@@ -289,5 +289,38 @@ Future<List<ProductModel>> searchProducts(String query) async {
         .order('created_at', ascending: false);
         
     return data.map((item) => ProductModel.fromJson(item)).toList();
+  }
+/// 'products' 버킷의 'public' 폴더에 있는 모든 파일을 삭제하는 함수
+  Future<void> emptyPublicFolderInProducts() async {
+    const bucketName = 'products';
+    const folderName = 'public';
+
+    debugPrint('"$bucketName" 버킷의 "$folderName" 폴더 삭제를 시작합니다...');
+
+    try {
+      final fileList = await _client.storage
+          .from(bucketName)
+          .list(path: folderName);
+
+      if (fileList.isEmpty) {
+        debugPrint('✅ 폴더에 삭제할 파일이 없습니다.');
+        return;
+      }
+
+      final filePathsToRemove = fileList
+          .map((file) => '$folderName/${file.name}')
+          .toList();
+
+      await _client.storage
+          .from(bucketName)
+          .remove(filePathsToRemove);
+      
+      debugPrint('✅ ${filePathsToRemove.length}개의 파일이 성공적으로 삭제되었습니다.');
+
+    } on StorageException catch (e) {
+      debugPrint('🚨 스토리지 에러 발생: ${e.message}');
+    } catch (e) {
+      debugPrint('🚨 알 수 없는 에러 발생: $e');
+    }
   }
 }
