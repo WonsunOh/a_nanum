@@ -1,11 +1,25 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../../core/constants/app_constants.dart';
+import '../../../core/errors/app_exception.dart';
+import '../../../core/errors/error_handler.dart';
+import '../../../core/utils/logger.dart';
 import '../../../data/models/group_buy_model.dart';
 import '../../../data/repositories/group_buy_repository.dart';
 
-// '상품 선택' 화면을 위한 Provider
-final masterProductsProvider = FutureProvider.autoDispose<List<Product>>((ref) {
-  final repository = ref.watch(groupBuyRepositoryProvider);
-  return repository.fetchMasterProducts();
+// ✅ 1단계: 기존 구조 유지 + 에러 처리 + 로깅
+final masterProductsProvider = FutureProvider.autoDispose<List<Product>>((ref) async {
+  try {
+    Logger.debug('마스터 상품 목록 로드 시작', 'MasterProducts');
+    
+    final repository = ref.watch(groupBuyRepositoryProvider);
+    final products = await repository.fetchMasterProducts();
+    
+    Logger.info('마스터 상품 로드 완료: ${products.length}개', 'MasterProducts');
+    return products;
+  } catch (error, stackTrace) {
+    Logger.error('마스터 상품 로드 실패', error, stackTrace, 'MasterProducts');
+    throw ErrorHandler.handleSupabaseError(error);
+  }
 });
 
 // '공구 설정' 화면의 액션을 위한 ViewModel Provider
@@ -29,23 +43,37 @@ class CreateGroupBuyViewModel extends StateNotifier<AsyncValue<void>> {
     required int initialQuantity,
     required DateTime deadline,
   }) async {
-    state = const AsyncValue.loading();
     try {
-      // Repository의 함수를 직접 호출합니다.
+      // 입력 검증
+      if (targetParticipants < AppConstants.minGroupBuyParticipants) {
+        throw ValidationException('최소 참여자는 ${AppConstants.minGroupBuyParticipants}명입니다.');
+      }
+      if (targetParticipants > AppConstants.maxGroupBuyParticipants) {
+        throw ValidationException('최대 참여자는 ${AppConstants.maxGroupBuyParticipants}명입니다.');
+      }
+      if (deadline.isBefore(DateTime.now())) {
+        throw const ValidationException('마감일은 현재 시간보다 미래여야 합니다.');
+      }
+
+      Logger.debug('공동구매 생성 시작: 상품ID $productId', 'CreateGroupBuy');
+      
+      state = const AsyncValue.loading();
+      
       await _repository.createGroupBuyFromMaster(
         productId: productId,
         targetParticipants: targetParticipants,
         initialQuantity: initialQuantity,
         deadline: deadline,
       );
-      // 성공 시, state를 data로 변경하고 true를 반환합니다.
-      state = const AsyncValue.data(null);
-      return true;
-    } catch (e, s) {
       
-
-      // state를 error로 변경하고 false를 반환합니다.
-      state = AsyncValue.error(e, s);
+      state = const AsyncValue.data(null);
+      Logger.info('공동구매 생성 성공', 'CreateGroupBuy');
+      return true;
+    } catch (error, stackTrace) {
+      Logger.error('공동구매 생성 실패', error, stackTrace, 'CreateGroupBuy');
+      
+      final appError = ErrorHandler.handleSupabaseError(error);
+      state = AsyncValue.error(appError, stackTrace);
       return false;
     }
   }

@@ -1,5 +1,7 @@
 // user_app/lib/features/shop/viewmodel/product_detail_viewmodel.dart (전체 교체)
 import 'package:riverpod_annotation/riverpod_annotation.dart';
+import '../../../core/errors/error_handler.dart';
+import '../../../core/utils/logger.dart';
 import '../../../data/models/product_model.dart';
 import '../../../data/models/product_variant_model.dart';
 import '../../../data/repositories/product_repository.dart';
@@ -19,26 +21,35 @@ class ProductDetailState {
   });
 }
 
-// ⭐️ 2. Provider가 ProductModel 대신 ProductDetailState를 반환하도록 변경
+// ✅ 1단계: 기존 구조 + 에러 처리 + 성능 최적화
 @riverpod
 Future<ProductDetailState> productDetail(
   ProductDetailRef ref,
   int productId,
 ) async {
-  final productRepository = ref.watch(productRepositoryProvider);
+  try {
+    Logger.debug('상품 상세 정보 로드 시작: $productId', 'ProductDetail');
+    
+    final productRepository = ref.watch(productRepositoryProvider);
 
-  // ⭐️ 3. 상품 정보와 옵션 정보를 병렬로 동시에 불러옵니다.
-  final results = await Future.wait([
-    productRepository.fetchProductById(productId),
-    productRepository.fetchProductOptionsAndVariants(productId),
-  ]);
+    // ✅ 병렬 처리로 성능 최적화
+    final results = await Future.wait([
+      productRepository.fetchProductById(productId),
+      productRepository.fetchProductOptionsAndVariants(productId),
+    ]);
 
-  final product = results[0] as ProductModel;
-  final optionsData = results[1] as (List<OptionGroup>, List<ProductVariant>);
+    final product = results[0] as ProductModel;
+    final optionsData = results[1] as (List<OptionGroup>, List<ProductVariant>);
 
-  return ProductDetailState(
-    product: product,
-    optionGroups: optionsData.$1,
-    variants: optionsData.$2,
-  );
+    Logger.info('상품 상세 정보 로드 완료: ${product.name}', 'ProductDetail');
+    
+    return ProductDetailState(
+      product: product,
+      optionGroups: optionsData.$1,
+      variants: optionsData.$2,
+    );
+  } catch (error, stackTrace) {
+    Logger.error('상품 상세 정보 로드 실패', error, stackTrace, 'ProductDetail');
+    throw ErrorHandler.handleSupabaseError(error);
+  }
 }

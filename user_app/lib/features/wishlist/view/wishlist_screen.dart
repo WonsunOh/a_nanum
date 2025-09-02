@@ -37,7 +37,7 @@ class WishlistScreen extends ConsumerWidget {
                   icon: const Icon(Icons.delete_outline, color: Colors.redAccent),
                   onPressed: () {
                     // 찜 목록에서 삭제
-                    ref.read(wishlistViewModelProvider.notifier).remove(product.id);
+                    ref.read(wishlistViewModelProvider.notifier).removeFromWishlist(product.id);
                   },
                 ),
                 onTap: () {

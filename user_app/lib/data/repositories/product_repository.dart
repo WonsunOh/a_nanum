@@ -1,8 +1,8 @@
 // user_app/lib/data/repositories/product_repository.dart
 
-import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import '../../core/errors/error_handler.dart';
 import '../models/product_model.dart';
 import '../models/product_variant_model.dart';
 
@@ -18,28 +18,18 @@ class ProductRepository {
   ProductRepository(this._client);
 
   // 쇼핑몰에 진열된 모든 상품 목록을 가져오는 메서드
+  /// ✅ 에러 처리가 추가된 상품 목록 조회
   Future<List<ProductModel>> fetchProducts() async {
     try {
-      final response = await _client
-          .from('products')
-          .select()
-          .eq('is_displayed', true) // '진열됨' 상태인 상품만 필터링
+      final data = await _client
+          .from('products_with_category_path')
+          .select('*')
           .order('created_at', ascending: false);
-
-      final List<ProductModel> products = [];
-      for (final item in response) {
-        try {
-          // 정상적인 데이터만 리스트에 추가
-          products.add(ProductModel.fromJson(item));
-        } catch (e) {
-          // 문제가 있는 데이터는 건너뛰고, 디버그 콘솔에 로그를 남김
-          debugPrint('Skipping a product due to parsing error: $e. Data: $item');
-        }
-      }
-      return products;
-    } catch (e) {
-      debugPrint('Error fetching products: $e');
-      rethrow;
+      
+      return data.map((item) => ProductModel.fromJson(item)).toList();
+    } catch (error, stackTrace) {
+      ErrorHandler.logError(error, stackTrace, 'fetchProducts');
+      throw ErrorHandler.handleSupabaseError(error);
     }
   }
 

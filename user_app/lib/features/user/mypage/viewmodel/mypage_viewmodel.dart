@@ -1,5 +1,8 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../../core/errors/app_exception.dart';
+import '../../../../core/errors/error_handler.dart';
+import '../../../../core/utils/logger.dart';
 import '../../../../data/models/group_buy_model.dart';
 import '../../../../data/models/my_participation_model.dart';
 import '../../../../data/repositories/group_buy_repository.dart';
@@ -9,10 +12,19 @@ final myPageViewModelProvider = StateNotifierProvider.autoDispose<MyPageViewMode
   return MyPageViewModel(ref.read(groupBuyRepositoryProvider));
 });
 
-// 💡 '내가 개설한 공구' 목록을 위한 Provider (이것은 그대로 유지)
-final myHostedGroupBuysProvider = FutureProvider.autoDispose<List<GroupBuy>>((ref) {
-  final repository = ref.watch(groupBuyRepositoryProvider);
-  return repository.fetchMyHostedGroupBuys();
+final myHostedGroupBuysProvider = FutureProvider.autoDispose<List<GroupBuy>>((ref) async {
+  try {
+    Logger.debug('내가 개설한 공구 로드 시작', 'MyHostedGroupBuys');
+    
+    final repository = ref.watch(groupBuyRepositoryProvider);
+    final groupBuys = await repository.fetchMyHostedGroupBuys();
+    
+    Logger.info('개설한 공구 로드 완료: ${groupBuys.length}개', 'MyHostedGroupBuys');
+    return groupBuys;
+  } catch (error, stackTrace) {
+    Logger.error('개설한 공구 로드 실패', error, stackTrace, 'MyHostedGroupBuys');
+    throw ErrorHandler.handleSupabaseError(error);
+  }
 });
 
 
@@ -23,26 +35,54 @@ class MyPageViewModel extends StateNotifier<AsyncValue<List<MyParticipation>>> {
     fetchMyParticipations();
   }
 
-  // 데이터 로드 및 새로고침
+  // ✅ 1단계: 기존 기능 + 에러 처리 + 로깅
   Future<void> fetchMyParticipations() async {
-    state = const AsyncValue.loading();
-    state = await AsyncValue.guard(() => _repository.fetchMyParticipations());
+    try {
+      Logger.debug('내 참여 목록 로드 시작', 'MyPageViewModel');
+      
+      state = const AsyncValue.loading();
+      final participations = await _repository.fetchMyParticipations();
+      
+      state = AsyncValue.data(participations);
+      Logger.info('참여 목록 로드 완료: ${participations.length}개', 'MyPageViewModel');
+    } catch (error, stackTrace) {
+      Logger.error('참여 목록 로드 실패', error, stackTrace, 'MyPageViewModel');
+      state = AsyncValue.error(ErrorHandler.handleSupabaseError(error), stackTrace);
+    }
   }
 
-  // 참여 취소 (반환 타입 void)
   Future<void> cancelParticipation(int groupBuyId) async {
-    // 낙관적 업데이트: UI를 먼저 로딩 상태로 변경
-    state = const AsyncValue.loading();
-    // guard를 사용해 repository 호출
-    await AsyncValue.guard(() => _repository.cancelParticipation(groupBuyId));
-    // 작업 완료 후, 목록을 다시 불러와 state를 갱신
-    await fetchMyParticipations();
+    try {
+      Logger.debug('참여 취소 시도: 공구ID $groupBuyId', 'MyPageViewModel');
+      
+      state = const AsyncValue.loading();
+      await _repository.cancelParticipation(groupBuyId);
+      
+      await fetchMyParticipations(); // 목록 새로고침
+      Logger.info('참여 취소 완료', 'MyPageViewModel');
+    } catch (error, stackTrace) {
+      Logger.error('참여 취소 실패', error, stackTrace, 'MyPageViewModel');
+      state = AsyncValue.error(ErrorHandler.handleSupabaseError(error), stackTrace);
+    }
   }
 
-  // 수량 변경 (반환 타입 void)
   Future<void> editQuantity(int groupBuyId, int newQuantity) async {
-    state = const AsyncValue.loading();
-    await AsyncValue.guard(() => _repository.editQuantity(groupBuyId, newQuantity));
-    await fetchMyParticipations();
+    try {
+      // 수량 검증
+      if (newQuantity < 1) {
+        throw const ValidationException('수량은 1개 이상이어야 합니다.');
+      }
+
+      Logger.debug('수량 변경 시도: 공구ID $groupBuyId, 새 수량 $newQuantity', 'MyPageViewModel');
+      
+      state = const AsyncValue.loading();
+      await _repository.editQuantity(groupBuyId, newQuantity);
+      
+      await fetchMyParticipations(); // 목록 새로고침
+      Logger.info('수량 변경 완료', 'MyPageViewModel');
+    } catch (error, stackTrace) {
+      Logger.error('수량 변경 실패', error, stackTrace, 'MyPageViewModel');
+      state = AsyncValue.error(ErrorHandler.handleSupabaseError(error), stackTrace);
+    }
   }
 }

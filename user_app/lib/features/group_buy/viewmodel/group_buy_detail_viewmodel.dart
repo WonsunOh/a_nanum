@@ -2,6 +2,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../../../core/errors/error_handler.dart';
+import '../../../core/utils/logger.dart';
 import '../../../data/models/group_buy_model.dart';
 import '../../../data/repositories/group_buy_repository.dart';
 
@@ -76,16 +78,24 @@ class GroupBuyDetailViewModel extends StateNotifier<AsyncValue<void>> {
 // 💡 현재 사용자가 특정 공구에 참여했는지 여부를 확인하는 Provider
 // .family를 사용하면 Provider에 파라미터(groupBuyId)를 전달할 수 있습니다.
 final hasJoinedProvider = FutureProvider.autoDispose.family<bool, int>((ref, groupBuyId) async {
-  final repository = ref.watch(groupBuyRepositoryProvider);
-  final currentUser = Supabase.instance.client.auth.currentUser;
+  try {
+    Logger.debug('참여 상태 확인 시작: 공구ID $groupBuyId', 'HasJoined');
+    
+    final repository = ref.watch(groupBuyRepositoryProvider);
+    final currentUser = Supabase.instance.client.auth.currentUser;
 
-  if (currentUser == null) {
-    return false; // 로그인 안 했으면 참여 안 한 것
+    if (currentUser == null) {
+      Logger.debug('비로그인 사용자 - 참여 상태: false', 'HasJoined');
+      return false;
+    }
+
+    final participantUids = await repository.getParticipantUids(groupBuyId);
+    final hasJoined = participantUids.contains(currentUser.id);
+    
+    Logger.info('참여 상태 확인 완료: $hasJoined', 'HasJoined');
+    return hasJoined;
+  } catch (error, stackTrace) {
+    Logger.error('참여 상태 확인 실패', error, stackTrace, 'HasJoined');
+    throw ErrorHandler.handleSupabaseError(error);
   }
-
-  // 1. 해당 공구의 전체 참여자 uid 목록을 가져옵니다.
-  final participantUids = await repository.getParticipantUids(groupBuyId);
-  
-  // 2. 그 목록에 현재 내 uid가 포함되어 있는지 확인합니다.
-  return participantUids.contains(currentUser.id);
 });
