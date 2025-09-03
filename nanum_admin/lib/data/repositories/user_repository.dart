@@ -5,45 +5,52 @@ import '../models/app_user_model.dart';
 import '../models/user_detail_model.dart';
 
 class UserRepository {
-  // 생성자에서 SupabaseClient를 직접 받도록 수정
   final SupabaseClient _client;
   UserRepository(this._client);
 
-  // 모든 사용자 목록을 가져옵니다.
+  // ✅ Admin API 대신 뷰를 사용하여 모든 사용자 목록을 가져옵니다
   Future<List<AppUser>> fetchAllUsers({String? searchQuery}) async {
     try {
-      // 이제 관리자 클라이언트가 아닌, 안전한 전역 클라이언트를 사용합니다.
-      // 이 API는 관리자 권한이 필요하므로, Supabase 대시보드에서 RLS 정책으로 제어해야 합니다.
-      final List<User> response = await _client.auth.admin.listUsers();
+      // 🔧 admin.listUsers() 대신 public.admin_users 뷰를 사용
+      var query = _client.from('admin_users').select('*');
       
-      final profilesResponse = await _client.from('profiles').select('id, username, level');
-      final profilesMap = {
-        for (var p in profilesResponse)
-          p['id']: {'username': p['username'], 'level': p['level']}
-      };
-
-      List<AppUser> users = response.map((user) {
-        final userProfile = profilesMap[user.id];
-        return AppUser.fromUser(
-          user,
-          username: userProfile?['username'],
-          level: userProfile?['level'],
+      // 검색 쿼리가 있으면 필터링 추가
+      if (searchQuery != null && searchQuery.isNotEmpty) {
+        query = query.or(
+          'email.ilike.%$searchQuery%,username.ilike.%$searchQuery%'
+        );
+      }
+      
+      final response = await query;
+      
+      // 응답 데이터를 AppUser 모델로 변환
+      List<AppUser> users = response.map<AppUser>((userData) {
+        return AppUser(
+          id: userData['id'],
+          email: userData['email'] ?? '',
+          username: userData['username'] ?? userData['email'] ?? '',
+          level: userData['level'] ?? 1,
+          points: userData['points'] ?? 0,
+          role: userData['role'] ?? 'user',
+          emailConfirmedAt: userData['email_confirmed_at'] != null 
+            ? DateTime.parse(userData['email_confirmed_at']) 
+            : null,
+          createdAt: userData['created_at'] != null 
+            ? DateTime.parse(userData['created_at']) 
+            : DateTime.now(),
+          lastSignInAt: userData['last_sign_in_at'] != null 
+            ? DateTime.parse(userData['last_sign_in_at']) 
+            : null,
         );
       }).toList();
-
-      if (searchQuery != null && searchQuery.isNotEmpty) {
-        users = users.where((user) {
-          final query = searchQuery.toLowerCase();
-          // 💡 버그 수정: user.username이 아닌, profiles에서 가져온 username으로 검색
-          final username = user.username.toLowerCase() ?? '';
-          return user.email.toLowerCase().contains(query) ||
-                 username.contains(query);
-        }).toList();
-      }
       
       return users;
     } catch (e) {
       debugPrint('Error fetching users: $e');
+      // 권한 에러인 경우 더 구체적인 에러 메시지 제공
+      if (e.toString().contains('403') || e.toString().contains('not_admin')) {
+        throw Exception('관리자 권한이 필요합니다. Supabase에서 관리자 권한을 설정해주세요.');
+      }
       rethrow;
     }
   }
@@ -74,9 +81,21 @@ class UserRepository {
       rethrow;
     }
   }
+
+  // 사용자 역할을 수정하는 메소드 (새로 추가)
+  Future<void> updateUserRole(String userId, String newRole) async {
+    try {
+      await _client
+          .from('profiles')
+          .update({'role': newRole})
+          .eq('id', userId);
+    } catch (e) {
+      debugPrint('Error updating user role: $e');
+      rethrow;
+    }
+  }
 }
 
 final userRepositoryProvider = Provider((ref) {
-  // main.dart에서 초기화된 전역 클라이언트를 주입합니다.
   return UserRepository(Supabase.instance.client);
 });

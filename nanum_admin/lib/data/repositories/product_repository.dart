@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:path/path.dart' as p;
 
+import '../../core/errors/error_handler.dart';
 import '../models/product_model.dart';
 import '../models/product_option_model.dart';
 import '../models/product_variant_model.dart';
@@ -21,14 +22,20 @@ class ProductRepository {
 
   // 관리자 페이지의 모든 상품 목록을 가져오는 기능
   Future<List<ProductModel>> fetchProducts() async {
-    // ⭐️ .from('products')를 .from('products_with_category_path')로 변경!
-    final data = await _client
-        .from('products_with_category_path')
-        .select('*') // 이제 모든 정보가 포함되어 있으므로 '*'로 충분합니다.
-        .order('created_at', ascending: false);
-        
-    return data.map((item) => ProductModel.fromJson(item)).toList();
+    try {
+      final data = await _client
+          .from('products_with_category_path')
+          .select('*')
+          .order('created_at', ascending: false);
+      
+      return data.map((item) => ProductModel.fromJson(item)).toList();
+    } catch (error, stackTrace) {
+      ErrorHandler.logError(error, stackTrace, 'fetchProducts');
+      throw ErrorHandler.handleSupabaseError(error);
+    }
   }
+
+  
   // 상품을 추가하는 기능
   Future<void> addProduct({
     required String name,
@@ -71,10 +78,7 @@ class ProductRepository {
     
     });
 
-    // ⭐️ [데이터 추적 3단계] Repository에서 DB로 데이터를 보내기 직전 최종 값 확인
-    debugPrint('--- [REPOSITORY] Inserting Data to Supabase ---');
-    debugPrint(productData.toString());
-    debugPrint('------------------------------------------------');
+    
 
   final newProduct = await _client.from('products').insert(productData).select().single();
     final newProductId = newProduct['id'];

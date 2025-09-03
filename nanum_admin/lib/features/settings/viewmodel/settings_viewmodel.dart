@@ -3,6 +3,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../core/errors/error_handler.dart';
+import '../../../core/utils/logger.dart';
 import '../../../data/models/settings_model.dart';
 import '../../../data/repositories/settings_repository.dart';
 
@@ -22,9 +24,12 @@ class SettingsViewModel extends StateNotifier<AsyncValue<Map<String, Setting>>> 
     fetchSettings();
   }
 
+  // ✅ 1단계: 기존 기능 + 에러 처리 + 로깅
   Future<void> fetchSettings() async {
-    state = const AsyncValue.loading();
     try {
+      Logger.debug('설정 목록 로드 시작', 'SettingsViewModel');
+      
+      state = const AsyncValue.loading();
       final settingsList = await _repository.fetchSettings();
       final settingsMap = {for (var s in settingsList) s.key: s};
 
@@ -34,30 +39,38 @@ class SettingsViewModel extends StateNotifier<AsyncValue<Map<String, Setting>>> 
       });
 
       state = AsyncValue.data(settingsMap);
-    } catch (e, st) {
-      state = AsyncValue.error(e, st);
+      Logger.info('설정 로드 완료: ${settingsMap.length}개', 'SettingsViewModel');
+    } catch (error, stackTrace) {
+      Logger.error('설정 로드 실패', error, stackTrace, 'SettingsViewModel');
+      state = AsyncValue.error(ErrorHandler.handleSupabaseError(error), stackTrace);
     }
   }
 
   Future<bool> saveSettings() async {
     if (state.value == null) return false;
 
-    final updatedValues = <String, String>{};
-    controllers.forEach((key, controller) {
-      // 기존 값과 다를 경우에만 업데이트 목록에 추가
-      if (controller.text != state.value![key]?.value) {
-        updatedValues[key] = controller.text;
-      }
-    });
-
-    if (updatedValues.isEmpty) return true; // 변경사항 없음
-
     try {
+      Logger.debug('설정 저장 시작', 'SettingsViewModel');
+      
+      final updatedValues = <String, String>{};
+      controllers.forEach((key, controller) {
+        if (controller.text != state.value![key]?.value) {
+          updatedValues[key] = controller.text;
+        }
+      });
+
+      if (updatedValues.isEmpty) {
+        Logger.info('변경된 설정이 없습니다', 'SettingsViewModel');
+        return true;
+      }
+
       await _repository.updateSettings(updatedValues);
       await fetchSettings(); // 저장 후 데이터 다시 불러오기
+      
+      Logger.info('설정 저장 완료: ${updatedValues.length}개 항목', 'SettingsViewModel');
       return true;
-    } catch (e) {
-      debugPrint('설정 저장 실패: $e');
+    } catch (error, stackTrace) {
+      Logger.error('설정 저장 실패', error, stackTrace, 'SettingsViewModel');
       return false;
     }
   }

@@ -1,10 +1,10 @@
-// admin_web/lib/core/router.dart
+// nanum_admin/lib/core/router.dart (수정된 버전)
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
-// ⭐️ 새로운 파일 경로에 맞게 import 문을 수정했습니다.
 import '../data/models/product_model.dart';
 import '../data/repositories/order_repository.dart';
 import '../features/auth/view/login_screen.dart';
@@ -27,32 +27,51 @@ final router = GoRouter(
   initialLocation: '/dashboard',
 
   // =================================================================
-  // ⭐️⭐️ 개발자용 스위치 (Development Switch) ⭐️⭐️
+  // 🔧 로그인 문제 해결을 위한 수정된 리디렉션 로직
   // =================================================================
-  // 개발 중에는 이 redirect 부분을 주석 처리하여 매번 로그인하는 번거로움을 피하세요.
-  // 실제 배포 전에는 반드시 주석을 해제하여 보안을 활성화해야 합니다!
   
   redirect: (BuildContext context, GoRouterState state) {
     final session = Supabase.instance.client.auth.currentSession;
     final isAuthenticated = session != null;
     final isLoggingIn = state.matchedLocation == '/login';
+    
+    debugPrint('🔄 [라우터] 리디렉션 체크');
+    debugPrint('📍 [라우터] 현재 경로: ${state.matchedLocation}');
+    debugPrint('🔑 [라우터] 인증 상태: $isAuthenticated');
+    debugPrint('🚪 [라우터] 로그인 페이지 여부: $isLoggingIn');
 
-    if (!isAuthenticated && !isLoggingIn) return '/login';
-    if (isAuthenticated && isLoggingIn) return '/dashboard';
+    // ✅ 1. 로그인 페이지에 있는 경우
+    if (isLoggingIn) {
+      if (isAuthenticated) {
+        debugPrint('➡️ [라우터] 이미 로그인됨 -> 대시보드로 이동');
+        return '/dashboard';
+      } else {
+        debugPrint('✅ [라우터] 로그인 페이지 접근 허용');
+        return null; // 로그인 페이지 접근 허용
+      }
+    }
 
+    // ✅ 2. 다른 페이지에 있는 경우
+    if (!isAuthenticated) {
+      debugPrint('➡️ [라우터] 미인증 상태 -> 로그인 페이지로 이동');
+      return '/login';
+    }
+
+    // ✅ 3. 인증된 상태에서 보호된 페이지 접근
+    debugPrint('✅ [라우터] 인증된 상태 -> 접근 허용');
     return null;
   },
   
   // =================================================================
   
   routes: [
-
-    // ⭐️ 4. 로그인 페이지 경로를 추가합니다.
+    // 🔑 로그인 페이지
     GoRoute(
       path: '/login',
       builder: (context, state) => const LoginScreen(),
     ),
-    // MainLayout을 사용하여 모든 화면에 공통 사이드바를 적용합니다.
+    
+    // 🏠 관리자 메인 레이아웃
     ShellRoute(
       builder: (context, state, child) {
         return MainLayout(child: child);
@@ -62,52 +81,60 @@ final router = GoRouter(
           path: '/dashboard',
           builder: (context, state) => const DashboardScreen(),
         ),
-        // ⭐️ 새로운 경로 구조를 적용했습니다.
+        
+        // 쇼핑몰 관리
         GoRoute(
           path: '/shop/products',
           builder: (context, state) => const ProductManagementScreen(),
-           routes: [
-            // 새 상품 등록 경로
+          routes: [
             GoRoute(
-              path: 'new', // 최종 경로: /shop/products/new
+              path: 'new',
               builder: (context, state) => const AddEditProductScreen(),
             ),
-            // 기존 상품 수정 경로
             GoRoute(
-              path: 'edit/:productId', // 최종 경로: /shop/products/edit/123
+              path: 'edit/:productId',
               builder: (context, state) {
-                // ⭐️ extra를 통해 전달받은 ProductModel 객체를 화면에 넘겨줍니다.
                 final product = state.extra as ProductModel;
                 return AddEditProductScreen(productToEdit: product);
               },
             ),
           ],
         ),
+        
         GoRoute(
           path: '/shop/discount_products',
           builder: (context, state) => const DiscountProductScreen(),
-        ),GoRoute(
+        ),
+        
+        GoRoute(
           path: '/shop/promotions',
           builder: (context, state) => const PromotionManagementScreen(),
         ),
+        
         GoRoute(
           path: '/shop/categories',
           builder: (context, state) => const CategoryManagementScreen(),
         ),
+        
+        // 공동구매 관리
         GoRoute(
           path: '/group-buy',
           builder: (context, state) => const GroupBuyManagementScreen(),
         ),
+        
+        // 주문 관리
         GoRoute(
-      path: '/orders/shop',
-      builder: (context, state) =>
-          const OrderManagementScreen(orderType: OrderType.shop), // ⭐️ 파라미터 전달
-    ),
-    GoRoute(
-      path: '/orders/group-buy',
-      builder: (context, state) =>
-          const OrderManagementScreen(orderType: OrderType.groupBuy), // ⭐️ 파라미터 전달
-    ),
+          path: '/orders/shop',
+          builder: (context, state) =>
+              const OrderManagementScreen(orderType: OrderType.shop),
+        ),
+        GoRoute(
+          path: '/orders/group-buy',
+          builder: (context, state) =>
+              const OrderManagementScreen(orderType: OrderType.groupBuy),
+        ),
+        
+        // 회원 관리
         GoRoute(
           path: '/users',
           builder: (context, state) => const UserManagementScreen(),
@@ -121,6 +148,8 @@ final router = GoRouter(
             ),
           ],
         ),
+        
+        // 고객 지원
         GoRoute(
           path: '/cs/inquiries',
           builder: (context, state) => const InquiryManagementScreen(),
@@ -129,12 +158,37 @@ final router = GoRouter(
           path: '/cs/templates',
           builder: (context, state) => const ReplyTemplateScreen(),
         ),
-         // ⭐️ 아래 내용 추가
-    GoRoute(
-      path: '/settings',
-      builder: (context, state) => const SettingsScreen(),
-    ),
+        
+        // 설정
+        GoRoute(
+          path: '/settings',
+          builder: (context, state) => const SettingsScreen(),
+        ),
       ],
     ),
   ],
+  
+  // 🔧 에러 처리 개선
+  errorBuilder: (context, state) {
+    debugPrint('🚨 [라우터] 에러 발생: ${state.error}');
+    return Scaffold(
+      body: Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const Icon(Icons.error_outline, size: 64, color: Colors.red),
+            const SizedBox(height: 16),
+            Text('페이지를 찾을 수 없습니다', style: Theme.of(context).textTheme.headlineSmall),
+            const SizedBox(height: 8),
+            Text('경로: ${state.matchedLocation}'),
+            const SizedBox(height: 16),
+            ElevatedButton(
+              onPressed: () => context.go('/dashboard'),
+              child: const Text('대시보드로 이동'),
+            ),
+          ],
+        ),
+      ),
+    );
+  },
 );

@@ -41,7 +41,7 @@ dependencies:
   intl: 0.20.2
   iamport_webview_flutter: 
   url_launcher: ^6.3.2
-  flutter_dotenv: 5.2.1
+  flutter_dotenv: 6.0.0
   equatable: ^2.0.7
   excel: 4.0.6
   web: 1.1.1
@@ -50,9 +50,13 @@ dependencies:
   path: ^1.9.1
   flutter_quill: ^11.4.2
   flutter_quill_extensions: ^11.0.0
-  google_fonts: 6.3.1
+  google_fonts: 
   flutter_localizations:
     sdk: flutter
+
+  # 🚀 결제 관련 의존성 추가
+  portone_flutter_v2: 1.2.0
+  uuid: ^4.5.1
   
 
 

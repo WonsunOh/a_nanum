@@ -1,6 +1,9 @@
 // admin_web/lib/features/shop_management/categories/viewmodel/category_viewmodel.dart (전체 교체)
 
 import 'package:riverpod_annotation/riverpod_annotation.dart';
+import '../../../../core/errors/app_exception.dart';
+import '../../../../core/errors/error_handler.dart';
+import '../../../../core/utils/logger.dart';
 import '../../../../data/models/category_model.dart';
 import '../../../../data/repositories/category_repository.dart';
 
@@ -17,57 +20,89 @@ class Categories extends _$Categories {
     return _buildCategoryTree();
   }
 
-  // ⭐️ 평평한 카테고리 리스트를 계층 구조로 변환하는 핵심 로직
+  // ✅ 1단계: 기존 기능 + 에러 처리 + 로깅
   Future<List<CategoryModel>> _buildCategoryTree() async {
-    final allCategories = await _repository.fetchCategories();
-    
-    // id를 키로 하는 맵을 만들어 빠른 조회를 가능하게 합니다.
-    final Map<int, CategoryModel> categoryMap = {
-      for (var cat in allCategories) cat.id: cat
-    };
-    
-    // 최상위 카테고리들을 담을 리스트
-    final List<CategoryModel> rootCategories = [];
+    try {
+      Logger.debug('카테고리 트리 구축 시작', 'Categories');
+      
+      final allCategories = await _repository.fetchCategories();
+      
+      final Map<int, CategoryModel> categoryMap = {
+        for (var cat in allCategories) cat.id: cat
+      };
+      
+      final List<CategoryModel> rootCategories = [];
 
-    for (var category in allCategories) {
-      // 부모 ID가 없는 카테고리는 최상위(root) 카테고리입니다.
-      if (category.parentId == null) {
-        rootCategories.add(category);
-      } else {
-        // 부모 ID가 있다면, 부모 카테고리의 children 리스트에 자신을 추가합니다.
-        final parent = categoryMap[category.parentId];
-        if (parent != null) {
-          parent.children.add(category);
+      for (var category in allCategories) {
+        if (category.parentId == null) {
+          rootCategories.add(category);
+        } else {
+          final parent = categoryMap[category.parentId];
+          if (parent != null) {
+            parent.children.add(category);
+          }
         }
       }
+      
+      Logger.info('카테고리 트리 구축 완료: ${rootCategories.length}개 루트', 'Categories');
+      return rootCategories;
+    } catch (error, stackTrace) {
+      Logger.error('카테고리 트리 구축 실패', error, stackTrace, 'Categories');
+      throw ErrorHandler.handleSupabaseError(error);
     }
-    return rootCategories;
   }
 
-  // 카테고리 추가
-  Future<void> addCategory({required String name, int? parentId}) async {
-    state = const AsyncValue.loading();
-    state = await AsyncValue.guard(() async {
+ Future<void> addCategory({required String name, int? parentId}) async {
+    try {
+      // 입력 검증
+      if (name.trim().isEmpty) {
+        throw const ValidationException('카테고리명을 입력해주세요.');
+      }
+      if (name.length > 50) {
+        throw const ValidationException('카테고리명은 50자 이하여야 합니다.');
+      }
+
+      Logger.debug('카테고리 추가: $name (부모ID: $parentId)', 'Categories');
+      
+      state = const AsyncValue.loading();
       await _repository.addCategory(name: name, parentId: parentId);
-      return _buildCategoryTree(); // 목록 새로고침
-    });
+      
+      state = AsyncValue.data(await _buildCategoryTree());
+      Logger.info('카테고리 추가 완료: $name', 'Categories');
+    } catch (error, stackTrace) {
+      Logger.error('카테고리 추가 실패', error, stackTrace, 'Categories');
+      state = AsyncValue.error(ErrorHandler.handleSupabaseError(error), stackTrace);
+    }
   }
 
-  // 카테고리 수정
   Future<void> updateCategory(CategoryModel category) async {
-    state = const AsyncValue.loading();
-    state = await AsyncValue.guard(() async {
+    try {
+      Logger.debug('카테고리 수정: ${category.name}', 'Categories');
+      
+      state = const AsyncValue.loading();
       await _repository.updateCategory(category);
-      return _buildCategoryTree(); // 목록 새로고침
-    });
+      
+      state = AsyncValue.data(await _buildCategoryTree());
+      Logger.info('카테고리 수정 완료', 'Categories');
+    } catch (error, stackTrace) {
+      Logger.error('카테고리 수정 실패', error, stackTrace, 'Categories');
+      state = AsyncValue.error(ErrorHandler.handleSupabaseError(error), stackTrace);
+    }
   }
 
-  // 카테고리 삭제
-  Future<void> deleteCategory(int categoryId) async {
-    state = const AsyncValue.loading();
-    state = await AsyncValue.guard(() async {
+
+   Future<void> deleteCategory(int categoryId) async {
+    try {
+      Logger.debug('카테고리 삭제: ID $categoryId', 'Categories');
+      
+      state = const AsyncValue.loading();
       await _repository.deleteCategory(categoryId);
-      return _buildCategoryTree(); // 목록 새로고침
-    });
+      
+      state = AsyncValue.data(await _buildCategoryTree());
+      Logger.info('카테고리 삭제 완료', 'Categories');
+    } catch (error, stackTrace) {
+      Logger.error('카테고리 삭제 실패', error, stackTrace, 'Categories');
+      state = AsyncValue.error(ErrorHandler.handleSupabaseError(error), stackTrace);
+    }
   }
 }
