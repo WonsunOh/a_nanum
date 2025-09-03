@@ -15,39 +15,76 @@ class OrderRepository {
   OrderRepository(this._client);
 
   // 장바구니 상품들로 새로운 주문을 생성합니다.
-  Future<OrderModel?> createOrder({
-    required List<CartItemModel> cartItems,
-    required int totalAmount,
-    required int shippingFee,
-    required String recipientName,
-    required String recipientPhone,
-    required String shippingAddress,
-  }) async {
-    final userId = _client.auth.currentUser?.id;
-    if (userId == null) throw Exception('로그인이 필요합니다.');
-
-    // PostgREST의 트랜잭션을 사용하여 주문 생성과 아이템 추가를 한번에 처리합니다.
-    // 이렇게 하면 중간에 에러가 발생했을 때 모든 작업이 취소되어 데이터 정합성을 지킬 수 있습니다.
-    final orderData = await _client.rpc('create_order_from_cart', params: {
-      'p_user_id': userId,
-      'p_total_amount': totalAmount,
-      'p_shipping_fee': shippingFee,
-      'p_recipient_name': recipientName,
-      'p_recipient_phone': recipientPhone,
-      'p_shipping_address': shippingAddress,
-      'p_cart_items': cartItems
-          .map((item) => {
-                'product_id': item.productId,
-                'quantity': item.quantity,
-                'price_per_item': item.product?.price ?? 0
-              })
-          .toList()
-    });
-
-    if (orderData != null) {
-      // TODO: 주문 성공 후 반환된 데이터를 OrderModel로 변환하는 로직 추가
-      return null;
-    }
-    return null;
+  // user_app/lib/data/repositories/order_repository.dart 수정
+Future<OrderModel?> createOrder({
+  required List<CartItemModel> cartItems,
+  required int totalAmount,
+  required int shippingFee,
+  required String recipientName,
+  required String recipientPhone,
+  required String shippingAddress,
+}) async {
+  final userId = _client.auth.currentUser?.id;
+  if (userId == null) {
+    print('❌ 로그인되지 않음');
+    throw Exception('로그인이 필요합니다.');
   }
+
+  print('🔍 OrderRepository.createOrder 시작');
+  print('- 사용자 ID: $userId');
+  print('- 상품 개수: ${cartItems.length}');
+  
+  try {
+    // ⭐️ RPC 대신 직접 orders 테이블에 insert
+    final orderResponse = await _client.from('orders').insert({
+      'user_id': userId,
+      'total_amount': totalAmount,
+      'shipping_fee': shippingFee,
+      'recipient_name': recipientName,
+      'recipient_phone': recipientPhone,
+      'shipping_address': shippingAddress,
+      'status': 'pending',
+    }).select().single();
+
+    final orderId = orderResponse['id'];
+    print('✅ 주문 테이블 생성: $orderId');
+
+    // order_items 테이블에 상품들 추가
+    final orderItems = cartItems.map((item) => {
+      'order_id': orderId,
+      'product_id': item.productId,
+      'quantity': item.quantity,
+      'price_per_item': item.product?.discountPrice ?? item.product?.price ?? 0,
+    }).toList();
+
+    await _client.from('order_items').insert(orderItems);
+    print('✅ 주문 상품 ${orderItems.length}개 추가');
+
+    // 장바구니에서 주문한 상품들 삭제
+    for (final item in cartItems) {
+      await _client.from('cart_items').delete().eq('id', item.id);
+    }
+    print('✅ 장바구니 정리 완료');
+
+    // 성공적으로 생성된 주문 정보 반환
+    return OrderModel(
+      id: orderId,
+      createdAt: DateTime.now(),
+      userId: userId,
+      totalAmount: totalAmount,
+      shippingFee: shippingFee,
+      status: 'pending',
+      recipientName: recipientName,
+      recipientPhone: recipientPhone,
+      shippingAddress: shippingAddress,
+      items: [],
+    );
+
+  } catch (e, stackTrace) {
+    print('❌ OrderRepository 에러: $e');
+    print('📍 스택 트레이스: $stackTrace');
+    rethrow;
+  }
+}
+  
 }

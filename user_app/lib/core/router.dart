@@ -10,6 +10,7 @@ import '../features/group_buy/view/group_buy_detail_screen.dart';
 import '../features/group_buy/view/group_buy_list_screen.dart';
 import '../features/order/view/checkout_screen.dart';
 import '../features/order/view/order_history_screen.dart';
+import '../features/payment/views/portone_web_html_screen.dart';
 import '../features/post/view/my_posts_screen.dart';
 import '../features/shop/view/product_detail_screen.dart';
 import '../features/shop/view/shop_screen.dart';
@@ -82,6 +83,42 @@ final routerProvider = Provider<GoRouter>((ref) {
                   ),
                 ],
               ),
+
+              GoRoute(
+  path: 'cart',
+  builder: (context, state) => const CartScreen(),
+  routes: [
+    GoRoute(
+      path: 'checkout', // 최종 경로: /shop/cart/checkout
+      builder: (context, state) => const CheckoutScreen(),
+      routes: [
+        // ⭐️ 결제 화면 경로 추가
+        GoRoute(
+          path: 'payment', // 최종 경로: /shop/cart/checkout/payment
+          builder: (context, state) {
+            // 쿼리 파라미터에서 결제 정보 가져오기
+            final totalAmount = int.parse(state.uri.queryParameters['totalAmount'] ?? '0');
+            final orderName = state.uri.queryParameters['orderName'] ?? '';
+            final customerName = state.uri.queryParameters['customerName'] ?? '';
+            final customerPhone = state.uri.queryParameters['customerPhone'] ?? '';
+            final customerAddress = state.uri.queryParameters['customerAddress'] ?? '';
+            final customerEmail = state.uri.queryParameters['customerEmail'] ?? '';
+            
+            return PortOneWebHtmlScreen(
+              totalAmount: totalAmount,
+              orderName: orderName,
+              customerName: customerName,
+              customerPhone: customerPhone,
+              customerAddress: customerAddress, 
+              customerEmail: customerEmail,
+              // orderItems: const [], // 필요하면 별도 방식으로 전달
+            );
+          },
+        ),
+      ],
+    ),
+  ],
+),
               GoRoute(
                 path: ':productId',
                 builder: (context, state) {

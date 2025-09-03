@@ -1,11 +1,14 @@
 // user_app/lib/features/order/view/checkout_screen.dart (전체 교체)
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 
+import '../../../data/models/cart_item_model.dart';
 import '../../cart/viewmodel/cart_viewmodel.dart';
+import '../../payment/views/portone_web_html_screen.dart';
 import '../viewmodel/order_viewmodel.dart';
 
 class CheckoutScreen extends ConsumerStatefulWidget {
@@ -28,57 +31,367 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
     _addressController.dispose();
     super.dispose();
   }
+// _submitOrder 메서드를 단순하게 수정
+Future<void> _submitOrder() async {
+  if (!_formKey.currentState!.validate()) return;
 
-  Future<void> _submitOrder() async {
-    if (!_formKey.currentState!.validate()) return;
-
-    // ⭐️ ref.read를 사용해 현재 장바구니 상태를 한 번만 읽어옵니다.
-    final cartState = ref.read(cartViewModelProvider).valueOrNull;
-    if (cartState == null || cartState.selectedItemIds.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('주문할 상품을 선택해주세요.')),
-      );
-      return;
-    }
-
-    // ⭐️ 선택된 아이템만 필터링하여 주문
-    final selectedItems = cartState.items.where((item) => cartState.selectedItemIds.contains(item.id)).toList();
-
-
-    // ⭐️ CartScreen의 계산 로직을 동일하게 적용합니다.
-    const int shippingFee = 3000;
-    const int freeShippingThreshold = 50000;
-    final int subtotal = selectedItems.fold(0, (sum, item) {
-            // 1. 할인가가 있는지 확인합니다.
-            final hasDiscount = item.product?.discountPrice != null && item.product!.discountPrice! < item.product!.price;
-            // 2. 할인가가 있으면 할인가를, 없으면 원래 가격을 사용합니다.
-            final priceToShow = hasDiscount ? item.product!.discountPrice! : item.product!.price;
-            // 3. (상품 가격 * 수량)을 누적하여 합산합니다.
-            return sum + (priceToShow * item.quantity);
-          });
-    final int currentShippingFee = (subtotal >= freeShippingThreshold || subtotal == 0) ? 0 : shippingFee;
-    final int totalAmount = subtotal + currentShippingFee;
-
-    final success = await ref.read(orderViewModelProvider.notifier).createOrder(
-      cartItems: selectedItems, // ⭐️ 선택된 아이템만 전달
-      totalAmount: totalAmount,
-      shippingFee: currentShippingFee,
-      recipientName: _nameController.text,
-      recipientPhone: _phoneController.text,
-      shippingAddress: _addressController.text,
+  final cartState = ref.read(cartViewModelProvider).valueOrNull;
+  if (cartState == null || cartState.selectedItemIds.isEmpty) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('주문할 상품을 선택해주세요.')),
     );
+    return;
+  }
 
-    if (success && mounted) {
-      context.go('/shop');
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('주문이 성공적으로 완료되었습니다.')),
+  final List<CartItemModel> selectedItems = cartState.items
+      .where((item) => cartState.selectedItemIds.contains(item.id))
+      .cast<CartItemModel>()
+      .toList();
+
+  // 결제 금액 계산
+  const int shippingFee = 3000;
+  const int freeShippingThreshold = 50000;
+  final int subtotal = selectedItems.fold(0, (sum, item) {
+    final hasDiscount = item.product?.discountPrice != null && 
+                       item.product!.discountPrice! < item.product!.price;
+    final priceToShow = hasDiscount ? 
+                       item.product!.discountPrice! : 
+                       item.product!.price;
+    return sum + (priceToShow * item.quantity);
+  });
+  final int currentShippingFee = (subtotal >= freeShippingThreshold || subtotal == 0) ? 0 : shippingFee;
+  final int totalAmount = subtotal + currentShippingFee;
+
+  print('🚀 결제 확인 화면 표시');
+
+  // ⭐️ 결제 확인 화면 표시
+  final confirmed = await showDialog<bool>(
+    context: context,
+    barrierDismissible: false,
+    builder: (context) => Dialog.fullscreen(
+      child: _buildPaymentConfirmationScreen(totalAmount, selectedItems),
+    ),
+  );
+
+  print('결제 확인 결과: $confirmed');
+
+  // ⭐️ 확인되면 바로 결제 처리
+  if (confirmed == true) {
+    await _processPayment(selectedItems, totalAmount, currentShippingFee);
+  }
+} 
+  
+  // ⭐️ 결제 확인 전체 화면 위젯
+ // _buildPaymentConfirmationScreen 메서드를 단순하게 수정
+Widget _buildPaymentConfirmationScreen(int totalAmount, List<CartItemModel> selectedItems) {
+  return Scaffold(
+    appBar: AppBar(
+      title: const Text('결제 확인'),
+      backgroundColor: Colors.blue,
+      foregroundColor: Colors.white,
+      leading: IconButton(
+        icon: const Icon(Icons.close),
+        onPressed: () {
+          print('❌ 결제 취소 버튼 클릭');
+          Navigator.of(context, rootNavigator: true).pop(false);
+        },
+      ),
+    ),
+    body: Column(
+      children: [
+        Expanded(
+          child: SingleChildScrollView(
+            child: _buildPaymentConfirmationCard(totalAmount, selectedItems),
+          ),
+        ),
+        // 하단 결제 버튼
+        Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.1),
+                blurRadius: 10,
+                offset: const Offset(0, -2),
+              ),
+            ],
+          ),
+          child: Row(
+            children: [
+              Expanded(
+                child: OutlinedButton(
+                  onPressed: () {
+                    print('❌ 취소 버튼 클릭');
+                    Navigator.of(context, rootNavigator: true).pop(false);
+                  },
+                  style: OutlinedButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(vertical: 16),
+                  ),
+                  child: const Text('취소'),
+                ),
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                flex: 2,
+                child: ElevatedButton(
+                  onPressed: () {
+                    print('💳 결제하기 버튼 클릭');
+                    // ⭐️ 단순하게 true를 반환하여 결제 진행 신호
+                    Navigator.of(context, rootNavigator: true).pop(true);
+                  },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.blue,
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(vertical: 16),
+                  ),
+                  child: Text('${_formatAmount(totalAmount)}원 결제하기'),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    ),
+  );
+}
+
+  // ⭐️ 결제 확인 카드 위젯
+  Widget _buildPaymentConfirmationCard(int totalAmount, List selectedItems) {
+    return Card(
+      margin: const EdgeInsets.all(16),
+      child: Padding(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(Icons.payment, color: Colors.blue),
+                const SizedBox(width: 12),
+                Text(
+                  '결제 정보',
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ],
+            ),
+            const Divider(height: 24),
+            _buildPaymentInfoRow('선택 상품', '${selectedItems.length}개'),
+            _buildPaymentInfoRow('받는 분', _nameController.text),
+            _buildPaymentInfoRow('연락처', _phoneController.text),
+            _buildPaymentInfoRow('배송지', _addressController.text),
+            const Divider(height: 24),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                const Text(
+                  '총 결제금액',
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                Text(
+                  '${_formatAmount(totalAmount)}원',
+                  style: const TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.red,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 20),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Colors.amber[50],
+                border: Border.all(color: Colors.amber),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Row(
+                children: [
+                  Icon(Icons.info_outline, color: Colors.amber[700]),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Text(
+                      '테스트 환경으로 실제 결제는 발생하지 않습니다.',
+                      style: TextStyle(color: Colors.amber[700]),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // ⭐️ 결제 정보 행 위젯
+  Widget _buildPaymentInfoRow(String label, String value) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(label, style: const TextStyle(color: Colors.grey)),
+          Flexible(
+            child: Text(
+              value, 
+              style: const TextStyle(fontWeight: FontWeight.w500),
+              textAlign: TextAlign.right,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+ Future<void> _processPayment(
+  List<CartItemModel> selectedItems, 
+  int totalAmount, 
+  int currentShippingFee
+) async {
+  try {
+    print('💳 PortOne 결제 처리 시작: ${totalAmount}원');
+    
+    // 사용자 이메일 (임시로 생성, 실제로는 사용자 프로필에서 가져와야 함)
+    final userEmail = "${_phoneController.text}@temp.com";
+    
+    Map<String, dynamic>? paymentResult;
+    
+    // _processPayment 메서드에서 호출 부분 수정
+if (kIsWeb) {
+  // 웹에서는 HTML 기반 PortOne 결제 사용
+  paymentResult = await showDialog<Map<String, dynamic>>(
+    context: context,
+    barrierDismissible: false,
+    builder: (context) => Dialog.fullscreen(
+      child: PortOneWebHtmlScreen(
+        totalAmount: totalAmount,
+        orderName: '소분쇼핑몰 주문 ${selectedItems.length}건',
+        customerName: _nameController.text,
+        customerPhone: _phoneController.text,
+        customerEmail: userEmail,
+        customerAddress: _addressController.text,
+      ),
+    ),
+  );
+} else {
+      // 모바일에서는 네이티브 SDK 사용 (추후 구현)
+      // paymentResult = await _requestMobilePayment(...);
+      
+      // 임시로 웹 버전 사용
+      paymentResult = await showDialog<Map<String, dynamic>>(
+        context: context,
+        barrierDismissible: false,
+        builder: (context) => Dialog.fullscreen(
+          child: PortOneWebHtmlScreen(
+            totalAmount: totalAmount,
+            orderName: '소분쇼핑몰 주문 ${selectedItems.length}건',
+            customerName: _nameController.text,
+            customerPhone: _phoneController.text,
+            customerEmail: userEmail,
+            customerAddress: _addressController.text,
+          ),
+        ),
       );
     }
+    
+    print('🔍 PortOne 결제 결과: $paymentResult');
+    
+    if (paymentResult != null && paymentResult['success'] == true) {
+      print('✅ PortOne 결제 성공: ${paymentResult['paymentId']}');
+      
+      // 결제 성공 시 주문 생성
+      final success = await ref.read(orderViewModelProvider.notifier).createOrder(
+        cartItems: selectedItems,
+        totalAmount: totalAmount,
+        shippingFee: currentShippingFee,
+        recipientName: _nameController.text,
+        recipientPhone: _phoneController.text,
+        shippingAddress: _addressController.text,
+      );
+
+      if (success && mounted) {
+        context.go('/shop');
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Row(
+              children: [
+                const Icon(Icons.check_circle, color: Colors.white),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        '결제 및 주문 완료!',
+                        style: TextStyle(fontWeight: FontWeight.bold),
+                      ),
+                      Text('${_formatAmount(totalAmount)}원 결제 완료'),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            backgroundColor: Colors.green,
+            duration: const Duration(seconds: 4),
+          ),
+        );
+      }
+    } else if (paymentResult != null && paymentResult['cancelled'] == true) {
+      // 사용자가 결제 취소
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('결제가 취소되었습니다.'),
+            backgroundColor: Colors.orange,
+          ),
+        );
+      }
+    } else {
+      // 결제 실패
+      final errorMessage = paymentResult?['error'] ?? '결제 처리 중 오류가 발생했습니다.';
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('결제 실패: $errorMessage'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  } catch (e, stackTrace) {
+    print('❌ PortOne 결제 처리 에러: $e');
+    print('📍 스택 트레이스: $stackTrace');
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('결제 처리 중 오류: $e'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
+  }
+}
+  
+  
+  // ⭐️ 금액 포맷팅 헬퍼 함수
+  String _formatAmount(int amount) {
+    return amount.toString().replaceAllMapped(
+      RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'),
+      (Match m) => '${m[1]},',
+    );
   }
 
   @override
   Widget build(BuildContext context) {
-
     return Scaffold(
       appBar: AppBar(title: const Text('주문/결제')),
       body: LayoutBuilder(
@@ -248,5 +561,7 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
       ],
     );
   }
+
+
 
 }

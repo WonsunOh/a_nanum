@@ -20,39 +20,49 @@ class OrderViewModel extends _$OrderViewModel {
   /// 새로운 주문을 생성합니다.
   ///
   /// 성공 시 true, 실패 시 false를 반환합니다.
-  Future<bool> createOrder({
-    required List<CartItemModel> cartItems,
-    required int totalAmount,
-    required int shippingFee,
-    required String recipientName,
-    required String recipientPhone,
-    required String shippingAddress,
-  }) async {
-    // UI에 로딩 상태임을 알립니다.
-    state = const AsyncValue.loading();
+  // user_app/lib/features/order/viewmodel/order_viewmodel.dart의 createOrder 메서드 수정
+  // user_app/lib/features/order/viewmodel/order_viewmodel.dart 수정
+Future<bool> createOrder({
+  required List<CartItemModel> cartItems,
+  required int totalAmount,
+  required int shippingFee,
+  required String recipientName,
+  required String recipientPhone,
+  required String shippingAddress,
+}) async {
+  print('🔍 OrderViewModel.createOrder 시작');
+  
+  // UI에 로딩 상태임을 알립니다.
+  state = const AsyncValue.loading();
+  
+  try {
+    // ⭐️ 직접 try-catch로 감싸서 에러를 확인
+    final result = await _repository.createOrder(
+      cartItems: cartItems,
+      totalAmount: totalAmount,
+      shippingFee: shippingFee,
+      recipientName: recipientName,
+      recipientPhone: recipientPhone,
+      shippingAddress: shippingAddress,
+    );
     
-    // state = await AsyncValue.guard(...)는 try-catch와 유사하게 동작하여
-    // Future 내에서 발생하는 에러를 자동으로 처리하고 state에 담아줍니다.
-    state = await AsyncValue.guard(() async {
-      await _repository.createOrder(
-        cartItems: cartItems,
-        totalAmount: totalAmount,
-        shippingFee: shippingFee,
-        recipientName: recipientName,
-        recipientPhone: recipientPhone,
-        shippingAddress: shippingAddress,
-      );
-    });
-
-    // state.hasError가 false이면 주문이 성공한 것입니다.
-    if (!state.hasError) {
-      // 주문이 성공했으므로, 장바구니 Provider를 무효화(invalidate)하여
-      // 장바구니 목록을 새로고침(비워진 상태로) 하도록 신호를 보냅니다.
+    print('🔍 Repository 결과: $result');
+    
+    if (result != null) {
+      state = const AsyncValue.data(null);
       ref.invalidate(cartViewModelProvider);
+      print('✅ 주문 생성 성공');
       return true;
+    } else {
+      print('❌ Repository에서 null 반환');
+      state = AsyncValue.error('주문 생성 실패', StackTrace.current);
+      return false;
     }
-    
-    // 주문 실패 시
+  } catch (e, stackTrace) {
+    print('❌ OrderViewModel 에러: $e');
+    print('📍 스택 트레이스: $stackTrace');
+    state = AsyncValue.error(e, stackTrace);
     return false;
   }
+}
 }
