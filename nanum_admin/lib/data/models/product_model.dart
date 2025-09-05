@@ -3,6 +3,7 @@
 import 'dart:convert';
 
 import 'product_option_model.dart';
+import 'product_variant_model.dart';
 
 class ProductModel {
   final int id;
@@ -11,6 +12,7 @@ class ProductModel {
   final String description;
   final int price;
   final String? imageUrl;
+  final List<String>? additionalImages; 
   final int stockQuantity;
   final int categoryId;
   final String? categoryPath; 
@@ -34,6 +36,7 @@ class ProductModel {
     String? description,
     required this.price,
     this.imageUrl,
+    this.additionalImages,
     required this.stockQuantity,
     required this.categoryId,
     this.categoryPath,
@@ -71,6 +74,9 @@ class ProductModel {
       description: description,
       price: json['total_price'] as int? ?? 0,
       imageUrl: json['image_url'] as String?,
+      additionalImages: json['additional_images'] != null 
+          ? List<String>.from(json['additional_images'])
+          : null,
       stockQuantity: json['stock_quantity'] as int? ?? 0,
       categoryId: json['category_id'] as int? ?? 1, // 카테고리가 없으면 기본값 1
       categoryPath:json['category_path'] as String?, 
@@ -100,6 +106,7 @@ class ProductModel {
       'discount_start_date': discountStartDate?.toIso8601String(),
       'discount_end_date': discountEndDate?.toIso8601String(),
       'image_url': imageUrl,
+      'additional_images': additionalImages,
       'stock_quantity': stockQuantity,
       'category_id': categoryId,
       'is_displayed': isDisplayed,
@@ -123,6 +130,7 @@ class ProductModel {
     DateTime? discountStartDate,
     DateTime? discountEndDate,
     String? imageUrl,
+    List<String>? additionalImages,
     int? stockQuantity,
     int? categoryId,
     bool? isDisplayed,
@@ -140,6 +148,7 @@ class ProductModel {
       description: description ?? this.description,
       price: price ?? this.price,
       imageUrl: imageUrl ?? this.imageUrl,
+      additionalImages: additionalImages ?? this.additionalImages,
       stockQuantity: stockQuantity ?? this.stockQuantity,
       categoryId: categoryId ?? this.categoryId,
       isDisplayed: isDisplayed ?? this.isDisplayed,
@@ -152,5 +161,27 @@ class ProductModel {
       discountStartDate: discountStartDate ?? this.discountStartDate,
       discountEndDate: discountEndDate ?? this.discountEndDate,
     );
+  }
+}
+
+extension ProductStockCalculation on ProductModel {
+  /// 총 재고 계산 (옵션 있을 경우 variants 재고 합계, 없을 경우 기본 재고)
+  int calculateTotalStock(List<ProductVariant>? variants) {
+    if (variants != null && variants.isNotEmpty) {
+      return variants.fold(0, (sum, variant) => sum + variant.stockQuantity);
+    }
+    return stockQuantity;
+  }
+  
+  /// 재고 부족 여부 확인
+  bool isLowStock([List<ProductVariant>? variants]) {
+    final total = calculateTotalStock(variants);
+    return total > 0 && total <= 10;
+  }
+  
+  /// 품절 여부 확인
+  bool isOutOfStock([List<ProductVariant>? variants]) {
+    final total = calculateTotalStock(variants);
+    return total <= 0;
   }
 }

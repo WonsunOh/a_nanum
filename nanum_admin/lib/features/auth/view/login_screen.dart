@@ -39,11 +39,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   Widget build(BuildContext context) {
     // ✅ 에러 없는 상태 감시
     ref.listen<AsyncValue>(authViewModelProvider, (previous, next) {
-      debugPrint('🔄 [로그인화면] 상태 변화: ${next.runtimeType}');
 
       if (next.hasValue && !next.isLoading && !next.hasError) {
         // 로그인 성공
-        debugPrint('🎉 [로그인화면] 성공 -> 대시보드 이동');
         
         WidgetsBinding.instance.addPostFrameCallback((_) {
           if (mounted) {
@@ -52,7 +50,6 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
         });
       } else if (next.hasError && !next.isLoading) {
         // 로그인 실패
-        debugPrint('🚨 [로그인화면] 실패: ${next.error}');
         
         WidgetsBinding.instance.addPostFrameCallback((_) {
           if (mounted) {

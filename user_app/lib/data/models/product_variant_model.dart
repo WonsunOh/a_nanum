@@ -6,12 +6,14 @@ class ProductVariant {
   final String name;
   final int additionalPrice;
   final int stockQuantity;
+  final List<OptionValue> values;
 
   ProductVariant({
     required this.id,
     required this.name,
     this.additionalPrice = 0,
     this.stockQuantity = 0,
+    this.values = const [],
   });
 
   factory ProductVariant.fromJson(Map<String, dynamic> json) {
@@ -20,6 +22,7 @@ class ProductVariant {
       name: json['name'],
       additionalPrice: json['additional_price'] ?? 0,
       stockQuantity: json['stock_quantity'] ?? 0,
+      values: [], // values는 별도로 로드됩니다
     );
   }
 }

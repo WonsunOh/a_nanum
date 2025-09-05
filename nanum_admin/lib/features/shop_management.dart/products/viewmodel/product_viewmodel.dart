@@ -1,5 +1,6 @@
 // admin_web/lib/features/shop_management/products/viewmodel/product_viewmodel.dart (전체 교체)
 
+import 'package:flutter/foundation.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
@@ -47,7 +48,7 @@ class ProductViewModel extends _$ProductViewModel {
     required bool isSoldOut,
     String? productCode,
     String? relatedProductCode,
-    XFile? imageFile,
+    List<XFile>? imageFiles,
     List<OptionGroup>? optionGroups,
     List<ProductVariant>? variants,
     required int shippingFee,
@@ -55,30 +56,38 @@ class ProductViewModel extends _$ProductViewModel {
     DateTime? discountStartDate,
     DateTime? discountEndDate,
   }) async {
-    try {
-      // 입력 검증
-      if (name.trim().isEmpty) {
-        throw const ValidationException('상품명을 입력해주세요.');
-      }
-      if (price <= 0) {
-        throw const ValidationException('가격은 0원보다 커야 합니다.');
-      }
-      if (stockQuantity < 0) {
-        throw const ValidationException('재고는 0개 이상이어야 합니다.');
-      }
 
-      Logger.debug('상품 추가 시작: $name', 'ProductViewModel');
-      
-      state = const AsyncValue.loading();
-      
-      String? imageUrl;
-      if (imageFile != null) {
-        Logger.debug('이미지 업로드 시작', 'ProductViewModel');
+   
+    state = const AsyncValue.loading();
+  state = await AsyncValue.guard(() async {
+
+    
+    
+    // ✅ 여러 이미지 업로드 처리
+    String? mainImageUrl;
+    List<String> additionalImageUrls = [];
+    
+    if (imageFiles != null && imageFiles.isNotEmpty) {
+      for (int i = 0; i < imageFiles.length; i++) {
+        final imageFile = imageFiles[i];
+
         final imageBytes = await imageFile.readAsBytes();
-        imageUrl = await _repository.uploadImage(imageBytes, imageFile.name);
-        Logger.debug('이미지 업로드 완료: $imageUrl', 'ProductViewModel');
+        final imageUrl = await _repository.uploadImage(imageBytes, imageFile.name);
+
+        
+        if (imageUrl != null) {
+          if (i == 0) {
+            mainImageUrl = imageUrl; // 첫 번째는 대표 이미지
+          } else {
+            additionalImageUrls.add(imageUrl); // 나머지는 추가 이미지
+          }
+        }
       }
 
+  
+    }
+     
+     
       await _repository.addProduct(
         name: name,
         description: description,
@@ -90,7 +99,8 @@ class ProductViewModel extends _$ProductViewModel {
         isSoldOut: isSoldOut,
         productCode: productCode,
         relatedProductCode: relatedProductCode,
-        imageUrl: imageUrl,
+        imageUrl: mainImageUrl,
+        additionalImages: additionalImageUrls.isNotEmpty ? additionalImageUrls : null, // ✅ 추가 이미지들 전달
         optionGroups: optionGroups,
         variants: variants,
         shippingFee: shippingFee,
@@ -99,13 +109,9 @@ class ProductViewModel extends _$ProductViewModel {
         discountEndDate: discountEndDate,
       );
       
-      state = AsyncValue.data(await _fetchProducts());
-      Logger.info('상품 추가 완료: $name', 'ProductViewModel');
-    } catch (error, stackTrace) {
-      Logger.error('상품 추가 실패', error, stackTrace, 'ProductViewModel');
-      state = AsyncValue.error(ErrorHandler.handleSupabaseError(error), stackTrace);
-    }
-  }
+      return _repository.fetchProducts();
+  });
+}
 
   // ⭐️ 1. 상품의 '기본 정보'만 업데이트하는 메서드 (목록의 스위치에서 사용)
   Future<void> updateProductDetails(ProductModel product) async {
@@ -114,6 +120,8 @@ class ProductViewModel extends _$ProductViewModel {
       
       state = const AsyncValue.loading();
       await _repository.updateProductDetails(product);
+      // ✅ 업데이트 후 전체 목록 새로고침
+      await fetchAllProducts();
       
       state = AsyncValue.data(await _fetchProducts());
       Logger.info('상품 수정 완료', 'ProductViewModel');
@@ -164,30 +172,60 @@ class ProductViewModel extends _$ProductViewModel {
     );
   }
 
-  // ⭐️ 2. 상품 정보와 '옵션'을 모두 업데이트하는 메서드 (등록/수정 페이지에서 사용)
-  Future<void> updateProductWithOptions(
-    ProductModel product, {
-    List<OptionGroup>? optionGroups, // ⭐️ Nullable로 변경
-    List<ProductVariant>? variants, // ⭐️ Nullable로 변경
-    XFile? newImageFile,
-  }) async {
-    state = const AsyncValue.loading();
-    state = await AsyncValue.guard(() async {
-      String? imageUrl = product.imageUrl;
-      if (newImageFile != null) {
-        final imageBytes = await newImageFile.readAsBytes();
-        imageUrl = await _repository.uploadImage(imageBytes, newImageFile.name);
-      }
+ Future<void> updateProductWithOptions(
+  ProductModel product, {
+  List<OptionGroup>? optionGroups,
+  List<ProductVariant>? variants,
+  List<XFile>? imageFiles,
+  List<String>? existingImageUrls,
+}) async {
+  state = const AsyncValue.loading();
+  state = await AsyncValue.guard(() async {
 
-      final finalProduct = product.copyWith(imageUrl: imageUrl);
-      await _repository.updateProductWithOptions(
-        finalProduct,
-        optionGroups: optionGroups,
-        variants: variants,
-      );
-      return _repository.fetchProducts();
-    });
-  }
+    
+
+    // 최종 이미지 URL 목록 결정
+    List<String> finalImageUrls = [];
+    
+    // 1. existingImageUrls가 있으면 이걸 최우선으로 사용 (사용자가 수정한 순서)
+    if (existingImageUrls != null && existingImageUrls.isNotEmpty) {
+      finalImageUrls.addAll(existingImageUrls);
+    } else {
+      // 2. 없으면 기존 product의 이미지들 사용
+      if (product.imageUrl != null) finalImageUrls.add(product.imageUrl!);
+      if (product.additionalImages != null) finalImageUrls.addAll(product.additionalImages!);
+    }
+
+    // 3. 새로 업로드할 이미지들 추가
+    if (imageFiles != null && imageFiles.isNotEmpty) {
+      for (final imageFile in imageFiles) {
+        final imageBytes = await imageFile.readAsBytes();
+        final imageUrl = await _repository.uploadImage(imageBytes, imageFile.name);
+        if (imageUrl != null) {
+          finalImageUrls.add(imageUrl);
+        }
+      }
+    }
+
+    // 최종 이미지 구성
+    String? finalMainImage = finalImageUrls.isNotEmpty ? finalImageUrls.first : null;
+    List<String>? finalAdditionalImages = finalImageUrls.length > 1 
+        ? finalImageUrls.skip(1).toList() 
+        : null;
+
+    
+    await _repository.updateProductWithOptions(
+      product.copyWith(
+        imageUrl: finalMainImage,
+        additionalImages: finalAdditionalImages,
+      ),
+      optionGroups: optionGroups ?? [],
+      variants: variants ?? [],
+    );
+    
+    return _repository.fetchProducts();
+  });
+}
 
   Future<void> deleteProduct(int productId) async {
     try {
@@ -198,6 +236,8 @@ class ProductViewModel extends _$ProductViewModel {
       
       state = AsyncValue.data(await _fetchProducts());
       Logger.info('상품 삭제 완료', 'ProductViewModel');
+      // ✅ 삭제 후 전체 목록 새로고침
+      await fetchAllProducts();
     } catch (error, stackTrace) {
       Logger.error('상품 삭제 실패', error, stackTrace, 'ProductViewModel');
       state = AsyncValue.error(ErrorHandler.handleSupabaseError(error), stackTrace);
@@ -216,3 +256,8 @@ class ProductViewModel extends _$ProductViewModel {
     state = await AsyncValue.guard(() => _repository.fetchProducts());
   }
 }
+
+final productVariantsProvider = FutureProvider.family<List<ProductVariant>, int>((ref, productId) async {
+  final repository = ref.read(productRepositoryProvider);
+  return repository.fetchVariantsByProductId(productId);
+});

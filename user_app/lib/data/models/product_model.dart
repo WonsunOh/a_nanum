@@ -9,6 +9,7 @@ class ProductModel {
   final int? discountPrice; // 할인가
   final int shippingFee;   // 배송비
   final String? imageUrl;
+  final List<String>? additionalImages; // ✅ 추가 이미지 필드 추가
   final int stockQuantity;
   final int categoryId;
   final bool isDisplayed;
@@ -26,6 +27,7 @@ class ProductModel {
     this.discountPrice,
     required this.shippingFee,
     this.imageUrl,
+    this.additionalImages,
     required this.stockQuantity,
     required this.categoryId,
     required this.isDisplayed,
@@ -45,6 +47,9 @@ class ProductModel {
       discountPrice: json['discount_price'] as int?,
       shippingFee: json['shipping_fee'] as int? ?? 3000, // 기본 배송비 3000원
       imageUrl: json['image_url'] as String?,
+      additionalImages: json['additional_images'] != null 
+          ? List<String>.from(json['additional_images'])
+          : null,
       stockQuantity: json['stock_quantity'] as int? ?? 0,
       categoryId: json['category_id'] as int? ?? 1, // 기본 카테고리 1
       isDisplayed: json['is_displayed'] as bool? ?? false,
@@ -65,6 +70,7 @@ class ProductModel {
     int? discountPrice,
     int? shippingFee,
     String? imageUrl,
+    List<String>? additionalImages,
     int? stockQuantity,
     int? categoryId,
     bool? isDisplayed,
@@ -82,6 +88,7 @@ class ProductModel {
       discountPrice: discountPrice ?? this.discountPrice,
       shippingFee: shippingFee ?? this.shippingFee,
       imageUrl: imageUrl ?? this.imageUrl,
+      additionalImages: additionalImages ?? this.additionalImages,
       stockQuantity: stockQuantity ?? this.stockQuantity,
       categoryId: categoryId ?? this.categoryId,
       isDisplayed: isDisplayed ?? this.isDisplayed,

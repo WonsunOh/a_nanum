@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import '../../../../core/utils/navigation_utils.dart';
 import '../../auth/provider/auth_provider.dart';
 import '../../auth/viewmodel/auth_viewmodel.dart';
 import '../../../../providers/user_provider.dart'; // userProvider import
@@ -18,10 +19,11 @@ class MyPageScreen extends ConsumerWidget {
     ref.listen(authStateChangeProvider, (previous, next) {
       // 로그아웃 이벤트(signedOut)가 감지되면
       if (next.value?.event == AuthChangeEvent.signedOut) {
-        // 즉시 로그인 화면으로 이동시킵니다.
-        context.go('/login');
-      }
-    });
+         WidgetsBinding.instance.addPostFrameCallback((_) {
+        SafeNavigation.go(context, '/shop'); // ✅ 안전한 네비게이션
+      });
+    }
+  });
     final userProfileAsync = ref.watch(userProvider);
 
     // 마이페이지 메뉴 데이터
@@ -30,7 +32,8 @@ class MyPageScreen extends ConsumerWidget {
       _MyPageMenuItem(icon: Icons.list_alt, title: '주문 내역', route: '/shop/mypage/orders'),
       _MyPageMenuItem(icon: Icons.edit_note, title: '내가 쓴 글', route: '/shop/mypage/posts'),
       _MyPageMenuItem(icon: Icons.logout, title: '로그아웃', onTap: () {
-        ref.read(authViewModelProvider.notifier).signOut();
+        // ✅ 로그아웃 확인 다이얼로그 추가 (선택사항)
+        _showLogoutDialog(context, ref);
       }),
     ];
 
@@ -95,6 +98,32 @@ class MyPageScreen extends ConsumerWidget {
       },
       loading: () => const Center(child: CircularProgressIndicator()),
       error: (e, st) => const Center(child: Text('프로필 정보를 불러올 수 없습니다.')),
+    );
+  }
+
+  // ✅ 로그아웃 확인 다이얼로그 (선택사항)
+  void _showLogoutDialog(BuildContext context, WidgetRef ref) {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: const Text('로그아웃'),
+          content: const Text('정말 로그아웃 하시겠습니까?'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('취소'),
+            ),
+            TextButton(
+              onPressed: () {
+                Navigator.of(context).pop();
+                ref.read(authViewModelProvider.notifier).signOut();
+              },
+              child: const Text('확인'),
+            ),
+          ],
+        );
+      },
     );
   }
 

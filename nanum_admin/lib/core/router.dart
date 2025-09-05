@@ -35,30 +35,22 @@ final router = GoRouter(
     final isAuthenticated = session != null;
     final isLoggingIn = state.matchedLocation == '/login';
     
-    debugPrint('🔄 [라우터] 리디렉션 체크');
-    debugPrint('📍 [라우터] 현재 경로: ${state.matchedLocation}');
-    debugPrint('🔑 [라우터] 인증 상태: $isAuthenticated');
-    debugPrint('🚪 [라우터] 로그인 페이지 여부: $isLoggingIn');
-
+    
     // ✅ 1. 로그인 페이지에 있는 경우
     if (isLoggingIn) {
       if (isAuthenticated) {
-        debugPrint('➡️ [라우터] 이미 로그인됨 -> 대시보드로 이동');
         return '/dashboard';
       } else {
-        debugPrint('✅ [라우터] 로그인 페이지 접근 허용');
         return null; // 로그인 페이지 접근 허용
       }
     }
 
     // ✅ 2. 다른 페이지에 있는 경우
     if (!isAuthenticated) {
-      debugPrint('➡️ [라우터] 미인증 상태 -> 로그인 페이지로 이동');
       return '/login';
     }
 
     // ✅ 3. 인증된 상태에서 보호된 페이지 접근
-    debugPrint('✅ [라우터] 인증된 상태 -> 접근 허용');
     return null;
   },
   
@@ -170,7 +162,6 @@ final router = GoRouter(
   
   // 🔧 에러 처리 개선
   errorBuilder: (context, state) {
-    debugPrint('🚨 [라우터] 에러 발생: ${state.error}');
     return Scaffold(
       body: Center(
         child: Column(

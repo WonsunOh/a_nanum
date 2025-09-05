@@ -47,7 +47,6 @@ class GroupBuyRepository {
       final publicUrl = _client.storage.from('products').getPublicUrl(fileName);
       return publicUrl;
     } catch (e) {
-      debugPrint('이미지 업로드 에러: $e');
       rethrow;
     }
   }

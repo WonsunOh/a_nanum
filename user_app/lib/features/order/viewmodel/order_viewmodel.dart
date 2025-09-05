@@ -30,7 +30,6 @@ Future<bool> createOrder({
   required String recipientPhone,
   required String shippingAddress,
 }) async {
-  print('🔍 OrderViewModel.createOrder 시작');
   
   // UI에 로딩 상태임을 알립니다.
   state = const AsyncValue.loading();
@@ -46,15 +45,12 @@ Future<bool> createOrder({
       shippingAddress: shippingAddress,
     );
     
-    print('🔍 Repository 결과: $result');
     
     if (result != null) {
       state = const AsyncValue.data(null);
       ref.invalidate(cartViewModelProvider);
-      print('✅ 주문 생성 성공');
       return true;
     } else {
-      print('❌ Repository에서 null 반환');
       state = AsyncValue.error('주문 생성 실패', StackTrace.current);
       return false;
     }

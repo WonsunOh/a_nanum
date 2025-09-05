@@ -38,6 +38,14 @@ class ErrorHandler {
     if (message.contains('User not found')) return '등록되지 않은 사용자입니다.';
     if (message.contains('Email already registered')) return '이미 가입된 이메일입니다.';
     if (message.contains('weak password')) return '비밀번호가 너무 간단합니다.';
+    // ⭐️ 새로 추가되는 패턴들
+  if (message.contains('Invalid login credentials')) return '이메일 또는 비밀번호가 틀렸습니다.';
+  if (message.contains('invalid_credentials')) return '이메일 또는 비밀번호가 틀렸습니다.';
+  if (message.contains('Email not confirmed')) return '이메일 인증이 필요합니다.';
+  if (message.contains('email_not_confirmed')) return '이메일 인증이 필요합니다.';
+  if (message.contains('User already registered')) return '이미 가입된 이메일입니다.';
+  if (message.contains('email_address_already_exists')) return '이미 가입된 이메일입니다.';
+
     return '인증 오류가 발생했습니다.';
   }
 

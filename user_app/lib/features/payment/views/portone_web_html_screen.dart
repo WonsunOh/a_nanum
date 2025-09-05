@@ -27,10 +27,8 @@ class _PortOneWebHtmlScreenState extends State<PortOneWebHtmlScreen> {
   bool _isLoading = false;
 
   void _requestPayment() {
-    print('🔍 [DEBUG] 결제하기 버튼 클릭됨');
     
     if (_isLoading) {
-      print('🔍 [DEBUG] 이미 처리 중이므로 무시');
       return;
     }
     
@@ -38,17 +36,14 @@ class _PortOneWebHtmlScreenState extends State<PortOneWebHtmlScreen> {
       _isLoading = true;
     });
     
-    print('🔍 [DEBUG] 로딩 상태로 변경됨');
     
     _processPayment();
   }
 
   Future<void> _processPayment() async {
     try {
-      print('🔍 [DEBUG] 결제 처리 시작');
       
       final merchantUid = 'order_${DateTime.now().millisecondsSinceEpoch}';
-      print('🔍 [DEBUG] Merchant UID: $merchantUid');
       
       // 2초 대기로 결제 처리 시뮬레이션
       await Future.delayed(const Duration(seconds: 2));
@@ -61,13 +56,10 @@ class _PortOneWebHtmlScreenState extends State<PortOneWebHtmlScreen> {
         'message': 'PortOne 테스트 결제가 완료되었습니다.'
       };
 
-      print('🔍 [DEBUG] 결제 완료, 결과: $result');
 
       if (mounted) {
-        print('🔍 [DEBUG] 화면이 마운트된 상태, Navigator.pop 호출');
         Navigator.pop(context, result);
       } else {
-        print('⚠️ [DEBUG] 화면이 마운트되지 않은 상태');
       }
       
     } catch (e, stackTrace) {
@@ -85,14 +77,12 @@ class _PortOneWebHtmlScreenState extends State<PortOneWebHtmlScreen> {
         setState(() {
           _isLoading = false;
         });
-        print('🔍 [DEBUG] 로딩 상태 해제');
       }
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    print('🔍 [DEBUG] PortOneWebHtmlScreen build 호출, _isLoading: $_isLoading');
     
     return Scaffold(
       appBar: AppBar(
@@ -104,7 +94,6 @@ class _PortOneWebHtmlScreenState extends State<PortOneWebHtmlScreen> {
           onPressed: _isLoading 
               ? null 
               : () {
-                  print('🔍 [DEBUG] 취소 버튼 클릭');
                   Navigator.pop(context, {'success': false, 'cancelled': true});
                 },
         ),
@@ -176,7 +165,6 @@ class _PortOneWebHtmlScreenState extends State<PortOneWebHtmlScreen> {
                 height: 56,
                 child: ElevatedButton.icon(
                   onPressed: () {
-                    print('🔍 [DEBUG] ElevatedButton onPressed 호출됨');
                     _requestPayment();
                   },
                   icon: const Icon(Icons.credit_card),
@@ -194,7 +182,6 @@ class _PortOneWebHtmlScreenState extends State<PortOneWebHtmlScreen> {
                 height: 48,
                 child: OutlinedButton(
                   onPressed: () {
-                    print('🔍 [DEBUG] 취소 버튼 클릭됨');
                     Navigator.pop(context, {'success': false, 'cancelled': true});
                   },
                   child: const Text('취소'),

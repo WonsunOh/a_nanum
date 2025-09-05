@@ -3,6 +3,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import '../../../../core/errors/app_exception.dart';
 import '../viewmodel/auth_viewmodel.dart';
 import 'signup_screen.dart'; // 회원가입 화면 import
 
@@ -26,21 +27,75 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
 
   @override
   Widget build(BuildContext context) {
-    ref.listen<AsyncValue>(authViewModelProvider, (_, state) {
-      if (state.hasError && !state.isLoading) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('로그인 실패: ${state.error}'),
-            backgroundColor: Colors.red,
-          ),
-        );
-      } else if (!state.hasError &&
-          !state.isLoading &&
-          state.valueOrNull != null) {
-        final fromPath = GoRouterState.of(context).uri.queryParameters['from'];
-        context.go(fromPath ?? '/shop');
+
+   ref.listen<AsyncValue>(authViewModelProvider, (_, state) {
+  if (state.hasError && !state.isLoading) {
+    // ⭐️ 개선된 에러 처리
+    final error = state.error;
+    
+    if (error is AuthenticationException) {
+      String message = error.message;
+      Color backgroundColor = Colors.red;
+      
+      // ⭐️ 이메일 미인증 계정에 대한 특별 처리
+      if (error.message.contains('이메일 인증이 필요합니다') ||
+          error.message.contains('Email not confirmed') ||
+          error.message.contains('email_not_confirmed')) {
+        message = '이메일 인증이 필요합니다.\n메일함을 확인하고 인증 링크를 클릭해주세요.';
+        backgroundColor = Colors.orange;
       }
-    });
+      
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Row(
+            children: [
+              Icon(
+                backgroundColor == Colors.orange 
+                    ? Icons.mail_outline 
+                    : Icons.error_outline, 
+                color: Colors.white
+              ),
+              const SizedBox(width: 8),
+              Expanded(child: Text(message)),
+            ],
+          ),
+          backgroundColor: backgroundColor,
+          duration: const Duration(seconds: 4),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    } else if (error is NetworkException) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Row(
+            children: [
+              const Icon(Icons.wifi_off, color: Colors.white),
+              const SizedBox(width: 8),
+              Expanded(child: Text('네트워크 오류: ${error.message}')),
+            ],
+          ),
+          backgroundColor: Colors.orange,
+          duration: const Duration(seconds: 4),
+        ),
+      );
+    } else {
+      // 기타 에러
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('로그인 실패: ${error.toString()}'),
+          backgroundColor: Colors.red,
+          duration: const Duration(seconds: 4),
+        ),
+      );
+    }
+  } else if (!state.hasError &&
+      !state.isLoading &&
+      state.valueOrNull != null) {
+    final fromPath = GoRouterState.of(context).uri.queryParameters['from'];
+    context.go(fromPath ?? '/shop');
+  }
+});
+
 
     final authState = ref.watch(authViewModelProvider);
     final isLoading = authState is AsyncLoading;

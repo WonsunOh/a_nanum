@@ -1,6 +1,7 @@
 // user_app/lib/features/user/auth/viewmodel/auth_viewmodel.dart (전체 교체)
 
 import 'package:riverpod_annotation/riverpod_annotation.dart';
+import '../../../../core/errors/app_exception.dart';
 import '../../../../core/errors/error_handler.dart';
 import '../../../../core/utils/logger.dart';
 import '../../../../data/repositories/auth_repository.dart';
@@ -38,25 +39,42 @@ class AuthViewModel extends _$AuthViewModel {
     required String password,
     required String nickname,
     required String fullName,
+    String? phoneNumber,
+    String? address,
+    int level = 1,
   }) async {
-    Logger.debug('회원가입 시도: $email', 'AuthViewModel');
+    Logger.debug('회원가입 시도: $email, 레벨: $level', 'AuthViewModel');
     
     state = const AsyncValue.loading();
     state = await AsyncValue.guard(() async {
       try {
-        await _authRepository.signUp(
-          email: email,
-          password: password,
-          nickname: nickname,
-          fullName: fullName,
-        );
-        Logger.info('회원가입 성공: $email', 'AuthViewModel');
-      } catch (error, stackTrace) {
-        Logger.error('회원가입 실패', error, stackTrace, 'AuthViewModel');
-        throw ErrorHandler.handleSupabaseError(error);
+      await _authRepository.signUp(
+        email: email,
+        password: password,
+        nickname: nickname,
+        fullName: fullName,
+        phoneNumber: phoneNumber,
+        address: address,
+        level: level,
+      );
+      Logger.info('회원가입 성공: $email, 레벨: $level', 'AuthViewModel');
+    } catch (error, stackTrace) {
+      Logger.error('회원가입 실패', error, stackTrace, 'AuthViewModel');
+      
+      print('🚨 ViewModel에서 잡은 에러:');
+      print('📋 타입: ${error.runtimeType}');
+      print('💬 내용: $error');
+      
+      // ⭐️ AuthenticationException은 그대로 전달
+      if (error is AuthenticationException) {
+        throw error;
       }
-    });
-  }
+      
+      // 다른 에러만 ErrorHandler 사용
+      throw ErrorHandler.handleSupabaseError(error);
+    }
+  });
+}
 
  Future<void> signInWithGoogle() async {
     Logger.debug('구글 로그인 시도', 'AuthViewModel');

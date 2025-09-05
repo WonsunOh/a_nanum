@@ -1,4 +1,3 @@
-import 'package:a_micro_divide/core/router.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
@@ -6,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:kakao_flutter_sdk_user/kakao_flutter_sdk_user.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import 'core/router.dart';
 import 'firebase_options.dart'; 
 
 
@@ -20,7 +20,7 @@ void main() async {
   );
   await dotenv.load(fileName: ".env");
 
-  // ⭐️ 카카오 SDK 초기화
+    // ⭐️ 카카오 SDK 초기화
   KakaoSdk.init(nativeAppKey: dotenv.env['KAKAO_NATIVE_APP_KEY']!);
 
   // ⭐️ 2. Supabase 초기화 코드를 여기에 추가합니다.

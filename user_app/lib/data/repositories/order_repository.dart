@@ -26,13 +26,9 @@ Future<OrderModel?> createOrder({
 }) async {
   final userId = _client.auth.currentUser?.id;
   if (userId == null) {
-    print('❌ 로그인되지 않음');
     throw Exception('로그인이 필요합니다.');
   }
 
-  print('🔍 OrderRepository.createOrder 시작');
-  print('- 사용자 ID: $userId');
-  print('- 상품 개수: ${cartItems.length}');
   
   try {
     // ⭐️ RPC 대신 직접 orders 테이블에 insert
@@ -47,7 +43,6 @@ Future<OrderModel?> createOrder({
     }).select().single();
 
     final orderId = orderResponse['id'];
-    print('✅ 주문 테이블 생성: $orderId');
 
     // order_items 테이블에 상품들 추가
     final orderItems = cartItems.map((item) => {
@@ -58,13 +53,11 @@ Future<OrderModel?> createOrder({
     }).toList();
 
     await _client.from('order_items').insert(orderItems);
-    print('✅ 주문 상품 ${orderItems.length}개 추가');
 
     // 장바구니에서 주문한 상품들 삭제
     for (final item in cartItems) {
       await _client.from('cart_items').delete().eq('id', item.id);
     }
-    print('✅ 장바구니 정리 완료');
 
     // 성공적으로 생성된 주문 정보 반환
     return OrderModel(

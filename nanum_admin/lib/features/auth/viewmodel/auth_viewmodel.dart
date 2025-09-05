@@ -13,7 +13,6 @@ class AuthViewModel extends _$AuthViewModel {
   }
 
   Future<void> signInWithPassword(String email, String password) async {
-    debugPrint('🔐 관리자 로그인 시도: $email');
     
     state = const AsyncValue.loading();
     
@@ -23,12 +22,10 @@ class AuthViewModel extends _$AuthViewModel {
         password: password,
       );
       
-      debugPrint('✅ 관리자 로그인 성공');
     });
   }
 
   Future<void> signOut() async {
-    debugPrint('🚪 관리자 로그아웃');
     
     state = const AsyncValue.loading();
     state = await AsyncValue.guard(() async {

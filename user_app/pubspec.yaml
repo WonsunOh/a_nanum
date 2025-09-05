@@ -51,6 +51,8 @@ dependencies:
   riverpod_annotation: ^2.6.1
   kakao_flutter_sdk_user: 1.9.7+3
   collection: 1.19.1
+  flutter_quill: ^11.4.2
+  flutter_quill_extensions: ^11.0.0
 
 
   # 🚀 결제 관련 의존성 (WebView 방식)

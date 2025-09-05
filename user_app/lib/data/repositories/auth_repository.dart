@@ -4,6 +4,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import '../../core/errors/app_exception.dart';
+
 // Repository는 데이터 소스와의 통신을 담당합니다.
 class AuthRepository {
   final SupabaseClient _client;
@@ -22,21 +24,79 @@ class AuthRepository {
     );
   }
 
-  // ⭐️ fullName과 nickname을 data 파라미터로 전달합니다.
+ // auth_repository.dart 수정
+
 Future<void> signUp({
   required String email,
   required String password,
   required String nickname,
   required String fullName,
+  String? phoneNumber,
+  String? address,
+  int level = 1,
 }) async {
-  await _client.auth.signUp(
-    email: email,
-    password: password,
-    data: {
-      'full_name': fullName,
-      'nickname': nickname
-    },
-  );
+  print('🚀 회원가입 요청 시작: $email');
+  
+  final userData = {
+    'full_name': fullName,
+    'nickname': nickname,
+    'level': level,
+  };
+  
+  if (phoneNumber?.trim().isNotEmpty == true) {
+    userData['phone_number'] = phoneNumber!.trim();
+  }
+  
+  if (address?.trim().isNotEmpty == true) {
+    userData['address'] = address!.trim();
+  }
+  
+  try {
+    // 1차: 회원가입 시도
+    final response = await _client.auth.signUp(
+      email: email,
+      password: password,
+      data: userData,
+    );
+    
+    print('📊 1차 가입 응답:');
+    print('👤 User ID: ${response.user?.id}');
+    print('📧 Email: ${response.user?.email}');
+    print('✉️ Email Confirmed: ${response.user?.emailConfirmedAt}');
+    print('⚡ Session: ${response.session != null}');
+    
+    // 2차: 즉시 중복 체크
+    await Future.delayed(const Duration(milliseconds: 100));
+    
+    try {
+      final checkResponse = await _client.auth.signUp(
+        email: email,
+        password: 'check_duplicate_password_123',
+        data: {'check': 'duplicate'},
+      );
+      
+      print('📊 중복 체크 응답:');
+      print('👤 Check User ID: ${checkResponse.user?.id}');
+      
+      // ⭐️ 핵심: User ID가 다르면 이미 존재하는 계정
+      if (checkResponse.user?.id != response.user?.id) {
+        print('🚨 다른 User ID = 이미 존재하는 계정');
+        throw const AuthenticationException('이미 가입된 이메일입니다.\n이전에 발송된 인증 이메일을 확인해주세요.');
+      }
+      
+      print('✅ 동일한 User ID = 새로운 계정 생성 완료');
+      
+    } catch (duplicateCheckError) {
+      if (duplicateCheckError is AuthenticationException) {
+        rethrow;
+      }
+      print('🔍 중복 체크 실패: $duplicateCheckError');
+    }
+    
+  } catch (e) {
+    print('🚨 회원가입 실패: $e');
+    rethrow;
+  }
 }
 
   // 로그아웃

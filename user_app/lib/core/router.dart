@@ -13,7 +13,7 @@ import '../features/order/view/order_history_screen.dart';
 import '../features/payment/views/portone_web_html_screen.dart';
 import '../features/post/view/my_posts_screen.dart';
 import '../features/shop/view/product_detail_screen.dart';
-import '../features/shop/view/shop_screen.dart';
+import '../features/shop/view/shop_screen.dart'; 
 import '../features/user/auth/view/login_screen.dart';
 import '../features/user/auth/view/signup_screen.dart';
 import '../features/user/auth/view/splash_screen.dart';
@@ -38,39 +38,78 @@ final routerProvider = Provider<GoRouter>((ref) {
   return GoRouter(
     initialLocation: '/splash',
     routes: [
-      GoRoute( path: '/splash', builder: (context, state) => const SplashScreen(), ),
-      GoRoute(path: '/login', builder: (context, state) => const LoginScreen()),
+      // 인증 관련 라우트 (MainLayout 없음)
+      GoRoute(
+        path: '/splash',
+        builder: (context, state) => const SplashScreen(),
+      ),
+      GoRoute(
+        path: '/login',
+        builder: (context, state) => const LoginScreen(),
+      ),
       GoRoute(
         path: '/signup',
         builder: (context, state) => const SignupScreen(),
       ),
 
-      // ⭐️ 새로운 홈
+      // 메인 ShellRoute with MainLayout
       ShellRoute(
         builder: (context, state, child) {
-          return MainLayout(child: child);
+          return MainLayout(
+            showCategorySidebar: _shouldShowCategorySidebar(state.matchedLocation),
+            child: child,
+          );
         },
         routes: [
+          // 쇼핑 관련 라우트들
           GoRoute(
             path: '/shop',
-            builder: (context, state) => const ShopScreen(),
+            builder: (context, state) => const ShopScreen(), // 단순한 상품 그리드
             routes: [
+              // 장바구니 관련 라우트
               GoRoute(
                 path: 'cart',
                 builder: (context, state) => const CartScreen(),
                 routes: [
                   GoRoute(
-                    path: 'checkout', // 최종 경로: /shop/cart/checkout
+                    path: 'checkout',
                     builder: (context, state) => const CheckoutScreen(),
+                    routes: [
+                      // 결제 라우트
+                      GoRoute(
+                        path: 'payment',
+                        builder: (context, state) {
+                          final totalAmount = int.parse(
+                            state.uri.queryParameters['totalAmount'] ?? '0',
+                          );
+                          final orderName = state.uri.queryParameters['orderName'] ?? '';
+                          final customerName = state.uri.queryParameters['customerName'] ?? '';
+                          final customerPhone = state.uri.queryParameters['customerPhone'] ?? '';
+                          final customerAddress = state.uri.queryParameters['customerAddress'] ?? '';
+                          final customerEmail = state.uri.queryParameters['customerEmail'] ?? '';
+                          
+                          return PortOneWebHtmlScreen(
+                            totalAmount: totalAmount,
+                            orderName: orderName,
+                            customerName: customerName,
+                            customerPhone: customerPhone,
+                            customerAddress: customerAddress, 
+                            customerEmail: customerEmail,
+                          );
+                        },
+                      ),
+                    ],
                   ),
                 ],
               ),
+              
+              // 마이페이지 관련 라우트
               GoRoute(
                 path: 'mypage',
                 builder: (context, state) => const MyPageScreen(),
                 routes: [
                   GoRoute(
-                    path: 'wishlist', // 최종 경로: /shop/mypage/wishlist
+                    path: 'wishlist',
                     builder: (context, state) => const WishlistScreen(),
                   ),
                   GoRoute(
@@ -83,78 +122,49 @@ final routerProvider = Provider<GoRouter>((ref) {
                   ),
                 ],
               ),
-
-              GoRoute(
-  path: 'cart',
-  builder: (context, state) => const CartScreen(),
-  routes: [
-    GoRoute(
-      path: 'checkout', // 최종 경로: /shop/cart/checkout
-      builder: (context, state) => const CheckoutScreen(),
-      routes: [
-        // ⭐️ 결제 화면 경로 추가
-        GoRoute(
-          path: 'payment', // 최종 경로: /shop/cart/checkout/payment
-          builder: (context, state) {
-            // 쿼리 파라미터에서 결제 정보 가져오기
-            final totalAmount = int.parse(state.uri.queryParameters['totalAmount'] ?? '0');
-            final orderName = state.uri.queryParameters['orderName'] ?? '';
-            final customerName = state.uri.queryParameters['customerName'] ?? '';
-            final customerPhone = state.uri.queryParameters['customerPhone'] ?? '';
-            final customerAddress = state.uri.queryParameters['customerAddress'] ?? '';
-            final customerEmail = state.uri.queryParameters['customerEmail'] ?? '';
-            
-            return PortOneWebHtmlScreen(
-              totalAmount: totalAmount,
-              orderName: orderName,
-              customerName: customerName,
-              customerPhone: customerPhone,
-              customerAddress: customerAddress, 
-              customerEmail: customerEmail,
-              // orderItems: const [], // 필요하면 별도 방식으로 전달
-            );
-          },
-        ),
-      ],
-    ),
-  ],
-),
+              
+              // 상품 상세 라우트 (마지막에 배치하여 충돌 방지)
               GoRoute(
                 path: ':productId',
                 builder: (context, state) {
-                  // 'cart', 'mypage'가 아닌 경우에만 상품 ID로 간주
-                  if (state.pathParameters['productId'] != 'cart' &&
-                      state.pathParameters['productId'] != 'mypage') {
-                    final productId = int.parse(
-                      state.pathParameters['productId']!,
-                    );
-                    return ProductDetailScreen(productId: productId);
+                  final productIdStr = state.pathParameters['productId']!;
+                  // 예약된 라우트 이름이 아닌지 확인
+                  if (productIdStr == 'cart' || productIdStr == 'mypage') {
+                    return const SizedBox.shrink();
                   }
-                  // 일치하는 경로가 없을 경우 에러 페이지 또는 홈으로 리디렉션 (옵션)
-                  return const SizedBox.shrink();
+                  
+                  final productId = int.tryParse(productIdStr);
+                  if (productId == null) {
+                    return const SizedBox.shrink();
+                  }
+                  
+                  return ProductDetailScreen(productId: productId);
                 },
               ),
             ],
           ),
-        ],
-      ),
 
-      GoRoute(
-        path: '/group-buy', // ➡️ 기존 '/home'에서 변경
-        builder: (context, state) => const GroupBuyListScreen(),
-        routes: [
+          // 공동구매 관련 라우트 (카테고리 사이드바 없음)
           GoRoute(
-            path: 'detail/:id',
-            builder: (context, state) {
-              final groupBuyId = int.parse(state.pathParameters['id']!);
-              return GroupBuyDetailScreen(groupBuyId: groupBuyId);
-            },
+            path: '/group-buy',
+            builder: (context, state) => const GroupBuyListScreen(),
+            routes: [
+              GoRoute(
+                path: 'detail/:id',
+                builder: (context, state) {
+                  final groupBuyId = int.parse(state.pathParameters['id']!);
+                  return GroupBuyDetailScreen(groupBuyId: groupBuyId);
+                },
+              ),
+            ],
+          ),
+          
+          // 공구 제안 라우트
+          GoRoute(
+            path: '/propose',
+            builder: (context, state) => const ProposeGroupBuyScreen(),
           ),
         ],
-      ),
-      GoRoute(
-        path: '/propose',
-        builder: (context, state) => const ProposeGroupBuyScreen(),
       ),
     ],
 
@@ -165,28 +175,76 @@ final routerProvider = Provider<GoRouter>((ref) {
       final isAtSplash = state.matchedLocation == '/splash';
       final isGoingToLogin = state.matchedLocation == '/login';
 
-      // ⭐️ 규칙 1: 스플래시 화면에 있다면, 무조건 '/shop'으로 이동시킨다.
+      // 규칙 1: 스플래시 화면에서는 항상 쇼핑몰로 리디렉션
       if (isAtSplash) {
         return '/shop';
       }
 
-            // 로그인이 필요한 페이지 목록
-      final authRequiredRoutes = ['/shop/mypage', '/shop/cart', '/shop/cart/checkout'];
+      // 인증이 필요한 라우트들
+      final authRequiredRoutes = [
+        '/shop/mypage',
+        '/shop/cart', 
+        '/shop/cart/checkout'
+      ];
 
-// 로그인 안 된 사용자가 보호된 경로로 가려고 하면 -> 로그인 페이지로
+      // 인증되지 않은 사용자를 보호된 라우트에서 로그인으로 리디렉션
       if (!isAuthenticated && authRequiredRoutes.contains(state.matchedLocation)) {
         return '/login?from=${state.matchedLocation}';
       }
       
-      // 로그인 된 사용자가 로그인 페이지로 가려고 하면 -> 쇼핑몰 홈으로
-      if (isAuthenticated && isGoingToLogin) {
-        return '/shop';
+      // 로그인 페이지로 직접 이동하는 경우 리디렉션 방지
+      if (isGoingToLogin) {
+        if (isAuthenticated) {
+          // 이미 로그인되어 있으면서 로그인 페이지로 가려는 경우만 처리
+          final from = state.uri.queryParameters['from'];
+          if (from != null && from.isNotEmpty) {
+            try {
+          final decodedFrom = Uri.decodeComponent(from);
+          // 안전한 경로인지 확인
+          if (decodedFrom.startsWith('/shop/')) {
+            return decodedFrom;
+          }
+        } catch (e) {
+          // 디코딩 실패 시 기본 경로로
+        }
+      }
+          return '/shop';
+        }
+        // 로그인이 안 되어 있으면 로그인 페이지로 그냥 이동
+        return null;
       }
 
       return null;
     },
   );
+
+  
 });
+
+
+
+// 카테고리 사이드바를 표시할 경로인지 확인하는 함수
+bool _shouldShowCategorySidebar(String location) {
+  // 쇼핑 관련 페이지에서만 카테고리 사이드바 표시
+  // 단, 장바구니, 마이페이지, 결제 관련 페이지에서는 숨김
+  if (!location.startsWith('/shop')) {
+    return false; // 쇼핑 경로가 아니면 사이드바 숨김
+  }
+  
+  final hideOnRoutes = [
+    '/shop/cart',
+    '/shop/mypage',
+  ];
+  
+  // 정확한 경로 매치
+  for (final route in hideOnRoutes) {
+    if (location == route || location.startsWith('$route/')) {
+      return false;
+    }
+  }
+  
+  return true; // 나머지 쇼핑 경로에서는 사이드바 표시
+}
 
 class GoRouterRefreshStream extends ChangeNotifier {
   GoRouterRefreshStream(Stream<AuthState> stream) {

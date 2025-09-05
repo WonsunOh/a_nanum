@@ -24,10 +24,19 @@ class AppConfig {
   static String get portoneUserCode => dotenv.env['PORTONE_USER_CODE'] ?? '';
   static String get portoneStoreId => dotenv.env['PORTONE_STORE_ID'] ?? '';
   
+  // 주소 설정
+  static String get jusoApiKey {
+    final key = dotenv.env['JUSO_API_KEY'] ?? '';
+    print('AppConfig - JUSO_API_KEY: ${key.isNotEmpty ? '설정됨(${key.length}자리)' : '설정안됨'}');
+    return key;
+  }
+
+
   // 검증 메서드
   static void validateConfig() {
     assert(supabaseUrl.isNotEmpty, 'SUPABASE_URL이 설정되지 않았습니다.');
     assert(supabaseAnonKey.isNotEmpty, 'SUPABASE_ANON_KEY가 설정되지 않았습니다.');
+    assert(jusoApiKey.isNotEmpty, 'JUSO_API_KEY가 설정되지 않았습니다. .env 파일을 확인해주세요.');
     
     if (isDevelopment) {
       print('🔧 Development Mode');

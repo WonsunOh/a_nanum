@@ -54,11 +54,14 @@ class ProductRepository {
     String? productCode,
     String? relatedProductCode,
     String? imageUrl,
+    List<String>? additionalImages,
     required int shippingFee, 
     Map<String, bool>? tags, 
     
   }) async {
-    final Map<String, dynamic> productData =({
+
+
+    final Map<String, dynamic> productData ={
       'name': name,
       'description': description,
       'total_price': price,
@@ -72,16 +75,20 @@ class ProductRepository {
       'product_code': productCode,
       'related_product_code': relatedProductCode,
       'image_url': imageUrl,
+      'additional_images': additionalImages,
       'shipping_fee': shippingFee, // ⭐️ 3. insert 구문에 추가
     'tags': tags,
     
     
-    });
+    };
 
-    
+  
 
   final newProduct = await _client.from('products').insert(productData).select().single();
-    final newProductId = newProduct['id'];
+
+  
+
+  final newProductId = newProduct['id'];
 
   // ⭐️ 옵션 데이터가 있을 때만 저장 로직을 실행
   if (optionGroups != null && variants != null) {
@@ -148,29 +155,25 @@ Future<void> _saveFullOptions(int productId, List<OptionGroup> optionGroups, Lis
 // ⭐️ 상품 수정 메서드 수정
 Future<void> updateProductWithOptions(ProductModel product, {List<OptionGroup>? optionGroups, List<ProductVariant>? variants}) async {
   // 1. 상품 기본 정보 업데이트
-  final Map<String, dynamic> productData =({
-      'name': product.name,
-      'description': product.description,
-      'total_price': product.price,
-      'stock_quantity': product.stockQuantity,
-      'category_id': product.categoryId,
-      'is_displayed': product.isDisplayed,
-      'is_sold_out': product.isSoldOut,
-      'product_code': product.productCode,
-      'related_product_code': product.relatedProductCode,
-      'shipping_fee': product.shippingFee,
-      'tags': product.tags,
-      'image_url': product.imageUrl,
-      'discount_price': product.discountPrice,
-      // ⭐️ 6. 누락되었던 날짜 필드를 여기에 추가합니다.
-      'discount_start_date': product.discountStartDate?.toIso8601String(),
-      'discount_end_date': product.discountEndDate?.toIso8601String(),
-    });
+  final Map<String, dynamic> productData = {
+    'name': product.name,
+    'description': product.description,
+    'total_price': product.price,
+    'stock_quantity': product.stockQuantity,
+    'category_id': product.categoryId,
+    'is_displayed': product.isDisplayed,
+    'is_sold_out': product.isSoldOut,
+    'product_code': product.productCode,
+    'related_product_code': product.relatedProductCode,
+    'shipping_fee': product.shippingFee,
+    'tags': product.tags,
+    'image_url': product.imageUrl,
+    'additional_images': product.additionalImages, // ✅ 이 부분이 누락되어 있었음
+    'discount_price': product.discountPrice,
+    'discount_start_date': product.discountStartDate?.toIso8601String(),
+    'discount_end_date': product.discountEndDate?.toIso8601String(),
+  };
 
-  // ⭐️ [데이터 추적 3단계] Repository에서 DB로 데이터를 보내기 직전 최종 값 확인
-    debugPrint('--- [REPOSITORY] Updating Data to Supabase ---');
-    debugPrint(productData.toString());
-    debugPrint('-----------------------------------------------');
 
   await _client.from('products').update(productData).eq('id', product.id);
 
@@ -180,7 +183,11 @@ Future<void> updateProductWithOptions(ProductModel product, {List<OptionGroup>? 
   if (optionGroups != null && variants != null) {
     await _saveFullOptions(product.id, optionGroups, variants);
   }
+   
 }
+
+
+
 
   // ⭐️ 2. 상품의 '옵션'만 새로 저장하는 메서드
 Future<void> saveOptions(int productId, List<ProductOption> options) async {
@@ -299,7 +306,6 @@ Future<List<ProductModel>> searchProducts(String query) async {
     const bucketName = 'products';
     const folderName = 'public';
 
-    debugPrint('"$bucketName" 버킷의 "$folderName" 폴더 삭제를 시작합니다...');
 
     try {
       final fileList = await _client.storage
@@ -307,7 +313,6 @@ Future<List<ProductModel>> searchProducts(String query) async {
           .list(path: folderName);
 
       if (fileList.isEmpty) {
-        debugPrint('✅ 폴더에 삭제할 파일이 없습니다.');
         return;
       }
 
@@ -319,7 +324,6 @@ Future<List<ProductModel>> searchProducts(String query) async {
           .from(bucketName)
           .remove(filePathsToRemove);
       
-      debugPrint('✅ ${filePathsToRemove.length}개의 파일이 성공적으로 삭제되었습니다.');
 
     } on StorageException catch (e) {
       debugPrint('🚨 스토리지 에러 발생: ${e.message}');
@@ -327,4 +331,42 @@ Future<List<ProductModel>> searchProducts(String query) async {
       debugPrint('🚨 알 수 없는 에러 발생: $e');
     }
   }
+Future<List<ProductVariant>> fetchVariantsByProductId(int productId) async {
+    try {
+      final response = await _client
+          .from('product_variants')
+          .select('*')
+          .eq('product_id', productId);
+
+          // ✅ 안전한 타입 변환
+    if (response == null) return [];
+
+      return (response as List<dynamic>)
+          .map((json) => ProductVariant.fromJson(json))
+          .toList();
+    } catch (e) {
+      debugPrint('Failed to fetch product variants for product $productId: $e');
+    return []; // 에러 시 빈 리스트 반환
+    }
+  }
+
+  // product_repository.dart의 fetchProductById 수정
+Future<ProductModel> fetchProductById(int productId) async {
+  try {
+    final data = await _client
+        .from('products')
+        .select('*')
+        .eq('id', productId)
+        .single();
+    
+    
+    final product = ProductModel.fromJson(data);
+    
+    
+    return product;
+  } catch (error, stackTrace) {
+    debugPrint('fetchProductById 에러: $error');
+    throw error;
+  }
+}
 }
