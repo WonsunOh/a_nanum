@@ -36,7 +36,7 @@ const RESOURCES = {"canvaskit/skwasm.js": "1ef3ea3a0fec4569e5d531da25f34095",
 "assets/packages/flutter_inappwebview/assets/t_rex_runner/t-rex.css": "5a8d0222407e388155d7d1395a75d5b9",
 "assets/packages/quill_native_bridge_linux/assets/xclip": "d37b0dbbc8341839cde83d351f96279e",
 "assets/packages/flutter_inappwebview_web/assets/web/web_support.js": "509ae636cfdd93e49b5a6eaf0f06d79f",
-"flutter_bootstrap.js": "a22975353b3099c11558045b9fa22957",
+"flutter_bootstrap.js": "06338791152e20dfa2f9c43694cd4d3c",
 "favicon.png": "5dcef449791fa27946b3d35ad8803796",
 "index.html": "38d5574c80e3da38080f0de0e179b61c",
 "/": "38d5574c80e3da38080f0de0e179b61c"};
