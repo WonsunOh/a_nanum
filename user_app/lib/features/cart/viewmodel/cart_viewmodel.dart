@@ -65,12 +65,6 @@ class CartViewModel extends _$CartViewModel {
   int? variantId,
 }) async {
   try {
-    // ✅ 받은 파라미터 로그
-    print('=== CartViewModel.addProductToCart ===');
-    print('받은 productId: $productId');
-    print('받은 quantity: $quantity');
-    print('받은 variantId: $variantId');
-    print('==================================');
     
     await _repository.addProductToCart(
       productId: productId,

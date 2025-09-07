@@ -21,7 +21,6 @@ class InquiryRepository {
         'content': content,
       });
     } catch (e) {
-      print('문의 제출 에러: $e');
       rethrow;
     }
   }

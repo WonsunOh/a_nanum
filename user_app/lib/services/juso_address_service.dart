@@ -13,13 +13,8 @@ class JusoAddressService {
     if (keyword.trim().isEmpty) return [];
     
     try {
-      print('🔍 검색 키워드: $keyword');
-      
       // API 키 확인
       final apiKey = AppConfig.jusoApiKey;
-      print('🔑 API Key 존재 여부: ${apiKey.isNotEmpty}');
-      print('🔑 API Key 길이: ${apiKey.length}자리');
-      print('🔑 API Key 앞 5자리: ${apiKey.length > 5 ? apiKey.substring(0, 5) : apiKey}...');
       
       final uri = Uri.parse(_baseUrl).replace(queryParameters: {
         'confmKey': apiKey,
@@ -29,20 +24,14 @@ class JusoAddressService {
         'resultType': 'json',
       });
 
-      print('🌐 API 요청 URL: $uri');
 
       final response = await http.get(uri);
       
-      print('📡 HTTP 상태 코드: ${response.statusCode}');
-      print('📄 응답 내용 길이: ${response.body.length}자');
-      print('📄 응답 내용: ${response.body}');
       
       if (response.statusCode == 200) {
         final decodedData = json.decode(response.body);
         final results = decodedData['results'];
         
-        print('📊 API 결과 구조: ${results.keys}');
-        print('📊 common 섹션: ${results['common']}');
         
         // 에러 체크
         final errorCode = results['common']['errorCode'];
@@ -57,25 +46,19 @@ class JusoAddressService {
         
         // 검색 결과가 있는 경우
         final jusoData = results['juso'];
-        print('📭 juso 데이터 존재 여부: ${jusoData != null}');
         
         if (jusoData != null) {
           final jusoList = jusoData as List;
-          print('✅ 검색 결과 개수: ${jusoList.length}');
           
           if (jusoList.isNotEmpty) {
-            print('📍 첫 번째 결과: ${jusoList.first}');
           }
           
           return jusoList
               .map((item) => JusoAddressModel.fromJson(item))
               .toList();
         } else {
-          print('📭 검색 결과가 null입니다');
         }
       } else {
-        print('🔴 HTTP 요청 실패: ${response.statusCode}');
-        print('🔴 응답 내용: ${response.body}');
       }
       
       return [];

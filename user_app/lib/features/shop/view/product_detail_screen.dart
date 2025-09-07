@@ -10,11 +10,46 @@ import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
-import '../../../data/models/checkout_item_model.dart';
 import '../../../data/models/product_model.dart';
 import '../../../data/models/product_variant_model.dart';
 import '../../cart/viewmodel/cart_viewmodel.dart';
+import '../../wishlist/viewmodel/wishlist_viewmodel.dart';
 import '../viewmodel/product_detail_viewmodel.dart';
+
+
+// 바로구매 데이터를 위한 전역 상태
+class DirectPurchaseData {
+  final int productId;
+  final String productName;
+  final int productPrice;
+  final int? productDiscountPrice;
+  final String? productImage;
+  final List<Map<String, dynamic>> items;
+
+  DirectPurchaseData({
+    required this.productId,
+    required this.productName,
+    required this.productPrice,
+    this.productDiscountPrice,
+    this.productImage,
+    required this.items,
+  });
+
+  Map<String, dynamic> toJson() {
+    return {
+      'productId': productId,
+      'productName': productName,
+      'productPrice': productPrice,
+      'productDiscountPrice': productDiscountPrice,
+      'productImage': productImage,
+      'items': items,
+    };
+  }
+}
+
+// 바로구매 데이터 Provider
+final directPurchaseProvider = StateProvider<DirectPurchaseData?>((ref) => null);
+
 
 // 선택된 상품 항목 클래스
 class SelectedVariantItem {
@@ -95,7 +130,6 @@ class ProductDetailScreen extends ConsumerStatefulWidget {
 }
 
 class _ProductDetailScreenState extends ConsumerState<ProductDetailScreen> {
-  bool _isFavorited = false;
   Map<String, String> _currentOptions = {};
   late QuillController _descriptionController;
 
@@ -103,8 +137,7 @@ class _ProductDetailScreenState extends ConsumerState<ProductDetailScreen> {
   int _selectedTabIndex = 0;
   int _selectedImageIndex = 0; // ✅ 선택된 이미지 인덱스 추가
   ProductVariant? _selectedVariant;
-  List<dynamic> _optionGroups = [];
-  int _quantity = 1;  
+  
 
   @override
   void initState() {
@@ -174,22 +207,73 @@ class _ProductDetailScreenState extends ConsumerState<ProductDetailScreen> {
     });
   }
 
-  void _toggleFavorite() {
-    _safeSetState(() { // ✅ _safeSetState 사용
-      _isFavorited = !_isFavorited;
-    });
+  void _toggleFavorite() async {
+  try {
+    print('찜하기 버튼 클릭: 상품 ${widget.productId}');
     
-    if (mounted) { // ✅ mounted 체크
+    final resultMessage = await ref.read(wishlistToggleProvider.notifier).toggleWishlist(widget.productId);
+    
+    if (mounted) {
+      final isAddAction = resultMessage.contains('추가');
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(
-            _isFavorited ? '찜 목록에 추가되었습니다.' : '찜 목록에서 삭제되었습니다.',
+          content: Row(
+            children: [
+              Icon(
+                isAddAction ? Icons.favorite : Icons.heart_broken,
+                color: Colors.white,
+                size: 20,
+              ),
+              const SizedBox(width: 8),
+              Text(resultMessage),
+            ],
           ),
-          duration: const Duration(seconds: 1),
+          duration: const Duration(milliseconds: 1500),
+          behavior: SnackBarBehavior.fixed, // ✅ floating에서 fixed로 변경
+          // margin 제거하여 화면 제일 아래에 표시
+          backgroundColor: isAddAction ? Colors.green[600] : Colors.orange[600],
+        ),
+      );
+    }
+  } catch (e) {
+    print('찜하기 에러: $e');
+    if (mounted) {
+       // 로그인 관련 에러 메시지 개선
+      String errorMessage;
+      if (e.toString().contains('로그인이 필요합니다') || 
+          e.toString().contains('로그인') ||
+          e.toString().contains('Exception: 로그인')) {
+        errorMessage = '찜하기 기능을 사용하려면 로그인해주세요';
+      } else {
+        errorMessage = '일시적인 오류가 발생했습니다. 다시 시도해주세요';
+      }
+      
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Row(
+            children: [
+              const Icon(Icons.info_outline, color: Colors.white, size: 20),
+              const SizedBox(width: 8),
+              Expanded(child: Text(errorMessage)),
+            ],
+          ),
+          duration: const Duration(milliseconds: 2000),
+          behavior: SnackBarBehavior.fixed, // ✅ 에러 메시지도 하단 고정
+          backgroundColor: Colors.blue[600], // 로그인 안내는 파란색
+          action: e.toString().contains('로그인') 
+              ? SnackBarAction(
+                  label: '로그인',
+                  textColor: Colors.white,
+                  onPressed: () {
+                    context.go('/login');
+                  },
+                )
+              : null,
         ),
       );
     }
   }
+}
 
   // 설명을 Quill 컨트롤러에 설정하는 메서드
   void _setDescription(String? description) {
@@ -225,18 +309,38 @@ class _ProductDetailScreenState extends ConsumerState<ProductDetailScreen> {
 
     final productDetailAsync = ref.watch(productDetailProvider(widget.productId));
 
+    final isWishlistedAsync = ref.watch(isProductWishlistedProvider(widget.productId));
+
     return Scaffold(
       appBar: AppBar(
         title: const Text('상품 정보'),
         actions: [
-          IconButton(
-            onPressed: _toggleFavorite,
-            icon: Icon(
-              _isFavorited ? Icons.favorite : Icons.favorite_border,
-              color: _isFavorited ? Colors.red : null,
-            ),
-            tooltip: '찜하기',
+          Consumer(
+    builder: (context, ref, child) {
+      final isWishlistedAsync = ref.watch(isProductWishlistedProvider(widget.productId));
+      
+      return isWishlistedAsync.when(
+        data: (isWishlisted) => IconButton(
+          onPressed: _toggleFavorite,
+          icon: Icon(
+            isWishlisted ? Icons.favorite : Icons.favorite_border,
+            color: isWishlisted ? Colors.red : null,
           ),
+          tooltip: isWishlisted ? '찜 해제' : '찜하기',
+        ),
+        loading: () => IconButton(
+          onPressed: null,
+          icon: const Icon(Icons.favorite_border),
+          tooltip: '로딩 중...',
+        ),
+        error: (_, __) => IconButton(
+          onPressed: _toggleFavorite,
+          icon: const Icon(Icons.favorite_border),
+          tooltip: '찜하기',
+        ),
+      );
+    },
+  ),
         ],
       ),
       body: productDetailAsync.when(
@@ -1532,16 +1636,9 @@ Future<void> _addToCart(BuildContext context, ProductModel product) async {
 
   try {
     for (final item in selectedItems) {
-      print('=== 장바구니 추가 디버그 ===');
-      print('selectedItem: $item');
-      print('variant: ${item.variant}');
-      print('variant.id: ${item.variant.id}');
-      print('variant.name: ${item.variant.name}');
-      print('==========================');
       
       // ✅ 임시로 직접 variant ID 확인
       final variantIdToSend = item.variant.id;
-      print('전송할 variantId: $variantIdToSend');
       
       await ref.read(cartViewModelProvider.notifier).addProductToCart(
         productId: product.id,
@@ -1563,7 +1660,7 @@ Future<void> _addToCart(BuildContext context, ProductModel product) async {
 }
 
 
-// 기존 _buyNow 메서드도 수정
+// _buyNow 메서드 완전 수정
 void _buyNow(BuildContext context, ProductModel product) {
   final selectedItems = ref.watch(selectedItemsProvider);
   
@@ -1577,12 +1674,43 @@ void _buyNow(BuildContext context, ProductModel product) {
     return;
   }
 
-  // 장바구니에 추가 후 체크아웃으로 이동
-  _addToCart(context, product).then((_) {
-    if (mounted) {
-      context.go('/shop/cart');
-    }
-  });
+  try {
+    
+    // ✅ 전역 상태에 바로구매 데이터 저장
+    final directPurchaseData = DirectPurchaseData(
+      productId: product.id,
+      productName: product.name,
+      productPrice: product.price,
+      productDiscountPrice: product.discountPrice,
+      productImage: product.imageUrl,
+      items: selectedItems.map((item) => {
+        'variantId': item.variant.id,
+        'variantName': item.variant.name,
+        'additionalPrice': item.variant.additionalPrice,
+        'quantity': item.quantity,
+      }).toList(),
+    );
+    
+    // 전역 상태에 데이터 저장
+    ref.read(directPurchaseProvider.notifier).state = directPurchaseData;
+    
+    
+    // ✅ 기존 경로 그대로 사용
+    context.go('/shop/cart/checkout');
+    
+    // 선택 상품 초기화
+    ref.read(selectedItemsProvider.notifier).clear();
+    
+  } catch (e, stackTrace) {
+    print('바로구매 에러: $e');
+    print('스택 트레이스: $stackTrace');
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('바로구매 처리 중 오류가 발생했습니다: $e'),
+        backgroundColor: Colors.red,
+      ),
+    );
+  }
 }
 
 
@@ -1611,6 +1739,30 @@ void _buyNow(BuildContext context, ProductModel product) {
       ],
     ),
   );
+}
+
+// 바로구매 데이터 인코딩 (간단한 JSON)
+String _encodeDirectPurchaseData(List<SelectedVariantItem> selectedItems, ProductModel product) {
+  // ✅ checkout_screen.dart에서 기대하는 데이터 구조로 변경
+  final data = {
+    'productId': product.id,
+    'productName': product.name,
+    'productPrice': product.price,
+    'productDiscountPrice': product.discountPrice,
+    'productImage': product.imageUrl,
+    'items': selectedItems.map((item) => {
+      'variantId': item.variant.id,
+      'variantName': item.variant.name,
+      'additionalPrice': item.variant.additionalPrice,
+      'quantity': item.quantity,
+    }).toList(),
+  };
+  
+  final jsonString = jsonEncode(data);
+  
+  final encoded = Uri.encodeComponent(jsonString);
+  
+  return encoded;
 }
 
   void _showCartSuccessDialog() {
@@ -1669,3 +1821,4 @@ void _buyNow(BuildContext context, ProductModel product) {
   );
 }
 }
+

@@ -327,22 +327,22 @@ class _JusoAddressSearchWidgetState extends State<JusoAddressSearchWidget> {
         
         const SizedBox(height: 20),
         
-        const Text(
-          '상세주소',
-          style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-        ),
-        const SizedBox(height: 8),
-        TextField(
-          controller: _detailController,
-          decoration: InputDecoration(
-            hintText: '동, 호수 등 상세주소를 입력하세요',
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
-            ),
-          ),
-        ),
+        // const Text(
+        //   '상세주소',
+        //   style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+        // ),
+        // const SizedBox(height: 8),
+        // TextField(
+        //   controller: _detailController,
+        //   decoration: InputDecoration(
+        //     hintText: '동, 호수 등 상세주소를 입력하세요',
+        //     border: OutlineInputBorder(
+        //       borderRadius: BorderRadius.circular(12),
+        //     ),
+        //   ),
+        // ),
         
-        const SizedBox(height: 20),
+        // const SizedBox(height: 20),
         
         TextButton(
           onPressed: () {

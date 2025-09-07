@@ -61,9 +61,6 @@ class AuthViewModel extends _$AuthViewModel {
     } catch (error, stackTrace) {
       Logger.error('회원가입 실패', error, stackTrace, 'AuthViewModel');
       
-      print('🚨 ViewModel에서 잡은 에러:');
-      print('📋 타입: ${error.runtimeType}');
-      print('💬 내용: $error');
       
       // ⭐️ AuthenticationException은 그대로 전달
       if (error is AuthenticationException) {

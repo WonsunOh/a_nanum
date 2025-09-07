@@ -35,7 +35,6 @@ Future<List<GroupBuy>> fetchMyGroupBuys() async {
     .toList();
 
   } catch (e) {
-    print('내가 참여한 공구 목록 가져오기 에러: $e');
     rethrow;
   }
 }

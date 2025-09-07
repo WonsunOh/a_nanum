@@ -26,4 +26,20 @@ class OrderModel {
     required this.shippingAddress,
     this.items = const [],
   });
+
+  // ✅ fromJson 메서드 추가
+  factory OrderModel.fromJson(Map<String, dynamic> json) {
+    return OrderModel(
+      id: json['id'],
+      createdAt: DateTime.parse(json['created_at']),
+      userId: json['user_id'],
+      totalAmount: json['total_amount'],
+      shippingFee: json['shipping_fee'] ?? 0,
+      status: json['status'],
+      recipientName: json['recipient_name'],
+      recipientPhone: json['recipient_phone'],
+      shippingAddress: json['shipping_address'],
+      items: [], // 기본값으로 빈 리스트
+    );
+  }
 }

@@ -29,6 +29,7 @@ Future<bool> createOrder({
   required String recipientName,
   required String recipientPhone,
   required String shippingAddress,
+  String? paymentId,
 }) async {
   
   // UI에 로딩 상태임을 알립니다.
@@ -43,6 +44,7 @@ Future<bool> createOrder({
       recipientName: recipientName,
       recipientPhone: recipientPhone,
       shippingAddress: shippingAddress,
+      paymentId: paymentId,
     );
     
     

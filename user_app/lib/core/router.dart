@@ -13,11 +13,13 @@ import '../features/order/view/order_history_screen.dart';
 import '../features/payment/views/portone_web_html_screen.dart';
 import '../features/post/view/my_posts_screen.dart';
 import '../features/shop/view/product_detail_screen.dart';
-import '../features/shop/view/shop_screen.dart'; 
+import '../features/shop/view/shop_screen.dart';
 import '../features/user/auth/view/login_screen.dart';
 import '../features/user/auth/view/signup_screen.dart';
 import '../features/user/auth/view/splash_screen.dart';
+import '../features/user/level_upgrade/view/level_upgrade_form_screen.dart';
 import '../features/user/mypage/view/mypage_screen.dart';
+import '../features/user/mypage/view/profile_edit_screen.dart';
 import '../features/wishlist/view/wishlist_screen.dart';
 import 'widgets/main_layout.dart';
 
@@ -43,10 +45,7 @@ final routerProvider = Provider<GoRouter>((ref) {
         path: '/splash',
         builder: (context, state) => const SplashScreen(),
       ),
-      GoRoute(
-        path: '/login',
-        builder: (context, state) => const LoginScreen(),
-      ),
+      GoRoute(path: '/login', builder: (context, state) => const LoginScreen()),
       GoRoute(
         path: '/signup',
         builder: (context, state) => const SignupScreen(),
@@ -56,7 +55,9 @@ final routerProvider = Provider<GoRouter>((ref) {
       ShellRoute(
         builder: (context, state, child) {
           return MainLayout(
-            showCategorySidebar: _shouldShowCategorySidebar(state.matchedLocation),
+            showCategorySidebar: _shouldShowCategorySidebar(
+              state.matchedLocation,
+            ),
             child: child,
           );
         },
@@ -73,7 +74,9 @@ final routerProvider = Provider<GoRouter>((ref) {
                 routes: [
                   GoRoute(
                     path: 'checkout',
-                    builder: (context, state) => const CheckoutScreen(),
+                    builder: (context, state) {
+                      return CheckoutScreen();
+                    },
                     routes: [
                       // 결제 라우트
                       GoRoute(
@@ -82,18 +85,24 @@ final routerProvider = Provider<GoRouter>((ref) {
                           final totalAmount = int.parse(
                             state.uri.queryParameters['totalAmount'] ?? '0',
                           );
-                          final orderName = state.uri.queryParameters['orderName'] ?? '';
-                          final customerName = state.uri.queryParameters['customerName'] ?? '';
-                          final customerPhone = state.uri.queryParameters['customerPhone'] ?? '';
-                          final customerAddress = state.uri.queryParameters['customerAddress'] ?? '';
-                          final customerEmail = state.uri.queryParameters['customerEmail'] ?? '';
-                          
+                          final orderName =
+                              state.uri.queryParameters['orderName'] ?? '';
+                          final customerName =
+                              state.uri.queryParameters['customerName'] ?? '';
+                          final customerPhone =
+                              state.uri.queryParameters['customerPhone'] ?? '';
+                          final customerAddress =
+                              state.uri.queryParameters['customerAddress'] ??
+                              '';
+                          final customerEmail =
+                              state.uri.queryParameters['customerEmail'] ?? '';
+
                           return PortOneWebHtmlScreen(
                             totalAmount: totalAmount,
                             orderName: orderName,
                             customerName: customerName,
                             customerPhone: customerPhone,
-                            customerAddress: customerAddress, 
+                            customerAddress: customerAddress,
                             customerEmail: customerEmail,
                           );
                         },
@@ -102,12 +111,16 @@ final routerProvider = Provider<GoRouter>((ref) {
                   ),
                 ],
               ),
-              
+
               // 마이페이지 관련 라우트
               GoRoute(
                 path: 'mypage',
                 builder: (context, state) => const MyPageScreen(),
                 routes: [
+                  GoRoute(
+                    path: 'profile-edit',
+                    builder: (context, state) => const ProfileEditScreen(),
+                  ),
                   GoRoute(
                     path: 'wishlist',
                     builder: (context, state) => const WishlistScreen(),
@@ -120,9 +133,14 @@ final routerProvider = Provider<GoRouter>((ref) {
                     path: 'posts',
                     builder: (context, state) => const MyPostsScreen(),
                   ),
+                  // ⭐️ 레벨 업그레이드 라우터 추가
+                  GoRoute(
+                    path: 'level-upgrade',
+                    builder: (context, state) => const LevelUpgradeFormScreen(),
+                  ),
                 ],
               ),
-              
+
               // 상품 상세 라우트 (마지막에 배치하여 충돌 방지)
               GoRoute(
                 path: ':productId',
@@ -132,12 +150,12 @@ final routerProvider = Provider<GoRouter>((ref) {
                   if (productIdStr == 'cart' || productIdStr == 'mypage') {
                     return const SizedBox.shrink();
                   }
-                  
+
                   final productId = int.tryParse(productIdStr);
                   if (productId == null) {
                     return const SizedBox.shrink();
                   }
-                  
+
                   return ProductDetailScreen(productId: productId);
                 },
               ),
@@ -158,7 +176,7 @@ final routerProvider = Provider<GoRouter>((ref) {
               ),
             ],
           ),
-          
+
           // 공구 제안 라우트
           GoRoute(
             path: '/propose',
@@ -183,15 +201,17 @@ final routerProvider = Provider<GoRouter>((ref) {
       // 인증이 필요한 라우트들
       final authRequiredRoutes = [
         '/shop/mypage',
-        '/shop/cart', 
+        '/shop/cart',
         '/shop/cart/checkout'
+            '/shop/mypage/level-upgrade',
       ];
 
       // 인증되지 않은 사용자를 보호된 라우트에서 로그인으로 리디렉션
-      if (!isAuthenticated && authRequiredRoutes.contains(state.matchedLocation)) {
+      if (!isAuthenticated &&
+          authRequiredRoutes.contains(state.matchedLocation)) {
         return '/login?from=${state.matchedLocation}';
       }
-      
+
       // 로그인 페이지로 직접 이동하는 경우 리디렉션 방지
       if (isGoingToLogin) {
         if (isAuthenticated) {
@@ -199,15 +219,15 @@ final routerProvider = Provider<GoRouter>((ref) {
           final from = state.uri.queryParameters['from'];
           if (from != null && from.isNotEmpty) {
             try {
-          final decodedFrom = Uri.decodeComponent(from);
-          // 안전한 경로인지 확인
-          if (decodedFrom.startsWith('/shop/')) {
-            return decodedFrom;
+              final decodedFrom = Uri.decodeComponent(from);
+              // 안전한 경로인지 확인
+              if (decodedFrom.startsWith('/shop/')) {
+                return decodedFrom;
+              }
+            } catch (e) {
+              // 디코딩 실패 시 기본 경로로
+            }
           }
-        } catch (e) {
-          // 디코딩 실패 시 기본 경로로
-        }
-      }
           return '/shop';
         }
         // 로그인이 안 되어 있으면 로그인 페이지로 그냥 이동
@@ -217,11 +237,7 @@ final routerProvider = Provider<GoRouter>((ref) {
       return null;
     },
   );
-
-  
 });
-
-
 
 // 카테고리 사이드바를 표시할 경로인지 확인하는 함수
 bool _shouldShowCategorySidebar(String location) {
@@ -230,19 +246,16 @@ bool _shouldShowCategorySidebar(String location) {
   if (!location.startsWith('/shop')) {
     return false; // 쇼핑 경로가 아니면 사이드바 숨김
   }
-  
-  final hideOnRoutes = [
-    '/shop/cart',
-    '/shop/mypage',
-  ];
-  
+
+  final hideOnRoutes = ['/shop/cart', '/shop/mypage'];
+
   // 정확한 경로 매치
   for (final route in hideOnRoutes) {
     if (location == route || location.startsWith('$route/')) {
       return false;
     }
   }
-  
+
   return true; // 나머지 쇼핑 경로에서는 사이드바 표시
 }
 

@@ -148,14 +148,12 @@ void _showAlreadyRegisteredDialog(BuildContext context) {
             width: double.infinity,
             child: ElevatedButton(
               onPressed: () {
-                print('🔄 다이얼로그 닫기 및 로그인 페이지 이동 시도');
                 Navigator.of(context).pop(); // 다이얼로그 닫기
                 
                 // 약간의 지연 후 페이지 이동 (더 확실하게)
                 Future.delayed(const Duration(milliseconds: 100), () {
                   if (context.mounted) {
                     context.go('/login');
-                    print('✅ 로그인 페이지로 이동 완료');
                   }
                 });
               },
@@ -182,6 +180,17 @@ void _showAlreadyRegisteredDialog(BuildContext context) {
 
   void _submit() {
     if (_formKey.currentState!.validate()) {
+
+      print('🔍 회원가입 폼 데이터:');
+    print('  - 전화번호 컨트롤러: "${_phoneController.text}"');
+    print('  - 전화번호 trim: "${_phoneController.text.trim()}"');
+    print('  - 전화번호 isEmpty: ${_phoneController.text.trim().isEmpty}');
+    
+    final phoneToSend = _phoneController.text.trim().isNotEmpty 
+        ? _phoneController.text.trim() 
+        : null;
+    print('  - 전송할 전화번호: $phoneToSend');
+    
       // 전체 주소 조합
       String fullAddress = _addressController.text.trim();
       if (_detailAddressController.text.trim().isNotEmpty) {

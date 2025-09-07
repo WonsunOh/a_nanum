@@ -1,29 +1,31 @@
 // GENERATED CODE - DO NOT MODIFY BY HAND
 
-part of 'wishlist_viewmodel.dart';
+part of 'order_history_viewmodel.dart';
 
 // **************************************************************************
 // RiverpodGenerator
 // **************************************************************************
 
-String _$wishlistViewModelHash() => r'6171b8ab23eec52e1babc6cd427ea3b289ad53de';
+String _$orderHistoryViewModelHash() =>
+    r'c7a6d043a563bf7ed47433606111ac2e8071bf69';
 
-/// See also [WishlistViewModel].
-@ProviderFor(WishlistViewModel)
-final wishlistViewModelProvider =
+/// See also [OrderHistoryViewModel].
+@ProviderFor(OrderHistoryViewModel)
+final orderHistoryViewModelProvider =
     AutoDisposeAsyncNotifierProvider<
-      WishlistViewModel,
-      List<WishlistItemModel>
+      OrderHistoryViewModel,
+      List<OrderHistoryModel>
     >.internal(
-      WishlistViewModel.new,
-      name: r'wishlistViewModelProvider',
+      OrderHistoryViewModel.new,
+      name: r'orderHistoryViewModelProvider',
       debugGetCreateSourceHash: const bool.fromEnvironment('dart.vm.product')
           ? null
-          : _$wishlistViewModelHash,
+          : _$orderHistoryViewModelHash,
       dependencies: null,
       allTransitiveDependencies: null,
     );
 
-typedef _$WishlistViewModel = AutoDisposeAsyncNotifier<List<WishlistItemModel>>;
+typedef _$OrderHistoryViewModel =
+    AutoDisposeAsyncNotifier<List<OrderHistoryModel>>;
 // ignore_for_file: type=lint
 // ignore_for_file: subtype_of_sealed_class, invalid_use_of_internal_member, invalid_use_of_visible_for_testing_member, deprecated_member_use_from_same_package
