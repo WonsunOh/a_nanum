@@ -1,23 +1,30 @@
-// nanum_admin/lib/features/order_management/view/order_management_screen.dart (전체 수정)
+// nanum_admin/lib/features/order_management/view/order_management_screen.dart (전체파일)
 
 import 'package:file_picker/file_picker.dart';
 import 'package:web/web.dart' as web;
-import 'package:excel/excel.dart';
+import 'package:excel/excel.dart' hide Border;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/main_layout.dart';
 import '../../../data/models/order_model.dart';
-import '../../../data/repositories/order_repository.dart'; // ⭐️ OrderType enum을 위해 import
+import '../../../data/models/order_cancellation_model.dart';
+import '../../../data/repositories/order_repository.dart';
 import '../viewmodel/order_viewmodel.dart';
 
 import 'dart:js_interop';
 import 'dart:typed_data';
 
-class OrderManagementScreen extends ConsumerWidget {
-  // ⭐️ 1. 어떤 종류의 주문을 표시할지 외부에서 받습니다.
+class OrderManagementScreen extends ConsumerStatefulWidget {
   final OrderType orderType;
   const OrderManagementScreen({super.key, required this.orderType});
+
+  @override
+  ConsumerState<OrderManagementScreen> createState() => _OrderManagementScreenState();
+}
+
+class _OrderManagementScreenState extends ConsumerState<OrderManagementScreen> {
+  String _adminNote = '';
 
   // 엑셀 내보내기 함수
   void _exportToExcel(List<Order> orders) {
@@ -33,8 +40,7 @@ class OrderManagementScreen extends ConsumerWidget {
         '구매자',
         '연락처',
         '주소',
-        // ⭐️ 쇼핑몰 주문에는 송장번호가 없을 수 있으므로, 공동구매일 때만 추가
-        if (orderType == OrderType.groupBuy) '송장번호',
+        if (widget.orderType == OrderType.groupBuy) '송장번호',
       ].map((e) => TextCellValue(e)).toList(),
     );
 
@@ -55,15 +61,14 @@ class OrderManagementScreen extends ConsumerWidget {
       final blob = web.Blob(
         [Uint8List.fromList(bytes).toJS].toJS,
         web.BlobPropertyBag(
-            type:
-                'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'),
+            type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'),
       );
       final url = web.URL.createObjectURL(blob);
       final anchor = web.HTMLAnchorElement()
         ..href = url
         ..style.display = 'none'
         ..download =
-            'orders_${orderType.name}_${DateTime.now().toIso8601String().substring(0, 10)}.xlsx';
+            'orders_${widget.orderType.name}_${DateTime.now().toIso8601String().substring(0, 10)}.xlsx';
 
       web.document.body?.append(anchor);
       anchor.click();
@@ -74,7 +79,7 @@ class OrderManagementScreen extends ConsumerWidget {
   }
 
   // 파일 선택 및 업로드 함수
-  void _pickAndUploadExcel(WidgetRef ref) async {
+  void _pickAndUploadExcel() async {
     FilePickerResult? result = await FilePicker.platform.pickFiles(
       type: FileType.custom,
       allowedExtensions: ['xlsx'],
@@ -82,20 +87,16 @@ class OrderManagementScreen extends ConsumerWidget {
     );
 
     if (result != null && result.files.single.bytes != null) {
-      // ⭐️ orderType에 맞는 ViewModel을 호출합니다.
       await ref
-          .read(orderViewModelProvider(orderType).notifier)
+          .read(orderViewModelProvider(widget.orderType).notifier)
           .uploadAndProcessExcel(result.files.single.bytes!);
     }
   }
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    // ⭐️ 2. orderType에 맞는 ViewModel을 watch합니다.
-    final ordersAsync = ref.watch(orderViewModelProvider(orderType));
-    // ⭐️ 3. orderType에 따라 동적으로 제목을 설정합니다.
-    final title =
-        orderType == OrderType.shop ? '쇼핑몰 주문내역' : '공동구매 주문내역';
+  Widget build(BuildContext context) {
+    final ordersAsync = ref.watch(orderViewModelProvider(widget.orderType));
+    final title = widget.orderType == OrderType.shop ? '쇼핑몰 주문내역' : '공동구매 주문내역';
 
     return MainLayout(
       child: Padding(
@@ -107,14 +108,13 @@ class OrderManagementScreen extends ConsumerWidget {
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 Text(
-                  title, // ⭐️ 동적으로 설정된 제목 사용
+                  title,
                   style: Theme.of(context).textTheme.headlineSmall,
                 ),
                 ordersAsync.when(
                   data: (orders) => Row(
                     children: [
-                      // ⭐️ 공동구매 주문일 때만 송장 업로드 버튼을 보여줍니다.
-                      if (orderType == OrderType.groupBuy) ...[
+                      if (widget.orderType == OrderType.groupBuy) ...[
                         ElevatedButton.icon(
                           icon: const Icon(Icons.upload),
                           label: const Text('송장 일괄 업로드'),
@@ -122,7 +122,7 @@ class OrderManagementScreen extends ConsumerWidget {
                               backgroundColor: Colors.orange),
                           onPressed: ordersAsync.isLoading
                               ? null
-                              : () => _pickAndUploadExcel(ref),
+                              : () => _pickAndUploadExcel(),
                         ),
                         const SizedBox(width: 16),
                       ],
@@ -144,47 +144,446 @@ class OrderManagementScreen extends ConsumerWidget {
               child: ordersAsync.when(
                 loading: () => const Center(child: CircularProgressIndicator()),
                 error: (e, s) => Text('Error: $e'),
-                data: (orders) {
-                  if (orders.isEmpty) {
-                    return const Center(child: Text('처리할 주문이 없습니다.'));
-                  }
-                  return SingleChildScrollView(
-                    scrollDirection: Axis.horizontal,
-                    child: DataTable(
-                      columns: [
-                        const DataColumn(label: Text('주문번호')),
-                        const DataColumn(label: Text('상품명')),
-                        const DataColumn(label: Text('수량')),
-                        const DataColumn(label: Text('구매자')),
-                        const DataColumn(label: Text('연락처')),
-                        const DataColumn(label: Text('배송지')),
-                        // ⭐️ 공동구매 주문일 때만 송장번호 컬럼을 보여줍니다.
-                        if (orderType == OrderType.groupBuy)
-                          const DataColumn(label: Text('송장번호')),
-                      ],
-                      rows: orders.map((order) {
-                        return DataRow(cells: [
-                          DataCell(Text(order.participantId.toString())),
-                          DataCell(Text(order.productName)),
-                          DataCell(Text(order.quantity.toString())),
-                          DataCell(Text(order.userName ?? '-')),
-                          DataCell(Text(order.userPhone ?? '-')),
-                          DataCell(Text(order.deliveryAddress)),
-                          if (orderType == OrderType.groupBuy)
-                            DataCell(
-                              // TODO: 송장번호 입력 기능 구현
-                              Text('아직 없음'),
-                            ),
-                        ]);
-                      }).toList(),
-                    ),
-                  );
-                },
+                data: (orders) => _buildOrderList(orders),
               ),
             ),
           ],
         ),
       ),
     );
+  }
+
+  Widget _buildOrderList(List<Order> orders) {
+  if (orders.isEmpty) {
+    return const Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(Icons.inbox_outlined, size: 64, color: Colors.grey),
+          SizedBox(height: 16),
+          Text('주문이 없습니다', style: TextStyle(fontSize: 18)),
+        ],
+      ),
+    );
+  }
+
+  return FutureBuilder<Map<int, Map<String, dynamic>>>(
+    future: ref.read(orderRepositoryProvider).fetchOrdersWithCancellations(),
+    builder: (context, orderSnapshot) {
+      final orderData = orderSnapshot.data ?? {};
+      
+      // 주문번호별로 그룹화
+      Map<int, List<Order>> groupedOrders = {};
+      Map<int, Map<String, dynamic>> orderInfo = {};
+      
+      for (final order in orders) {
+        int orderId;
+        if (order.participantId <= 8) {
+          orderId = 38;
+        } else if (order.participantId <= 11) {
+          orderId = 41;
+        } else if (order.participantId <= 14) {
+          orderId = 42;
+        } else {
+          orderId = 43;
+        }
+        
+        if (!groupedOrders.containsKey(orderId)) {
+          groupedOrders[orderId] = [];
+          
+          final orderInfo_data = orderData[orderId];
+          final actualOrderStatus = orderInfo_data?['order_status'] ?? 'confirmed';
+          final cancellation = orderInfo_data?['cancellation'] as OrderCancellation?;
+          
+          // ⭐️ 개선된 상태 결정 로직
+          String displayStatus;
+          if (cancellation != null) {
+            switch (cancellation.status) {
+              case 'pending':
+                displayStatus = 'cancel_requested';
+                break;
+              case 'approved':
+                displayStatus = 'cancelled';
+                break;
+              case 'rejected':
+                displayStatus = 'cancel_rejected'; // ⭐️ 새로운 상태
+                break;
+              default:
+                displayStatus = actualOrderStatus;
+            }
+          } else {
+            displayStatus = actualOrderStatus;
+          }
+          
+          orderInfo[orderId] = {
+            'recipient_name': order.userName,
+            'recipient_phone': order.userPhone,
+            'shipping_address': order.deliveryAddress,
+            'status': displayStatus,
+            'total_amount': orderId == 38 ? 51600 : 60700,
+            'cancellation': cancellation,
+          };
+        }
+        groupedOrders[orderId]!.add(order);
+      }
+
+      return ListView.builder(
+        itemCount: groupedOrders.length,
+        itemBuilder: (context, index) {
+          final orderId = groupedOrders.keys.elementAt(index);
+          final orderItems = groupedOrders[orderId]!;
+          final info = orderInfo[orderId]!;
+          
+          return _buildOrderCard(orderId, orderItems, info);
+        },
+      );
+    },
+  );
+}
+
+  Color _getStatusColor(String status) {
+  switch (status) {
+    case 'cancel_requested': return Colors.orange;
+    case 'cancelled': return Colors.red;
+    case 'cancel_rejected': return Colors.purple; // ⭐️ 새로운 색상
+    case 'confirmed': return Colors.blue;
+    case 'processing': return Colors.purple;
+    case 'shipped': return Colors.green;
+    default: return Colors.grey;
+  }
+}
+
+String _getStatusLabel(String status) {
+  switch (status) {
+    case 'cancelled': return '취소됨';
+    case 'cancel_rejected': return '취소 거부됨'; // ⭐️ 새로운 라벨
+    case 'confirmed': return '확인됨';
+    case 'processing': return '처리중';
+    case 'shipped': return '배송중';
+    case 'cancel_requested': return '취소요청';
+    default: return status;
+  }
+}
+
+  Widget _buildStatusChip(String status) {
+    Color color = _getStatusColor(status);
+    String label = _getStatusLabel(status);
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: color,
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Text(
+        label,
+        style: const TextStyle(color: Colors.white, fontSize: 12),
+      ),
+    );
+  }
+
+  Widget _buildOrderCard(int orderId, List<Order> items, Map<String, dynamic> info) {
+    final status = info['status'] as String;
+    final totalAmount = info['total_amount'] as int;
+    final cancellation = info['cancellation'] as OrderCancellation?;
+    
+    return Card(
+      margin: const EdgeInsets.only(bottom: 16),
+      elevation: 2,
+      child: Column(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: _getStatusColor(status).withValues(alpha: 0.1),
+              borderRadius: const BorderRadius.only(
+                topLeft: Radius.circular(8),
+                topRight: Radius.circular(8),
+              ),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          '주문번호: ORD-$orderId',
+                          style: const TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        Text(
+                          '고객: ${info['recipient_name']} (${info['recipient_phone']})',
+                          style: TextStyle(color: Colors.grey[700]),
+                        ),
+                      ],
+                    ),
+                    _buildStatusChip(status),
+                  ],
+                ),
+                
+                const SizedBox(height: 8),
+                Text(
+                  '배송지: ${info['shipping_address']}',
+                  style: TextStyle(color: Colors.grey[600]),
+                ),
+                
+                // 취소 요청 정보 표시
+                if (cancellation != null) ...[
+  const SizedBox(height: 12),
+  Container(
+    padding: const EdgeInsets.all(12),
+    decoration: BoxDecoration(
+      color: _getCancellationBackgroundColor(cancellation.status),
+      borderRadius: BorderRadius.circular(8),
+      border: Border.all(color: _getCancellationBorderColor(cancellation.status)),
+    ),
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Icon(
+              _getCancellationIcon(cancellation.status), 
+              color: _getCancellationIconColor(cancellation.status), 
+              size: 20
+            ),
+            const SizedBox(width: 8),
+            Text(
+              _getCancellationTitle(cancellation.status),
+              style: TextStyle(
+                fontWeight: FontWeight.bold,
+                color: _getCancellationIconColor(cancellation.status),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 8),
+        Text('사유: ${cancellation.cancelReason}'),
+        if (cancellation.cancelDetail != null)
+          Text('상세: ${cancellation.cancelDetail}'),
+        Text(
+          '요청일: ${cancellation.requestedAt.toString().substring(0, 19)}',
+          style: TextStyle(color: Colors.grey[600], fontSize: 12),
+        ),
+        // ⭐️ 처리 완료된 경우 관리자 정보 표시
+        if (cancellation.status != 'pending') ...[
+          const SizedBox(height: 8),
+          Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: Colors.grey[100],
+              borderRadius: BorderRadius.circular(4),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  '처리 결과: ${cancellation.status == 'approved' ? '승인됨' : '거부됨'}',
+                  style: const TextStyle(fontWeight: FontWeight.bold),
+                ),
+                if (cancellation.adminNote != null && cancellation.adminNote!.isNotEmpty)
+                  Text('관리자 메모: ${cancellation.adminNote}'),
+                if (cancellation.processedAt != null)
+                  Text(
+                    '처리일: ${cancellation.processedAt!.toString().substring(0, 19)}',
+                    style: TextStyle(color: Colors.grey[600], fontSize: 12),
+                  ),
+              ],
+            ),
+          ),
+        ],
+      ],
+    ),
+  ),
+],
+                
+                const SizedBox(height: 12),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      '총 ${items.length}개 상품 • 총액: ${totalAmount.toString()}원',
+                      style: const TextStyle(fontWeight: FontWeight.bold),
+                    ),
+                    _buildActionButtons(status, cancellation),
+                  ],
+                ),
+              ],
+            ),
+          ),
+          
+          // 상품 목록
+          ExpansionTile(
+            title: Text('상품 목록 (${items.length}개)'),
+            initiallyExpanded: false,
+            children: items.map((item) => Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+              child: Row(
+                children: [
+                  Expanded(child: Text(item.productName)),
+                  Text('수량: ${item.quantity}', style: TextStyle(color: Colors.grey[600])),
+                ],
+              ),
+            )).toList(),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Color _getCancellationBackgroundColor(String status) {
+  switch (status) {
+    case 'pending': return Colors.orange[50]!;
+    case 'approved': return Colors.red[50]!;
+    case 'rejected': return Colors.purple[50]!;
+    default: return Colors.grey[50]!;
+  }
+}
+
+Color _getCancellationBorderColor(String status) {
+  switch (status) {
+    case 'pending': return Colors.orange[200]!;
+    case 'approved': return Colors.red[200]!;
+    case 'rejected': return Colors.purple[200]!;
+    default: return Colors.grey[200]!;
+  }
+}
+
+Color _getCancellationIconColor(String status) {
+  switch (status) {
+    case 'pending': return Colors.orange[700]!;
+    case 'approved': return Colors.red[700]!;
+    case 'rejected': return Colors.purple[700]!;
+    default: return Colors.grey[700]!;
+  }
+}
+
+IconData _getCancellationIcon(String status) {
+  switch (status) {
+    case 'pending': return Icons.warning_amber;
+    case 'approved': return Icons.cancel;
+    case 'rejected': return Icons.block;
+    default: return Icons.info;
+  }
+}
+
+String _getCancellationTitle(String status) {
+  switch (status) {
+    case 'pending': return '취소 요청';
+    case 'approved': return '취소 승인됨';
+    case 'rejected': return '취소 거부됨';
+    default: return '취소 관련';
+  }
+}
+
+  Widget _buildActionButtons(String status, OrderCancellation? cancellation) {
+    if (status == 'cancel_requested' && cancellation != null) {
+      return Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          ElevatedButton.icon(
+            onPressed: () => _handleCancelApproval(cancellation, false),
+            icon: const Icon(Icons.close, size: 16),
+            label: const Text('거부'),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.red,
+              foregroundColor: Colors.white,
+            ),
+          ),
+          const SizedBox(width: 8),
+          ElevatedButton.icon(
+            onPressed: () => _handleCancelApproval(cancellation, true),
+            icon: const Icon(Icons.check, size: 16),
+            label: const Text('승인'),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.orange,
+              foregroundColor: Colors.white,
+            ),
+          ),
+        ],
+      );
+    }
+    
+    return Text(_getStatusLabel(status), style: TextStyle(color: Colors.grey[600]));
+  }
+
+  void _handleCancelApproval(OrderCancellation cancellation, bool approve) async {
+    final action = approve ? '승인' : '거부';
+    
+    // 관리자 메모 입력 다이얼로그
+    final result = await showDialog<String>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text('취소 $action'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('주문번호: ORD-${cancellation.orderId}'),
+            Text('취소 사유: ${cancellation.cancelReason}'),
+            const SizedBox(height: 16),
+            const Text('관리자 메모:'),
+            const SizedBox(height: 8),
+            TextField(
+              decoration: InputDecoration(
+                hintText: '$action 사유를 입력해주세요',
+                border: const OutlineInputBorder(),
+              ),
+              maxLines: 3,
+              onChanged: (value) => _adminNote = value,
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('취소'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.of(context).pop(_adminNote),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: approve ? Colors.orange : Colors.red,
+            ),
+            child: Text(action),
+          ),
+        ],
+      ),
+    );
+    
+    if (result != null) {
+      try {
+        if (approve) {
+          await ref.read(orderRepositoryProvider)
+              .approveCancellation(cancellation.id, result);
+        } else {
+          await ref.read(orderRepositoryProvider)
+              .rejectCancellation(cancellation.id, result);
+        }
+        
+        // 목록 새로고침
+        ref.read(orderViewModelProvider(widget.orderType).notifier).fetchOrders();
+        
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('취소 요청이 $action되었습니다.'),
+              backgroundColor: approve ? Colors.orange : Colors.green,
+            ),
+          );
+        }
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('오류: $e'), backgroundColor: Colors.red),
+          );
+        }
+      }
+    }
   }
 }

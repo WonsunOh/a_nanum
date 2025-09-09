@@ -16,19 +16,19 @@ class SignupScreen extends ConsumerStatefulWidget {
 
 class _SignupScreenState extends ConsumerState<SignupScreen> {
   final _formKey = GlobalKey<FormState>();
-  
+
   // 필수 입력 필드 (레벨 1)
   final _nameController = TextEditingController();
   final _nicknameController = TextEditingController();
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   final _confirmPasswordController = TextEditingController();
-  
+
   // 선택 입력 필드 (레벨 2용)
   final _phoneController = TextEditingController();
   final _addressController = TextEditingController();
   final _detailAddressController = TextEditingController();
-  
+
   // 주소 검색 관련
   List<JusoAddressModel> _addressSearchResults = [];
   bool _isSearchingAddress = false;
@@ -74,11 +74,11 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
         _addressSearchResults = [];
         _isSearchingAddress = false;
       });
-      
+
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('주소 검색 중 오류가 발생했습니다: $e')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('주소 검색 중 오류가 발생했습니다: $e')));
       }
     }
   }
@@ -91,106 +91,100 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
       _showAddressResults = false;
       _detailAddressController.clear();
     });
-    
+
     FocusScope.of(context).requestFocus(FocusNode());
   }
 
- // 올바른 메시지와 동작으로 수정
-void _showAlreadyRegisteredDialog(BuildContext context) {
-  showDialog(
-    context: context,
-    barrierDismissible: false,
-    builder: (BuildContext context) {
-      return AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: Row(
-          children: [
-            Container(
-              padding: const EdgeInsets.all(8),
-              decoration: BoxDecoration(
-                color: Colors.orange.shade100,
-                shape: BoxShape.circle,
-              ),
-              child: Icon(
-                Icons.info_outline, 
-                color: Colors.orange.shade700,
-                size: 24,
-              ),
-            ),
-            const SizedBox(width: 12),
-            const Expanded(
-              child: Text(
-                '이미 가입된 회원',
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-              ),
-            ),
-          ],
-        ),
-        content: Container(
-          padding: const EdgeInsets.symmetric(vertical: 8),
-          child: const Column(
-            mainAxisSize: MainAxisSize.min,
+  // 올바른 메시지와 동작으로 수정
+  void _showAlreadyRegisteredDialog(BuildContext context) {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
+          title: Row(
             children: [
-              Text(
-                '이미 가입된 이메일입니다.',
-                style: TextStyle(fontSize: 16),
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: Colors.orange.shade100,
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(
+                  Icons.info_outline,
+                  color: Colors.orange.shade700,
+                  size: 24,
+                ),
               ),
-              SizedBox(height: 8),
-              Text(
-                '로그인 페이지로 이동합니다.',
-                style: TextStyle(fontSize: 14),
+              const SizedBox(width: 12),
+              const Expanded(
+                child: Text(
+                  '이미 가입된 회원',
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                ),
               ),
             ],
           ),
-        ),
-        actions: [
-          SizedBox(
-            width: double.infinity,
-            child: ElevatedButton(
-              onPressed: () {
-                Navigator.of(context).pop(); // 다이얼로그 닫기
-                
-                // 약간의 지연 후 페이지 이동 (더 확실하게)
-                Future.delayed(const Duration(milliseconds: 100), () {
-                  if (context.mounted) {
-                    context.go('/login');
-                  }
-                });
-              },
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Theme.of(context).primaryColor,
-                foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(vertical: 14),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(8),
-                ),
-              ),
-              child: const Text(
-                '확인',
-                style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
-              ),
+          content: Container(
+            padding: const EdgeInsets.symmetric(vertical: 8),
+            child: const Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text('이미 가입된 이메일입니다.', style: TextStyle(fontSize: 16)),
+                SizedBox(height: 8),
+                Text('로그인 페이지로 이동합니다.', style: TextStyle(fontSize: 14)),
+              ],
             ),
           ),
-        ],
-      );
-    },
-  );
-}
+          actions: [
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton(
+                onPressed: () {
+                  Navigator.of(context).pop(); // 다이얼로그 닫기
 
+                  // 약간의 지연 후 페이지 이동 (더 확실하게)
+                  Future.delayed(const Duration(milliseconds: 100), () {
+                    if (context.mounted) {
+                      context.go('/login');
+                    }
+                  });
+                },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Theme.of(context).primaryColor,
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                ),
+                child: const Text(
+                  '확인',
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+                ),
+              ),
+            ),
+          ],
+        );
+      },
+    );
+  }
 
   void _submit() {
     if (_formKey.currentState!.validate()) {
-
       print('🔍 회원가입 폼 데이터:');
-    print('  - 전화번호 컨트롤러: "${_phoneController.text}"');
-    print('  - 전화번호 trim: "${_phoneController.text.trim()}"');
-    print('  - 전화번호 isEmpty: ${_phoneController.text.trim().isEmpty}');
-    
-    final phoneToSend = _phoneController.text.trim().isNotEmpty 
-        ? _phoneController.text.trim() 
-        : null;
-    print('  - 전송할 전화번호: $phoneToSend');
-    
+      print('  - 전화번호 컨트롤러: "${_phoneController.text}"');
+      print('  - 전화번호 trim: "${_phoneController.text.trim()}"');
+      print('  - 전화번호 isEmpty: ${_phoneController.text.trim().isEmpty}');
+
+      final phoneToSend = _phoneController.text.trim().isNotEmpty
+          ? _phoneController.text.trim()
+          : null;
+      print('  - 전송할 전화번호: $phoneToSend');
+
       // 전체 주소 조합
       String fullAddress = _addressController.text.trim();
       if (_detailAddressController.text.trim().isNotEmpty) {
@@ -199,23 +193,26 @@ void _showAlreadyRegisteredDialog(BuildContext context) {
       if (_selectedZipCode != null && _selectedZipCode!.isNotEmpty) {
         fullAddress = '($_selectedZipCode) $fullAddress';
       }
-      
+
       // 레벨 결정
-      final hasOptionalInfo = _phoneController.text.trim().isNotEmpty && 
-                             _addressController.text.trim().isNotEmpty;
+      final hasOptionalInfo =
+          _phoneController.text.trim().isNotEmpty &&
+          _addressController.text.trim().isNotEmpty;
       final level = hasOptionalInfo ? 2 : 1;
-      
-      ref.read(authViewModelProvider.notifier).signUp(
-        fullName: _nameController.text.trim(),
-        nickname: _nicknameController.text.trim(),
-        email: _emailController.text.trim(),
-        password: _passwordController.text.trim(),
-        phoneNumber: _phoneController.text.trim().isNotEmpty 
-            ? _phoneController.text.trim() 
-            : null,
-        address: fullAddress.isNotEmpty ? fullAddress : null,
-        level: level,
-      );
+
+      ref
+          .read(authViewModelProvider.notifier)
+          .signUp(
+            fullName: _nameController.text.trim(),
+            nickname: _nicknameController.text.trim(),
+            email: _emailController.text.trim(),
+            password: _passwordController.text.trim(),
+            phoneNumber: _phoneController.text.trim().isNotEmpty
+                ? _phoneController.text.trim()
+                : null,
+            address: fullAddress.isNotEmpty ? fullAddress : null,
+            level: level,
+          );
     }
   }
 
@@ -226,92 +223,101 @@ void _showAlreadyRegisteredDialog(BuildContext context) {
 
     // signup_screen.dart의 ref.listen 부분에서 에러 처리 수정
 
-ref.listen<AsyncValue<void>>(authViewModelProvider, (previous, next) {
-  next.when(
-    data: (_) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Container(
-            padding: const EdgeInsets.symmetric(vertical: 8),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Row(
+    ref.listen<AsyncValue<void>>(authViewModelProvider, (previous, next) {
+      next.when(
+        data: (_) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Container(
+                padding: const EdgeInsets.symmetric(vertical: 8),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Icon(Icons.mark_email_read, color: Colors.white, size: 20),
-                    SizedBox(width: 8),
-                    Text(
-                      '인증 이메일 발송 완료!',
-                      style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                    const Row(
+                      children: [
+                        Icon(
+                          Icons.mark_email_read,
+                          color: Colors.white,
+                          size: 20,
+                        ),
+                        SizedBox(width: 8),
+                        Text(
+                          '인증 이메일 발송 완료!',
+                          style: TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 16,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    Text('📧 ${_emailController.text}'),
+                    const Text('위 이메일로 인증 링크를 발송했습니다.'),
+                    const SizedBox(height: 6),
+                    Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withValues(alpha: 0.2),
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                      child: const Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            '📌 다음 단계:',
+                            style: TextStyle(fontWeight: FontWeight.bold),
+                          ),
+                          Text('1️⃣ 이메일 앱을 열어주세요'),
+                          Text('2️⃣ "나눔마켓" 인증 메일을 찾아주세요'),
+                          Text('3️⃣ 이메일 안의 "인증하기" 버튼을 클릭하세요'),
+                          Text('4️⃣ 인증 완료 후 로그인해주세요'),
+                        ],
+                      ),
                     ),
                   ],
                 ),
-                const SizedBox(height: 8),
-                Text('📧 ${_emailController.text}'),
-                const Text('위 이메일로 인증 링크를 발송했습니다.'),
-                const SizedBox(height: 6),
-                Container(
-                  padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.2),
-                    borderRadius: BorderRadius.circular(4),
-                  ),
-                  child: const Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text('📌 다음 단계:', style: TextStyle(fontWeight: FontWeight.bold)),
-                      Text('1️⃣ 이메일 앱을 열어주세요'),
-                      Text('2️⃣ "나눔마켓" 인증 메일을 찾아주세요'),
-                      Text('3️⃣ 이메일 안의 "인증하기" 버튼을 클릭하세요'),
-                      Text('4️⃣ 인증 완료 후 로그인해주세요'),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-          ),
-          backgroundColor: Colors.green,
-          duration: const Duration(seconds: 8),
-          behavior: SnackBarBehavior.floating,
-        ),
-      );
-      context.go('/login');
-    },
-    error: (error, _) {
-      if (error is AuthenticationException) {
-        // ⭐️ 중요: 정확한 메시지 체크
-        if (error.message.contains('이미 가입된 이메일입니다')) {
-          _showAlreadyRegisteredDialog(context);
-        } else {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Row(
-                children: [
-                  const Icon(Icons.error_outline, color: Colors.white),
-                  const SizedBox(width: 8),
-                  Expanded(child: Text(error.message)),
-                ],
               ),
-              backgroundColor: Colors.red,
-              duration: const Duration(seconds: 4),
+              backgroundColor: Colors.green,
+              duration: const Duration(seconds: 8),
+              behavior: SnackBarBehavior.floating,
             ),
           );
-        }
-      } else {
-        // 기타 에러 처리...
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('오류가 발생했습니다: ${error.toString()}'),
-            backgroundColor: Colors.red,
-          ),
-        );
-      }
-    },
-    loading: () {},
-  );
-});
-
+          context.go('/login');
+        },
+        error: (error, _) {
+          if (error is AuthenticationException) {
+            // ⭐️ 중요: 정확한 메시지 체크
+            if (error.message.contains('이미 가입된 이메일입니다')) {
+              _showAlreadyRegisteredDialog(context);
+            } else {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Row(
+                    children: [
+                      const Icon(Icons.error_outline, color: Colors.white),
+                      const SizedBox(width: 8),
+                      Expanded(child: Text(error.message)),
+                    ],
+                  ),
+                  backgroundColor: Colors.red,
+                  duration: const Duration(seconds: 4),
+                ),
+              );
+            }
+          } else {
+            // 기타 에러 처리...
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text('오류가 발생했습니다: ${error.toString()}'),
+                backgroundColor: Colors.red,
+              ),
+            );
+          }
+        },
+        loading: () {},
+      );
+    });
 
     return Scaffold(
       appBar: AppBar(title: const Text('회원가입')),
@@ -326,11 +332,11 @@ ref.listen<AsyncValue<void>>(authViewModelProvider, (previous, next) {
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   Text(
-                    '나눔마켓에 오신 것을 환영합니다!', 
-                    style: Theme.of(context).textTheme.headlineSmall
+                    '나눔마켓에 오신 것을 환영합니다!',
+                    style: Theme.of(context).textTheme.headlineSmall,
                   ),
                   const SizedBox(height: 24),
-                  
+
                   // 레벨 선택 안내
                   Container(
                     padding: const EdgeInsets.all(16),
@@ -344,10 +350,11 @@ ref.listen<AsyncValue<void>>(authViewModelProvider, (previous, next) {
                       children: [
                         Text(
                           '회원 등급 안내',
-                          style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                            fontWeight: FontWeight.bold,
-                            color: Colors.blue.shade700,
-                          ),
+                          style: Theme.of(context).textTheme.titleMedium
+                              ?.copyWith(
+                                fontWeight: FontWeight.bold,
+                                color: Colors.blue.shade700,
+                              ),
                         ),
                         const SizedBox(height: 8),
                         Text(
@@ -358,7 +365,7 @@ ref.listen<AsyncValue<void>>(authViewModelProvider, (previous, next) {
                     ),
                   ),
                   const SizedBox(height: 24),
-                  
+
                   // 필수 입력 필드들
                   Text(
                     '필수 정보',
@@ -367,7 +374,7 @@ ref.listen<AsyncValue<void>>(authViewModelProvider, (previous, next) {
                     ),
                   ),
                   const SizedBox(height: 16),
-                  
+
                   TextFormField(
                     controller: _nameController,
                     decoration: const InputDecoration(
@@ -378,7 +385,7 @@ ref.listen<AsyncValue<void>>(authViewModelProvider, (previous, next) {
                         (value == null || value.isEmpty) ? '필수 항목입니다.' : null,
                   ),
                   const SizedBox(height: 16),
-                  
+
                   TextFormField(
                     controller: _nicknameController,
                     decoration: const InputDecoration(
@@ -389,7 +396,7 @@ ref.listen<AsyncValue<void>>(authViewModelProvider, (previous, next) {
                         (value == null || value.isEmpty) ? '필수 항목입니다.' : null,
                   ),
                   const SizedBox(height: 16),
-                  
+
                   TextFormField(
                     controller: _emailController,
                     decoration: const InputDecoration(
@@ -397,12 +404,13 @@ ref.listen<AsyncValue<void>>(authViewModelProvider, (previous, next) {
                       border: OutlineInputBorder(),
                     ),
                     keyboardType: TextInputType.emailAddress,
-                    validator: (value) => (value == null || !value.contains('@'))
+                    validator: (value) =>
+                        (value == null || !value.contains('@'))
                         ? '유효한 이메일을 입력해주세요.'
                         : null,
                   ),
                   const SizedBox(height: 16),
-                  
+
                   TextFormField(
                     controller: _passwordController,
                     decoration: const InputDecoration(
@@ -415,7 +423,7 @@ ref.listen<AsyncValue<void>>(authViewModelProvider, (previous, next) {
                         : null,
                   ),
                   const SizedBox(height: 16),
-                  
+
                   TextFormField(
                     controller: _confirmPasswordController,
                     decoration: const InputDecoration(
@@ -428,7 +436,7 @@ ref.listen<AsyncValue<void>>(authViewModelProvider, (previous, next) {
                         : null,
                   ),
                   const SizedBox(height: 24),
-                  
+
                   // 선택 정보 섹션 - 주소 검색 기능 포함
                   Card(
                     child: ExpansionTile(
@@ -437,7 +445,10 @@ ref.listen<AsyncValue<void>>(authViewModelProvider, (previous, next) {
                           const Text('선택 정보 (레벨 2 회원)'),
                           const SizedBox(width: 8),
                           Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 8,
+                              vertical: 2,
+                            ),
                             decoration: BoxDecoration(
                               color: Colors.orange.shade100,
                               borderRadius: BorderRadius.circular(12),
@@ -470,39 +481,43 @@ ref.listen<AsyncValue<void>>(authViewModelProvider, (previous, next) {
                                 keyboardType: TextInputType.phone,
                               ),
                               const SizedBox(height: 16),
-                              
+
                               // 주소 검색 필드
                               Text(
                                 '주소',
-                                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                                  fontWeight: FontWeight.w500,
-                                ),
+                                style: Theme.of(context).textTheme.bodyMedium
+                                    ?.copyWith(fontWeight: FontWeight.w500),
                               ),
                               const SizedBox(height: 8),
-                              
+
                               TextFormField(
                                 controller: _addressController,
                                 decoration: InputDecoration(
                                   labelText: '도로명주소 검색',
                                   border: const OutlineInputBorder(),
                                   hintText: '예: 테헤란로 123',
-                                  suffixIcon: _isSearchingAddress 
-                                    ? const Padding(
-                                        padding: EdgeInsets.all(12.0),
-                                        child: SizedBox(
-                                          width: 20,
-                                          height: 20,
-                                          child: CircularProgressIndicator(strokeWidth: 2),
-                                        ),
-                                      )
-                                    : const Icon(Icons.search),
+                                  suffixIcon: _isSearchingAddress
+                                      ? const Padding(
+                                          padding: EdgeInsets.all(12.0),
+                                          child: SizedBox(
+                                            width: 20,
+                                            height: 20,
+                                            child: CircularProgressIndicator(
+                                              strokeWidth: 2,
+                                            ),
+                                          ),
+                                        )
+                                      : const Icon(Icons.search),
                                 ),
                                 onChanged: (value) {
-                                  Future.delayed(const Duration(milliseconds: 500), () {
-                                    if (_addressController.text == value) {
-                                      _searchAddress(value);
-                                    }
-                                  });
+                                  Future.delayed(
+                                    const Duration(milliseconds: 500),
+                                    () {
+                                      if (_addressController.text == value) {
+                                        _searchAddress(value);
+                                      }
+                                    },
+                                  );
                                 },
                                 onTap: () {
                                   if (_addressController.text.isNotEmpty) {
@@ -512,37 +527,47 @@ ref.listen<AsyncValue<void>>(authViewModelProvider, (previous, next) {
                                   }
                                 },
                               ),
-                              
+
                               // 주소 검색 결과 리스트
                               if (_showAddressResults)
                                 Container(
                                   margin: const EdgeInsets.only(top: 8),
                                   decoration: BoxDecoration(
-                                    border: Border.all(color: Colors.grey.shade300),
+                                    border: Border.all(
+                                      color: Colors.grey.shade300,
+                                    ),
                                     borderRadius: BorderRadius.circular(8),
                                   ),
-                                  constraints: const BoxConstraints(maxHeight: 200),
+                                  constraints: const BoxConstraints(
+                                    maxHeight: 200,
+                                  ),
                                   child: _addressSearchResults.isEmpty
                                       ? Container(
                                           padding: const EdgeInsets.all(16),
                                           child: Text(
-                                            _isSearchingAddress 
+                                            _isSearchingAddress
                                                 ? '주소를 검색하고 있습니다...'
                                                 : '검색 결과가 없습니다.',
-                                            style: TextStyle(color: Colors.grey.shade600),
+                                            style: TextStyle(
+                                              color: Colors.grey.shade600,
+                                            ),
                                             textAlign: TextAlign.center,
                                           ),
                                         )
                                       : ListView.builder(
                                           shrinkWrap: true,
-                                          itemCount: _addressSearchResults.length,
+                                          itemCount:
+                                              _addressSearchResults.length,
                                           itemBuilder: (context, index) {
-                                            final address = _addressSearchResults[index];
+                                            final address =
+                                                _addressSearchResults[index];
                                             return ListTile(
                                               dense: true,
                                               title: Text(
                                                 address.roadAddr,
-                                                style: const TextStyle(fontSize: 14),
+                                                style: const TextStyle(
+                                                  fontSize: 14,
+                                                ),
                                               ),
                                               subtitle: Text(
                                                 '(${address.zipNo}) ${address.jibunAddr}',
@@ -551,12 +576,13 @@ ref.listen<AsyncValue<void>>(authViewModelProvider, (previous, next) {
                                                   color: Colors.grey.shade600,
                                                 ),
                                               ),
-                                              onTap: () => _selectAddress(address),
+                                              onTap: () =>
+                                                  _selectAddress(address),
                                             );
                                           },
                                         ),
                                 ),
-                              
+
                               // 상세주소 입력 필드
                               if (_addressController.text.isNotEmpty) ...[
                                 const SizedBox(height: 16),
@@ -569,21 +595,27 @@ ref.listen<AsyncValue<void>>(authViewModelProvider, (previous, next) {
                                   ),
                                 ),
                               ],
-                              
+
                               // 우편번호 표시
-                              if (_selectedZipCode != null && _selectedZipCode!.isNotEmpty) ...[
+                              if (_selectedZipCode != null &&
+                                  _selectedZipCode!.isNotEmpty) ...[
                                 const SizedBox(height: 8),
                                 Container(
                                   padding: const EdgeInsets.all(8),
                                   decoration: BoxDecoration(
                                     color: Colors.green.shade50,
                                     borderRadius: BorderRadius.circular(4),
-                                    border: Border.all(color: Colors.green.shade200),
+                                    border: Border.all(
+                                      color: Colors.green.shade200,
+                                    ),
                                   ),
                                   child: Row(
                                     children: [
-                                      Icon(Icons.check_circle, 
-                                          color: Colors.green.shade600, size: 16),
+                                      Icon(
+                                        Icons.check_circle,
+                                        color: Colors.green.shade600,
+                                        size: 16,
+                                      ),
                                       const SizedBox(width: 8),
                                       Text(
                                         '우편번호: $_selectedZipCode',
@@ -604,7 +636,7 @@ ref.listen<AsyncValue<void>>(authViewModelProvider, (previous, next) {
                     ),
                   ),
                   const SizedBox(height: 32),
-                  
+
                   // 가입하기 버튼
                   ElevatedButton(
                     onPressed: isLoading ? null : _submit,
@@ -624,11 +656,14 @@ ref.listen<AsyncValue<void>>(authViewModelProvider, (previous, next) {
                           )
                         : const Text(
                             '가입하기',
-                            style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.bold,
+                            ),
                           ),
                   ),
                   const SizedBox(height: 24),
-                  
+
                   // 로그인 페이지로 이동
                   Row(
                     mainAxisAlignment: MainAxisAlignment.center,

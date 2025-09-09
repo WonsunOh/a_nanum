@@ -9,12 +9,10 @@ part 'order_viewmodel.g.dart';
 
 @riverpod
 class OrderViewModel extends _$OrderViewModel {
-  late final OrderRepository _repository;
+  OrderRepository get _repository => ref.watch(orderRepositoryProvider);
 
   @override
   Future<void> build() async {
-    // Provider가 처음 생성될 때 Repository를 초기화합니다.
-    _repository = ref.watch(orderRepositoryProvider);
   }
 
   /// 새로운 주문을 생성합니다.

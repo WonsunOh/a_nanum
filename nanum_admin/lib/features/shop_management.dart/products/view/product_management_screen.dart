@@ -7,7 +7,6 @@ import 'package:intl/intl.dart';
 import '../../../../data/models/product_model.dart';
 import '../../../../data/repositories/product_repository.dart';
 import '../viewmodel/product_viewmodel.dart';
-import '../providers/product_providers.dart' hide productVariantsProvider;
 
 class ProductManagementScreen extends ConsumerStatefulWidget {
   const ProductManagementScreen({super.key});
@@ -17,7 +16,8 @@ class ProductManagementScreen extends ConsumerStatefulWidget {
       _ProductManagementScreenState();
 }
 
-class _ProductManagementScreenState extends ConsumerState<ProductManagementScreen> {
+class _ProductManagementScreenState
+    extends ConsumerState<ProductManagementScreen> {
   final TextEditingController _searchController = TextEditingController();
   String _selectedFilter = 'all';
   bool _isGridView = false;
@@ -31,7 +31,7 @@ class _ProductManagementScreenState extends ConsumerState<ProductManagementScree
   @override
   Widget build(BuildContext context) {
     final productsAsync = ref.watch(productViewModelProvider);
-    
+
     return Scaffold(
       backgroundColor: Colors.grey.shade50,
       appBar: _buildAppBar(),
@@ -58,10 +58,7 @@ class _ProductManagementScreenState extends ConsumerState<ProductManagementScree
       elevation: 0,
       backgroundColor: Colors.white,
       foregroundColor: Colors.black87,
-      title: const Text(
-        '상품 관리',
-        style: TextStyle(fontWeight: FontWeight.bold),
-      ),
+      title: const Text('상품 관리', style: TextStyle(fontWeight: FontWeight.bold)),
       actions: [
         IconButton(
           onPressed: () => setState(() => _isGridView = !_isGridView),
@@ -77,7 +74,9 @@ class _ProductManagementScreenState extends ConsumerState<ProductManagementScree
             backgroundColor: Colors.blue.shade600,
             foregroundColor: Colors.white,
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(8),
+            ),
           ),
         ),
         const SizedBox(width: 8),
@@ -132,7 +131,10 @@ class _ProductManagementScreenState extends ConsumerState<ProductManagementScree
                       borderRadius: BorderRadius.circular(8),
                       borderSide: BorderSide(color: Colors.grey.shade300),
                     ),
-                    contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                    contentPadding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 12,
+                    ),
                   ),
                   onSubmitted: (value) => _performSearch(value),
                 ),
@@ -141,16 +143,18 @@ class _ProductManagementScreenState extends ConsumerState<ProductManagementScree
               ElevatedButton(
                 onPressed: () => _performSearch(_searchController.text),
                 style: ElevatedButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 24,
+                    vertical: 12,
+                  ),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8),
+                  ),
                 ),
                 child: const Text('검색'),
               ),
               const SizedBox(width: 8),
-              TextButton(
-                onPressed: _clearSearch,
-                child: const Text('초기화'),
-              ),
+              TextButton(onPressed: _clearSearch, child: const Text('초기화')),
             ],
           ),
           const SizedBox(height: 12),
@@ -190,13 +194,13 @@ class _ProductManagementScreenState extends ConsumerState<ProductManagementScree
 
   Widget _buildProductsView(List<ProductModel> products) {
     final filteredProducts = _filterProducts(products);
-    
+
     if (filteredProducts.isEmpty) {
       return _buildEmptyView();
     }
 
-    return _isGridView 
-        ? _buildGridView(filteredProducts) 
+    return _isGridView
+        ? _buildGridView(filteredProducts)
         : _buildTableView(filteredProducts);
   }
 
@@ -216,8 +220,9 @@ class _ProductManagementScreenState extends ConsumerState<ProductManagementScree
 
   Widget _buildProductCard(ProductModel product) {
     final currencyFormat = NumberFormat.currency(locale: 'ko_KR', symbol: '₩');
-    final hasDiscount = product.discountPrice != null && product.discountPrice! > 0;
-    
+    final hasDiscount =
+        product.discountPrice != null && product.discountPrice! > 0;
+
     return Card(
       elevation: 2,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
@@ -230,23 +235,27 @@ class _ProductManagementScreenState extends ConsumerState<ProductManagementScree
             child: Container(
               width: double.infinity,
               decoration: BoxDecoration(
-                borderRadius: const BorderRadius.vertical(top: Radius.circular(12)),
+                borderRadius: const BorderRadius.vertical(
+                  top: Radius.circular(12),
+                ),
                 color: Colors.grey.shade100,
               ),
               child: product.imageUrl != null && product.imageUrl!.isNotEmpty
                   ? ClipRRect(
-                      borderRadius: const BorderRadius.vertical(top: Radius.circular(12)),
+                      borderRadius: const BorderRadius.vertical(
+                        top: Radius.circular(12),
+                      ),
                       child: Image.network(
                         product.imageUrl!,
                         fit: BoxFit.cover,
-                        errorBuilder: (context, error, stackTrace) => 
+                        errorBuilder: (context, error, stackTrace) =>
                             const Icon(Icons.image_not_supported, size: 48),
                       ),
                     )
                   : const Icon(Icons.image_not_supported, size: 48),
             ),
           ),
-          
+
           // Product Info
           Expanded(
             flex: 2,
@@ -267,7 +276,7 @@ class _ProductManagementScreenState extends ConsumerState<ProductManagementScree
                     style: TextStyle(color: Colors.grey.shade600, fontSize: 12),
                   ),
                   const SizedBox(height: 8),
-                  
+
                   // Price
                   if (hasDiscount) ...[
                     Text(
@@ -290,9 +299,9 @@ class _ProductManagementScreenState extends ConsumerState<ProductManagementScree
                       currencyFormat.format(product.price),
                       style: const TextStyle(fontWeight: FontWeight.bold),
                     ),
-                  
+
                   const Spacer(),
-                  
+
                   // Stock and Status
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -300,13 +309,23 @@ class _ProductManagementScreenState extends ConsumerState<ProductManagementScree
                       _buildGridStockChip(product),
                       Row(
                         children: [
-                          _buildStatusChip(product.isSoldOut, product.isDisplayed),
+                          _buildStatusChip(
+                            product.isSoldOut,
+                            product.isDisplayed,
+                          ),
                           const SizedBox(width: 4),
                           PopupMenuButton<String>(
-                            onSelected: (value) => _handleProductAction(value, product),
+                            onSelected: (value) =>
+                                _handleProductAction(value, product),
                             itemBuilder: (context) => [
-                              const PopupMenuItem(value: 'edit', child: Text('편집')),
-                              const PopupMenuItem(value: 'delete', child: Text('삭제')),
+                              const PopupMenuItem(
+                                value: 'edit',
+                                child: Text('편집'),
+                              ),
+                              const PopupMenuItem(
+                                value: 'delete',
+                                child: Text('삭제'),
+                              ),
                             ],
                             child: const Icon(Icons.more_vert, size: 16),
                           ),
@@ -325,10 +344,12 @@ class _ProductManagementScreenState extends ConsumerState<ProductManagementScree
 
   Widget _buildGridStockChip(ProductModel product) {
     final variantsAsync = ref.watch(productVariantsProvider(product.id));
-    
+
     return variantsAsync.when(
       data: (variants) {
-        final totalStock = product.calculateTotalStock(variants.isNotEmpty ? variants : null);
+        final totalStock = product.calculateTotalStock(
+          variants.isNotEmpty ? variants : null,
+        );
         return _buildStockChip(totalStock);
       },
       loading: () => _buildStockChip(product.stockQuantity),
@@ -338,8 +359,8 @@ class _ProductManagementScreenState extends ConsumerState<ProductManagementScree
 
   Widget _buildTableView(List<ProductModel> products) {
     // ✅ 상품 정렬 추가 (최신순)
-  final sortedProducts = List<ProductModel>.from(products)
-    ..sort((a, b) => b.id.compareTo(a.id));
+    final sortedProducts = List<ProductModel>.from(products)
+      ..sort((a, b) => b.id.compareTo(a.id));
 
     return Container(
       margin: const EdgeInsets.all(16),
@@ -348,7 +369,7 @@ class _ProductManagementScreenState extends ConsumerState<ProductManagementScree
         borderRadius: BorderRadius.circular(12),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.05),
+            color: Colors.black.withValues(alpha: 0.05),
             blurRadius: 10,
             offset: const Offset(0, 2),
           ),
@@ -364,10 +385,8 @@ class _ProductManagementScreenState extends ConsumerState<ProductManagementScree
             columnSpacing: 5, // ✅ 간격 축소: 32 → 16
             horizontalMargin: 24,
             headingRowHeight: 56,
-          
-            decoration: BoxDecoration(
-              
-            ),
+
+            decoration: BoxDecoration(),
             // ignore: deprecated_member_use
             dataRowHeight: 72,
             headingRowColor: WidgetStateProperty.all(Colors.grey.shade50),
@@ -377,63 +396,62 @@ class _ProductManagementScreenState extends ConsumerState<ProductManagementScree
             ),
             columns: [
               DataColumn(
-              label: Container(
-                width: 40,
-                alignment: Alignment.center,
-                child: const Text('이미지'),
+                label: Container(
+                  width: 40,
+                  alignment: Alignment.center,
+                  child: const Text('이미지'),
+                ),
               ),
-            ),
-            DataColumn(
-              label: Container(
-                width: 120,
-                alignment: Alignment.center,
-                child: const Text('상품코드'),
+              DataColumn(
+                label: Container(
+                  width: 120,
+                  alignment: Alignment.center,
+                  child: const Text('상품코드'),
+                ),
               ),
-            ),
-            DataColumn(
-              label: Container(
-                width: 300,
-                alignment: Alignment.center,
-                child: const Text('상품명'),
+              DataColumn(
+                label: Container(
+                  width: 300,
+                  alignment: Alignment.center,
+                  child: const Text('상품명'),
+                ),
               ),
-            ),
-            DataColumn(
-              label: Container(
-                width: 200,
-                alignment: Alignment.center,
-                child: const Text('카테고리'),
+              DataColumn(
+                label: Container(
+                  width: 200,
+                  alignment: Alignment.center,
+                  child: const Text('카테고리'),
+                ),
               ),
-            ),
-            DataColumn(
-              label: Container(
-                width: 120,
-                alignment: Alignment.center,
-                child: const Text('가격'),
+              DataColumn(
+                label: Container(
+                  width: 120,
+                  alignment: Alignment.center,
+                  child: const Text('가격'),
+                ),
               ),
-            ),
-            DataColumn(
-              label: Container(
-                width: 120,
-                alignment: Alignment.center,
-                child: const Text('재고'),
+              DataColumn(
+                label: Container(
+                  width: 120,
+                  alignment: Alignment.center,
+                  child: const Text('재고'),
+                ),
+                numeric: true,
               ),
-              numeric: true,
-            ),
-            DataColumn(
-              label: Container(
-                width: 120,
-                alignment: Alignment.center,
-                child: const Text('진열/품절'),
+              DataColumn(
+                label: Container(
+                  width: 120,
+                  alignment: Alignment.center,
+                  child: const Text('진열/품절'),
+                ),
               ),
-            ),
-            DataColumn(
-              label: Container(
-                width: 120,
-                alignment: Alignment.center,
-                child: const Text('관리'),
+              DataColumn(
+                label: Container(
+                  width: 120,
+                  alignment: Alignment.center,
+                  child: const Text('관리'),
+                ),
               ),
-            ),
-          
             ],
             rows: products.map((product) => _buildDataRow(product)).toList(),
           ),
@@ -444,7 +462,8 @@ class _ProductManagementScreenState extends ConsumerState<ProductManagementScree
 
   DataRow _buildDataRow(ProductModel product) {
     final currencyFormat = NumberFormat.currency(locale: 'ko_KR', symbol: '₩');
-    final hasDiscount = product.discountPrice != null && product.discountPrice! > 0;
+    final hasDiscount =
+        product.discountPrice != null && product.discountPrice! > 0;
 
     return DataRow(
       cells: [
@@ -463,14 +482,14 @@ class _ProductManagementScreenState extends ConsumerState<ProductManagementScree
                     child: Image.network(
                       product.imageUrl!,
                       fit: BoxFit.cover,
-                      errorBuilder: (context, error, stackTrace) => 
+                      errorBuilder: (context, error, stackTrace) =>
                           const Icon(Icons.image_not_supported, size: 20),
                     ),
                   )
                 : const Icon(Icons.image_not_supported, size: 20),
           ),
         ),
-        
+
         // Product Code
         DataCell(
           Container(
@@ -483,7 +502,7 @@ class _ProductManagementScreenState extends ConsumerState<ProductManagementScree
             ),
           ),
         ),
-        
+
         // Name
         DataCell(
           SizedBox(
@@ -496,7 +515,7 @@ class _ProductManagementScreenState extends ConsumerState<ProductManagementScree
             ),
           ),
         ),
-        
+
         // Category
         DataCell(
           Container(
@@ -509,7 +528,7 @@ class _ProductManagementScreenState extends ConsumerState<ProductManagementScree
             ),
           ),
         ),
-        
+
         // Price
         DataCell(
           Container(
@@ -540,101 +559,106 @@ class _ProductManagementScreenState extends ConsumerState<ProductManagementScree
                   )
                 : Text(
                     currencyFormat.format(product.price),
-                    style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w500),
+                    style: const TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w500,
+                    ),
                   ),
           ),
         ),
-        
+
         // Stock
         DataCell(
-        Container(
+          Container(
             alignment: Alignment.center,
-          width: 120, // 폭 설정
-          child: _buildStockCellWithProduct(product),
+            width: 120, // 폭 설정
+            child: _buildStockCellWithProduct(product),
+          ),
         ),
-      ),       
-        
+
         // Status
         DataCell(
-        SizedBox(
-          width: 120, // 폭 설정
-          child: _buildStatusCellWithRow(product),
+          SizedBox(
+            width: 120, // 폭 설정
+            child: _buildStatusCellWithRow(product),
+          ),
         ),
-      ),
-        
+
         // Actions
         DataCell(
-        SizedBox(
-          width: 120, // 폭 설정
-          child: _buildActionButtons(product),
+          SizedBox(
+            width: 120, // 폭 설정
+            child: _buildActionButtons(product),
+          ),
         ),
-      ),
       ],
     );
   }
 
   // ✅ 진열/품절을 Row로 변경한 새로운 메서드
-Widget _buildStatusCellWithRow(ProductModel product) {
-  return Row(
-    mainAxisAlignment: MainAxisAlignment.center,
-    children: [
-      // 진열 상태
-      Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Text(
-            '진열',
-            style: TextStyle(
-              fontSize: 10,
-              color: Colors.grey.shade600,
-              fontWeight: FontWeight.w500,
+  Widget _buildStatusCellWithRow(ProductModel product) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        // 진열 상태
+        Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Text(
+              '진열',
+              style: TextStyle(
+                fontSize: 10,
+                color: Colors.grey.shade600,
+                fontWeight: FontWeight.w500,
+              ),
             ),
-          ),
-          Transform.scale(
-            scale: 0.7,
-            child: Switch(
-              value: product.isDisplayed,
-              onChanged: (value) => _toggleProductDisplay(product, value),
-              materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-              activeColor: Colors.green,
+            Transform.scale(
+              scale: 0.7,
+              child: Switch(
+                value: product.isDisplayed,
+                onChanged: (value) => _toggleProductDisplay(product, value),
+                materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                activeThumbColor: Colors.green,
+              ),
             ),
-          ),
-        ],
-      ),
-      // 품절 상태
-      Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Text(
-            '품절',
-            style: TextStyle(
-              fontSize: 10,
-              color: Colors.grey.shade600,
-              fontWeight: FontWeight.w500,
+          ],
+        ),
+        // 품절 상태
+        Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Text(
+              '품절',
+              style: TextStyle(
+                fontSize: 10,
+                color: Colors.grey.shade600,
+                fontWeight: FontWeight.w500,
+              ),
             ),
-          ),
-          Transform.scale(
-            scale: 0.7,
-            child: Switch(
-              value: product.isSoldOut,
-              onChanged: (value) => _toggleProductSoldOut(product, value),
-              materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-              activeColor: Colors.red,
+            Transform.scale(
+              scale: 0.7,
+              child: Switch(
+                value: product.isSoldOut,
+                onChanged: (value) => _toggleProductSoldOut(product, value),
+                materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                activeThumbColor: Colors.red,
+              ),
             ),
-          ),
-        ],
-      ),
-    ],
-  );
-}
+          ],
+        ),
+      ],
+    );
+  }
 
   Widget _buildStockCellWithProduct(ProductModel product) {
     final variantsAsync = ref.watch(productVariantsProvider(product.id));
-    
+
     return variantsAsync.when(
       data: (variants) {
-        final totalStock = product.calculateTotalStock(variants.isNotEmpty ? variants : null);
-        
+        final totalStock = product.calculateTotalStock(
+          variants.isNotEmpty ? variants : null,
+        );
+
         return Column(
           mainAxisAlignment: MainAxisAlignment.center,
           crossAxisAlignment: CrossAxisAlignment.end,
@@ -689,7 +713,7 @@ Widget _buildStatusCellWithRow(ProductModel product) {
   Widget _buildStockChip(int stock) {
     Color color;
     String label;
-    
+
     if (stock <= 0) {
       color = Colors.red;
       label = '없음';
@@ -704,9 +728,9 @@ Widget _buildStatusCellWithRow(ProductModel product) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.1),
+        color: color.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: color.withOpacity(0.3)),
+        border: Border.all(color: color.withValues(alpha: 0.3)),
       ),
       child: Text(
         label,
@@ -726,7 +750,6 @@ Widget _buildStatusCellWithRow(ProductModel product) {
       children: [
         // 편집 버튼
         Container(
-          
           decoration: BoxDecoration(
             color: Colors.blue.shade50,
             borderRadius: BorderRadius.circular(4),
@@ -736,7 +759,8 @@ Widget _buildStatusCellWithRow(ProductModel product) {
             icon: const Icon(Icons.edit_outlined, size: 16),
             tooltip: '편집',
             color: Colors.blue.shade700,
-            onPressed: () => context.go('/shop/products/edit/${product.id}', extra: product),
+            onPressed: () =>
+                context.go('/shop/products/edit/${product.id}', extra: product),
             padding: EdgeInsets.zero,
             constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
           ),
@@ -767,9 +791,9 @@ Widget _buildStatusCellWithRow(ProductModel product) {
       return Container(
         padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
         decoration: BoxDecoration(
-          color: Colors.red.withOpacity(0.1),
+          color: Colors.red.withValues(alpha: 0.1),
           borderRadius: BorderRadius.circular(8),
-          border: Border.all(color: Colors.red.withOpacity(0.3)),
+          border: Border.all(color: Colors.red.withValues(alpha: 0.3)),
         ),
         child: const Text(
           '품절',
@@ -777,14 +801,14 @@ Widget _buildStatusCellWithRow(ProductModel product) {
         ),
       );
     }
-    
+
     if (!isDisplayed) {
       return Container(
         padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
         decoration: BoxDecoration(
-          color: Colors.orange.withOpacity(0.1),
+          color: Colors.orange.withValues(alpha: 0.1),
           borderRadius: BorderRadius.circular(8),
-          border: Border.all(color: Colors.orange.withOpacity(0.3)),
+          border: Border.all(color: Colors.orange.withValues(alpha: 0.3)),
         ),
         child: const Text(
           '숨김',
@@ -792,13 +816,13 @@ Widget _buildStatusCellWithRow(ProductModel product) {
         ),
       );
     }
-    
+
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
       decoration: BoxDecoration(
-        color: Colors.green.withOpacity(0.1),
+        color: Colors.green.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: Colors.green.withOpacity(0.3)),
+        border: Border.all(color: Colors.green.withValues(alpha: 0.3)),
       ),
       child: const Text(
         '진열중',
@@ -812,7 +836,11 @@ Widget _buildStatusCellWithRow(ProductModel product) {
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(Icons.inventory_2_outlined, size: 80, color: Colors.grey.shade400),
+          Icon(
+            Icons.inventory_2_outlined,
+            size: 80,
+            color: Colors.grey.shade400,
+          ),
           const SizedBox(height: 16),
           Text(
             '등록된 상품이 없습니다',
@@ -867,39 +895,45 @@ Widget _buildStatusCellWithRow(ProductModel product) {
     List<ProductModel> filtered;
 
     switch (_selectedFilter) {
-    case 'displayed':
-      filtered = products.where((p) => p.isDisplayed).toList();
-      break;
-    case 'hidden':
-      filtered = products.where((p) => !p.isDisplayed).toList();
-      break;
-    case 'sold_out':
-      filtered = products.where((p) => p.isSoldOut).toList();
-      break;
-    case 'low_stock':
-      filtered = products.where((p) => p.stockQuantity <= 10 && p.stockQuantity > 0).toList();
-      break;
-    default:
-      filtered = products;
+      case 'displayed':
+        filtered = products.where((p) => p.isDisplayed).toList();
+        break;
+      case 'hidden':
+        filtered = products.where((p) => !p.isDisplayed).toList();
+        break;
+      case 'sold_out':
+        filtered = products.where((p) => p.isSoldOut).toList();
+        break;
+      case 'low_stock':
+        filtered = products
+            .where((p) => p.stockQuantity <= 10 && p.stockQuantity > 0)
+            .toList();
+        break;
+      default:
+        filtered = products;
+    }
+
+    // ✅ 필터된 결과도 정렬
+    filtered.sort((a, b) => b.id.compareTo(a.id));
+    return filtered;
   }
-  
-  // ✅ 필터된 결과도 정렬
-  filtered.sort((a, b) => b.id.compareTo(a.id));
-  return filtered;
-}
 
   void _toggleProductDisplay(ProductModel product, bool value) {
     final updatedProduct = product.copyWith(isDisplayed: value);
-    ref.read(productViewModelProvider.notifier).updateProductDetails(updatedProduct);
-    
+    ref
+        .read(productViewModelProvider.notifier)
+        .updateProductDetails(updatedProduct);
+
     // Variants 새로고침
     ref.invalidate(productVariantsProvider(product.id));
   }
 
   void _toggleProductSoldOut(ProductModel product, bool value) {
     final updatedProduct = product.copyWith(isSoldOut: value);
-    ref.read(productViewModelProvider.notifier).updateProductDetails(updatedProduct);
-    
+    ref
+        .read(productViewModelProvider.notifier)
+        .updateProductDetails(updatedProduct);
+
     // Variants 새로고침
     ref.invalidate(productVariantsProvider(product.id));
   }
@@ -922,7 +956,7 @@ Widget _buildStatusCellWithRow(ProductModel product) {
         builder: (context) => AlertDialog(
           title: const Text('삭제 확인'),
           content: const Text(
-            'products/public 폴더의 모든 이미지가 영구적으로 삭제됩니다. 이 작업은 되돌릴 수 없습니다.'
+            'products/public 폴더의 모든 이미지가 영구적으로 삭제됩니다. 이 작업은 되돌릴 수 없습니다.',
           ),
           actions: [
             TextButton(
@@ -942,9 +976,9 @@ Widget _buildStatusCellWithRow(ProductModel product) {
         await ref.read(productRepositoryProvider).emptyPublicFolderInProducts();
         if (mounted) {
           Navigator.of(context).pop();
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('이미지 삭제 작업을 요청했습니다.')),
-          );
+          ScaffoldMessenger.of(
+            context,
+          ).showSnackBar(const SnackBar(content: Text('이미지 삭제 작업을 요청했습니다.')));
         }
       }
     }
@@ -964,7 +998,9 @@ Widget _buildStatusCellWithRow(ProductModel product) {
           TextButton(
             onPressed: () {
               Navigator.of(context).pop();
-              ref.read(productViewModelProvider.notifier).deleteProduct(product.id);
+              ref
+                  .read(productViewModelProvider.notifier)
+                  .deleteProduct(product.id);
             },
             child: const Text('삭제', style: TextStyle(color: Colors.red)),
           ),

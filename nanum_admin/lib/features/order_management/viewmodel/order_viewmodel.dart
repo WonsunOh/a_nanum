@@ -1,6 +1,7 @@
 // nanum_admin/lib/features/order_management/viewmodel/order_viewmodel.dart (전체 수정)
 
 import 'package:excel/excel.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../data/models/order_model.dart';
@@ -22,14 +23,25 @@ class OrderViewModel extends StateNotifier<AsyncValue<List<Order>>> {
   }
 
   Future<void> fetchOrders() async {
-    state = const AsyncValue.loading();
-    // ⭐️ 2. orderType에 따라 다른 Repository 함수를 호출합니다.
+  state = const AsyncValue.loading();
+  
+  try {
+    // ⭐️ 디버그 정보 먼저 출력
+    if (orderType == OrderType.shop) {
+      await _repository.debugTablesInfo(); // 위에서 만든 함수 호출
+    }
+    
+    // 기존 로직
     if (orderType == OrderType.groupBuy) {
       state = await AsyncValue.guard(() => _repository.fetchGroupBuyOrders());
     } else {
       state = await AsyncValue.guard(() => _repository.fetchShopOrders());
     }
+  } catch (e, s) {
+    debugPrint('ViewModel error: $e');
+    state = AsyncValue.error(e, s);
   }
+}
 
   // 엑셀 파일 업로드 및 처리를 위한 메소드
   Future<void> uploadAndProcessExcel(List<int> fileBytes) async {

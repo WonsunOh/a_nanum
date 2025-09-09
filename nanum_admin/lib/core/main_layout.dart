@@ -18,7 +18,7 @@ class MainLayout extends ConsumerStatefulWidget {
 
 class _MainLayoutState extends ConsumerState<MainLayout> {
   bool _isMenuExpanded = true;
-  
+
   final List<AdminMenuItem> menuItems = [
     AdminMenuItem(
       title: '대시보드',
@@ -38,9 +38,7 @@ class _MainLayoutState extends ConsumerState<MainLayout> {
     AdminMenuItem(
       title: '공동구매 관리',
       icon: Icons.group_work_outlined,
-      children: [
-        AdminMenuItem(title: '공동구매 현황', route: '/group-buy'),
-      ],
+      children: [AdminMenuItem(title: '공동구매 현황', route: '/group-buy')],
     ),
     AdminMenuItem(
       title: '주문 관리',
@@ -50,11 +48,7 @@ class _MainLayoutState extends ConsumerState<MainLayout> {
         AdminMenuItem(title: '공동구매 주문내역', route: '/orders/group-buy'),
       ],
     ),
-    AdminMenuItem(
-      title: '회원 관리',
-      icon: Icons.people_outline,
-      route: '/users',
-    ),
+    AdminMenuItem(title: '회원 관리', icon: Icons.people_outline, route: '/users'),
     AdminMenuItem(
       title: '고객 지원',
       icon: Icons.support_agent_outlined,
@@ -75,7 +69,7 @@ class _MainLayoutState extends ConsumerState<MainLayout> {
     // ✅ 기존 Provider 사용하되 에러 처리만 개선
     ref.listen(authStateChangeProvider, (previous, next) {
       // ✅ null 안전성 처리 추가
-      next?.whenData((authState) {
+      next.whenData((authState) {
         if (authState.event == AuthChangeEvent.signedOut) {
           WidgetsBinding.instance.addPostFrameCallback((_) {
             if (mounted) {
@@ -87,11 +81,12 @@ class _MainLayoutState extends ConsumerState<MainLayout> {
     });
 
     // 중복 메뉴 방지 로직
-    final hasOuterLayout = context.findAncestorWidgetOfExactType<MainLayout>() != null;
+    final hasOuterLayout =
+        context.findAncestorWidgetOfExactType<MainLayout>() != null;
     if (hasOuterLayout) {
       return widget.child;
     }
-    
+
     // ✅ 원본 구조 그대로 유지
     final currentRoute = GoRouterState.of(context).matchedLocation;
 
@@ -111,7 +106,9 @@ class _MainLayoutState extends ConsumerState<MainLayout> {
                     child: Align(
                       alignment: Alignment.topRight,
                       child: IconButton(
-                        icon: Icon(_isMenuExpanded ? Icons.menu_open : Icons.menu),
+                        icon: Icon(
+                          _isMenuExpanded ? Icons.menu_open : Icons.menu,
+                        ),
                         tooltip: _isMenuExpanded ? '메뉴 접기' : '메뉴 펼치기',
                         onPressed: () {
                           setState(() {
@@ -155,7 +152,9 @@ class _MainLayoutState extends ConsumerState<MainLayout> {
                       children: menuItems.map((item) {
                         // ✅ null 안전성 문제 해결
                         final bool isSelected = item.children.isNotEmpty
-                            ? item.children.any((child) => currentRoute.startsWith(child.route))
+                            ? item.children.any(
+                                (child) => currentRoute.startsWith(child.route),
+                              )
                             : currentRoute.startsWith(item.route);
 
                         return item.children.isNotEmpty
@@ -163,27 +162,42 @@ class _MainLayoutState extends ConsumerState<MainLayout> {
                                 key: ValueKey(item.title),
                                 leading: Icon(
                                   item.icon,
-                                  color: isSelected ? Colors.blue : Colors.grey[600],
+                                  color: isSelected
+                                      ? Colors.blue
+                                      : Colors.grey[600],
                                 ),
                                 title: _isMenuExpanded
                                     ? Text(
                                         item.title,
                                         style: TextStyle(
-                                          color: isSelected ? Colors.blue : Colors.grey[700],
-                                          fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                                          color: isSelected
+                                              ? Colors.blue
+                                              : Colors.grey[700],
+                                          fontWeight: isSelected
+                                              ? FontWeight.bold
+                                              : FontWeight.normal,
                                         ),
                                       )
                                     : const SizedBox.shrink(),
                                 children: item.children.map((child) {
-                                  final childSelected = currentRoute.startsWith(child.route);
+                                  final childSelected = currentRoute.startsWith(
+                                    child.route,
+                                  );
                                   return ListTile(
-                                    contentPadding: const EdgeInsets.only(left: 72, right: 16),
+                                    contentPadding: const EdgeInsets.only(
+                                      left: 72,
+                                      right: 16,
+                                    ),
                                     title: _isMenuExpanded
                                         ? Text(
                                             child.title,
                                             style: TextStyle(
-                                              color: childSelected ? Colors.blue : Colors.grey[600],
-                                              fontWeight: childSelected ? FontWeight.bold : FontWeight.normal,
+                                              color: childSelected
+                                                  ? Colors.blue
+                                                  : Colors.grey[600],
+                                              fontWeight: childSelected
+                                                  ? FontWeight.bold
+                                                  : FontWeight.normal,
                                             ),
                                           )
                                         : const SizedBox.shrink(),
@@ -199,19 +213,27 @@ class _MainLayoutState extends ConsumerState<MainLayout> {
                             : ListTile(
                                 leading: Icon(
                                   item.icon,
-                                  color: isSelected ? Colors.blue : Colors.grey[600],
+                                  color: isSelected
+                                      ? Colors.blue
+                                      : Colors.grey[600],
                                 ),
                                 title: _isMenuExpanded
                                     ? Text(
                                         item.title,
                                         style: TextStyle(
-                                          color: isSelected ? Colors.blue : Colors.grey[700],
-                                          fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                                          color: isSelected
+                                              ? Colors.blue
+                                              : Colors.grey[700],
+                                          fontWeight: isSelected
+                                              ? FontWeight.bold
+                                              : FontWeight.normal,
                                         ),
                                       )
                                     : const SizedBox.shrink(),
                                 selected: isSelected,
-                                selectedTileColor: Colors.blue.withOpacity(0.1),
+                                selectedTileColor: Colors.blue.withValues(
+                                  alpha: 0.1,
+                                ),
                                 onTap: () => context.go(item.route),
                               );
                       }).toList(),
@@ -223,8 +245,8 @@ class _MainLayoutState extends ConsumerState<MainLayout> {
                   // 로그아웃 버튼
                   ListTile(
                     leading: const Icon(Icons.logout),
-                    title: _isMenuExpanded 
-                        ? const Text('로그아웃') 
+                    title: _isMenuExpanded
+                        ? const Text('로그아웃')
                         : const SizedBox.shrink(), // ✅ null 대신 빈 위젯
                     onTap: () {
                       ref.read(authViewModelProvider.notifier).signOut();
@@ -235,9 +257,9 @@ class _MainLayoutState extends ConsumerState<MainLayout> {
               ),
             ),
           ),
-          
+
           const VerticalDivider(width: 1),
-          
+
           // ✅ 원본 구조 그대로 유지
           Expanded(
             child: PageStorage(

@@ -17,7 +17,8 @@ class DashboardScreen extends ConsumerWidget {
         padding: const EdgeInsets.all(24.0),
         child: RefreshIndicator(
           onRefresh: () => ref.refresh(dashboardViewModelProvider.future),
-          child: ListView( // 전체 화면을 스크롤 가능하게 만듭니다.
+          child: ListView(
+            // 전체 화면을 스크롤 가능하게 만듭니다.
             children: [
               Text('요약', style: Theme.of(context).textTheme.headlineMedium),
               const SizedBox(height: 24),
@@ -25,7 +26,8 @@ class DashboardScreen extends ConsumerWidget {
                 loading: () => const Center(child: CircularProgressIndicator()),
                 error: (e, s) => Text('데이터 로딩 실패: $e'),
                 data: (metrics) {
-                  return Wrap( // 화면 폭에 따라 자동으로 줄바꿈되는 Wrap 위젯
+                  return Wrap(
+                    // 화면 폭에 따라 자동으로 줄바꿈되는 Wrap 위젯
                     spacing: 24, // 가로 간격
                     runSpacing: 24, // 세로 간격
                     children: [
@@ -58,7 +60,10 @@ class DashboardScreen extends ConsumerWidget {
                 },
               ),
               const SizedBox(height: 48),
-              Text('주간 매출 현황', style: Theme.of(context).textTheme.headlineMedium),
+              Text(
+                '주간 매출 현황',
+                style: Theme.of(context).textTheme.headlineMedium,
+              ),
               const SizedBox(height: 24),
               // TODO: 여기에 fl_chart 같은 패키지를 이용해 차트 위젯 추가
               Container(
@@ -68,7 +73,7 @@ class DashboardScreen extends ConsumerWidget {
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: const Center(child: Text('차트가 여기에 표시됩니다.')),
-              )
+              ),
             ],
           ),
         ),
@@ -97,9 +102,9 @@ class _MetricCard extends StatelessWidget {
       width: 250,
       padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.1),
+        color: color.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: color.withOpacity(0.3)),
+        border: Border.all(color: color.withValues(alpha: 0.3)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -110,7 +115,9 @@ class _MetricCard extends StatelessWidget {
           const SizedBox(height: 8),
           Text(
             value,
-            style: Theme.of(context).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold),
+            style: Theme.of(
+              context,
+            ).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold),
           ),
         ],
       ),

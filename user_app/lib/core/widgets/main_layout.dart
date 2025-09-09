@@ -11,9 +11,9 @@ import '../../features/shop/providers/category_filter_provider.dart';
 class MainLayout extends ConsumerStatefulWidget {
   final Widget child;
   final bool showCategorySidebar;
-  
+
   const MainLayout({
-    super.key, 
+    super.key,
     required this.child,
     this.showCategorySidebar = true,
   });
@@ -33,42 +33,43 @@ class _MainLayoutState extends ConsumerState<MainLayout> {
   }
 
   @override
-Widget build(BuildContext context) {
-  final categoriesAsync = ref.watch(categoriesProvider);
+  Widget build(BuildContext context) {
+    final categoriesAsync = ref.watch(categoriesProvider);
 
-  return LayoutBuilder(
-    builder: (context, constraints) {
-      final bool isDesktop = constraints.maxWidth >= 1200;
-      final bool isTablet = constraints.maxWidth >= 768 && constraints.maxWidth < 1200;
-      final bool isMobile = constraints.maxWidth < 768;
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final bool isDesktop = constraints.maxWidth >= 1200;
+        final bool isTablet =
+            constraints.maxWidth >= 768 && constraints.maxWidth < 1200;
+        final bool isMobile = constraints.maxWidth < 768;
 
-      return Scaffold(
-        key: _scaffoldKey,
-        backgroundColor: Colors.grey.shade100,
-        drawer: (isMobile || isTablet) && widget.showCategorySidebar 
-            ? _buildDrawer(categoriesAsync) 
-            : null,
-        body: Column(
-          children: [
-            // 커스텀 헤더
-            _buildCustomHeader(isMobile, isTablet),
-            // 메인 콘텐츠
-            Expanded(
-              child: isDesktop && widget.showCategorySidebar
-                  ? _buildDesktopLayout(categoriesAsync)
-                  : _buildMobileLayout(),
-            ),
-          ],
-        ),
-      );
-    },
-  );
-}
-  
+        return Scaffold(
+          key: _scaffoldKey,
+          backgroundColor: Colors.grey.shade100,
+          drawer: (isMobile || isTablet) && widget.showCategorySidebar
+              ? _buildDrawer(categoriesAsync)
+              : null,
+          body: Column(
+            children: [
+              // 커스텀 헤더
+              _buildCustomHeader(isMobile, isTablet),
+              // 메인 콘텐츠
+              Expanded(
+                child: isDesktop && widget.showCategorySidebar
+                    ? _buildDesktopLayout(categoriesAsync)
+                    : _buildMobileLayout(),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
   // 데스크톱 레이아웃 (사이드바 + 메인 콘텐츠)
   Widget _buildDesktopLayout(AsyncValue<List<CategoryModel>> categoriesAsync) {
     final selectedCategoryId = ref.watch(selectedCategoryProvider);
-    
+
     return Center(
       child: ConstrainedBox(
         constraints: const BoxConstraints(maxWidth: 1400), // 최대 너비 제한
@@ -81,7 +82,7 @@ Widget build(BuildContext context) {
                 color: Colors.white,
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.black.withOpacity(0.1),
+                    color: Colors.black.withValues(alpha: 0.1),
                     blurRadius: 4,
                     offset: const Offset(2, 0),
                   ),
@@ -92,14 +93,15 @@ Widget build(BuildContext context) {
                   categories: categories,
                   selectedCategoryId: selectedCategoryId,
                   onCategorySelected: (categoryId) {
-                    ref.read(selectedCategoryProvider.notifier).state = categoryId;
+                    ref.read(selectedCategoryProvider.notifier).state =
+                        categoryId;
                   },
                 ),
                 loading: () => const Center(child: CircularProgressIndicator()),
                 error: (e, st) => const Center(child: Text('카테고리 로드 실패')),
               ),
             ),
-            
+
             // 우측 메인 콘텐츠 영역
             Expanded(
               child: Container(
@@ -121,128 +123,139 @@ Widget build(BuildContext context) {
   }
 
   Widget _buildCustomHeader(bool isMobile, bool isTablet) {
-  return Container(
-    height: 60,
-    decoration: BoxDecoration(
-      color: Colors.white,
-      boxShadow: [
-        BoxShadow(
-          color: Colors.black.withOpacity(0.1),
-          blurRadius: 2,
-          offset: const Offset(0, 1),
-        ),
-      ],
-    ),
-    child: Center(
-      child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 1400),
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 16),
-          child: Row(
-            children: [
-              // 메뉴/로고
-              if ((isMobile || isTablet) && widget.showCategorySidebar)
-                IconButton(
-                  icon: const Icon(Icons.menu, color: Colors.black87),
-                  onPressed: () => _scaffoldKey.currentState?.openDrawer(),
-                )
-              else
-                const SizedBox(width: 8),
-              
-              GestureDetector(
-                onTap: () => context.go('/shop'),
-                child: Row(
+    return Container(
+      height: 60,
+      decoration: BoxDecoration(
+        color: Colors.white,
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.1),
+            blurRadius: 2,
+            offset: const Offset(0, 1),
+          ),
+        ],
+      ),
+      child: Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 1400),
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: Row(
+              children: [
+                // 메뉴/로고
+                if ((isMobile || isTablet) && widget.showCategorySidebar)
+                  IconButton(
+                    icon: const Icon(Icons.menu, color: Colors.black87),
+                    onPressed: () => _scaffoldKey.currentState?.openDrawer(),
+                  )
+                else
+                  const SizedBox(width: 8),
+
+                GestureDetector(
+                  onTap: () => context.go('/shop'),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.store, color: Colors.blue),
+                      const SizedBox(width: 12),
+                      const Text(
+                        '나눔샵',
+                        style: TextStyle(
+                          color: Colors.black87,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 20,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+
+                const SizedBox(width: 40),
+
+                // 검색바
+                Expanded(
+                  child: Container(
+                    height: 40,
+                    constraints: const BoxConstraints(maxWidth: 400),
+                    child: TextField(
+                      controller: _searchController,
+                      decoration: InputDecoration(
+                        hintText: '상품 검색',
+                        hintStyle: const TextStyle(fontSize: 14),
+                        prefixIcon: const Icon(Icons.search, size: 20),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(20),
+                          borderSide: BorderSide.none,
+                        ),
+                        filled: true,
+                        fillColor: Colors.grey.shade100,
+                        contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 16,
+                        ),
+                      ),
+                      onChanged: (value) {
+                        ref.read(searchQueryProvider.notifier).state = value;
+                      },
+                    ),
+                  ),
+                ),
+
+                const SizedBox(width: 24),
+
+                // 액션 버튼들
+                Row(
+                  mainAxisSize: MainAxisSize.min,
                   children: [
-                    const Icon(Icons.store, color: Colors.blue),
-                    const SizedBox(width: 12),
-                    const Text(
-                      '나눔샵',
-                      style: TextStyle(
+                    IconButton(
+                      onPressed: () => context.go('/shop/cart'),
+                      icon: const Icon(
+                        Icons.shopping_cart_outlined,
                         color: Colors.black87,
-                        fontWeight: FontWeight.bold,
-                        fontSize: 20,
+                      ),
+                    ),
+                    IconButton(
+                      onPressed: () => context.go('/group-buy'),
+                      icon: const Icon(
+                        Icons.group_work_outlined,
+                        color: Colors.black87,
+                      ),
+                    ),
+                    IconButton(
+                      onPressed: () => context.go('/shop/mypage'),
+                      icon: const Icon(
+                        Icons.person_outline,
+                        color: Colors.black87,
                       ),
                     ),
                   ],
                 ),
-              ),
-              
-              const SizedBox(width: 40),
-              
-              // 검색바
-              Expanded(
-                child: Container(
-                  height: 40,
-                  constraints: const BoxConstraints(maxWidth: 400),
-                  child: TextField(
-                    controller: _searchController,
-                    decoration: InputDecoration(
-                      hintText: '상품 검색',
-                      hintStyle: const TextStyle(fontSize: 14),
-                      prefixIcon: const Icon(Icons.search, size: 20),
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(20),
-                        borderSide: BorderSide.none,
-                      ),
-                      filled: true,
-                      fillColor: Colors.grey.shade100,
-                      contentPadding: const EdgeInsets.symmetric(horizontal: 16),
-                    ),
-                    onChanged: (value) {
-                      ref.read(searchQueryProvider.notifier).state = value;
-                    },
-                  ),
-                ),
-              ),
-              
-              const SizedBox(width: 24),
-              
-              // 액션 버튼들
-              Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  IconButton(
-                    onPressed: () => context.go('/shop/cart'),
-                    icon: const Icon(Icons.shopping_cart_outlined, color: Colors.black87),
-                  ),
-                  IconButton(
-                    onPressed: () => context.go('/group-buy'),
-                    icon: const Icon(Icons.group_work_outlined, color: Colors.black87),
-                  ),
-                  IconButton(
-                    onPressed: () => context.go('/shop/mypage'),
-                    icon: const Icon(Icons.person_outline, color: Colors.black87),
-                  ),
-                ],
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       ),
-    ),
-  );
-}
+    );
+  }
 
   // 모바일/태블릿 레이아웃
   Widget _buildMobileLayout() {
     final selectedCategoryId = ref.watch(selectedCategoryProvider);
-    
+
     return Center(
-    child: ConstrainedBox(
-      constraints: const BoxConstraints(maxWidth: 1400),
-      child: Column(
-        children: [
-          if (selectedCategoryId != null) _buildSelectedCategoryBar(),
-          Expanded(child: widget.child),
-        ],
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 1400),
+        child: Column(
+          children: [
+            if (selectedCategoryId != null) _buildSelectedCategoryBar(),
+            Expanded(child: widget.child),
+          ],
+        ),
       ),
-    ),
-  );
-}
+    );
+  }
 
   Widget _buildDrawer(AsyncValue<List<CategoryModel>> categoriesAsync) {
     final selectedCategoryId = ref.watch(selectedCategoryProvider);
-    
+
     return Drawer(
       child: categoriesAsync.when(
         data: (categories) => CategorySidebar(
@@ -262,12 +275,15 @@ Widget build(BuildContext context) {
   Widget _buildSelectedCategoryBar() {
     final selectedCategoryId = ref.watch(selectedCategoryProvider);
     final categoriesAsync = ref.read(categoriesProvider);
-    
-    final categoryName = categoriesAsync.when(
-      data: (categories) => _findCategoryName(categories, selectedCategoryId!),
-      loading: () => '로딩중...',
-      error: (_, __) => '카테고리',
-    ) ?? '카테고리';
+
+    final categoryName =
+        categoriesAsync.when(
+          data: (categories) =>
+              _findCategoryName(categories, selectedCategoryId!),
+          loading: () => '로딩중...',
+          error: (_, __) => '카테고리',
+        ) ??
+        '카테고리';
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
@@ -299,7 +315,8 @@ Widget build(BuildContext context) {
                 ),
                 const SizedBox(width: 8),
                 GestureDetector(
-                  onTap: () => ref.read(selectedCategoryProvider.notifier).state = null,
+                  onTap: () =>
+                      ref.read(selectedCategoryProvider.notifier).state = null,
                   child: Icon(
                     Icons.close,
                     size: 16,

@@ -338,9 +338,6 @@ Future<List<ProductVariant>> fetchVariantsByProductId(int productId) async {
           .select('*')
           .eq('product_id', productId);
 
-          // ✅ 안전한 타입 변환
-    if (response == null) return [];
-
       return (response as List<dynamic>)
           .map((json) => ProductVariant.fromJson(json))
           .toList();
@@ -364,9 +361,9 @@ Future<ProductModel> fetchProductById(int productId) async {
     
     
     return product;
-  } catch (error, stackTrace) {
+  } catch (error) {
     debugPrint('fetchProductById 에러: $error');
-    throw error;
+    rethrow;
   }
 }
 }

@@ -8,6 +8,8 @@ import '../features/cart/view/cart_screen.dart';
 import '../features/commiunity/proposal/view/propose_group_buy_screen.dart';
 import '../features/group_buy/view/group_buy_detail_screen.dart';
 import '../features/group_buy/view/group_buy_list_screen.dart';
+import '../features/notifications/view/notification_list_screen.dart';
+import '../features/notifications/view/order_cancellation_rejected_screen.dart';
 import '../features/order/view/checkout_screen.dart';
 import '../features/order/view/order_history_screen.dart';
 import '../features/payment/views/portone_web_html_screen.dart';
@@ -32,6 +34,7 @@ enum AppRoute {
   groupBuyDetail,
   propose,
   mypage,
+  notifications,
 }
 
 final routerProvider = Provider<GoRouter>((ref) {
@@ -182,6 +185,21 @@ final routerProvider = Provider<GoRouter>((ref) {
             path: '/propose',
             builder: (context, state) => const ProposeGroupBuyScreen(),
           ),
+
+          // ⭐️ 알림 관련 라우트 (새로 추가)
+          GoRoute(
+            path: '/notifications',
+            builder: (context, state) => const NotificationListScreen(),
+            routes: [
+              GoRoute(
+                path: 'cancellation-rejected/:orderId',
+                builder: (context, state) {
+                  final orderId = int.parse(state.pathParameters['orderId']!);
+                  return OrderCancellationRejectedScreen(orderId: orderId);
+                },
+              ),
+            ],
+          ),
         ],
       ),
     ],
@@ -202,13 +220,14 @@ final routerProvider = Provider<GoRouter>((ref) {
       final authRequiredRoutes = [
         '/shop/mypage',
         '/shop/cart',
-        '/shop/cart/checkout'
-            '/shop/mypage/level-upgrade',
+        '/shop/cart/checkout',
+        '/shop/mypage/level-upgrade',
+        '/notifications', // ⭐️ 알림 페이지도 인증 필요
       ];
 
       // 인증되지 않은 사용자를 보호된 라우트에서 로그인으로 리디렉션
       if (!isAuthenticated &&
-          authRequiredRoutes.contains(state.matchedLocation)) {
+          authRequiredRoutes.any((route) => state.matchedLocation.startsWith(route))) {
         return '/login?from=${state.matchedLocation}';
       }
 
@@ -221,7 +240,10 @@ final routerProvider = Provider<GoRouter>((ref) {
             try {
               final decodedFrom = Uri.decodeComponent(from);
               // 안전한 경로인지 확인
-              if (decodedFrom.startsWith('/shop/')) {
+              if (decodedFrom.startsWith('/shop/') || 
+                  decodedFrom.startsWith('/notifications') ||
+                  decodedFrom.startsWith('/group-buy') ||
+                  decodedFrom.startsWith('/propose')) {
                 return decodedFrom;
               }
             } catch (e) {

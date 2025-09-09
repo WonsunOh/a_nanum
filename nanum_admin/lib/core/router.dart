@@ -1,6 +1,5 @@
 // nanum_admin/lib/core/router.dart (수정된 버전)
 
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';

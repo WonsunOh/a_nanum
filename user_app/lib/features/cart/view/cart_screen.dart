@@ -50,7 +50,11 @@ class CartScreen extends ConsumerWidget {
   }
 
   // 모바일용 레이아웃
-  Widget _buildNarrowLayout(BuildContext context, WidgetRef ref, CartState cartState) {
+  Widget _buildNarrowLayout(
+    BuildContext context,
+    WidgetRef ref,
+    CartState cartState,
+  ) {
     final cartItems = cartState.items;
     final selectedIds = cartState.selectedItemIds;
     final currencyFormat = NumberFormat.currency(locale: 'ko_KR', symbol: '₩');
@@ -62,7 +66,10 @@ class CartScreen extends ConsumerWidget {
           children: [
             Icon(Icons.shopping_cart_outlined, size: 80, color: Colors.grey),
             SizedBox(height: 16),
-            Text('장바구니가 비어있습니다.', style: TextStyle(fontSize: 18, color: Colors.grey)),
+            Text(
+              '장바구니가 비어있습니다.',
+              style: TextStyle(fontSize: 18, color: Colors.grey),
+            ),
           ],
         ),
       );
@@ -96,10 +103,12 @@ class CartScreen extends ConsumerWidget {
                       Checkbox(
                         value: selectedIds.contains(item.id),
                         onChanged: (value) {
-                          ref.read(cartViewModelProvider.notifier).toggleItemSelection(item.id);
+                          ref
+                              .read(cartViewModelProvider.notifier)
+                              .toggleItemSelection(item.id);
                         },
                       ),
-                      
+
                       // 상품 이미지
                       ClipRRect(
                         borderRadius: BorderRadius.circular(8),
@@ -116,9 +125,9 @@ class CartScreen extends ConsumerWidget {
                           ),
                         ),
                       ),
-                      
+
                       const SizedBox(width: 12),
-                      
+
                       // 상품 정보
                       Expanded(
                         child: Column(
@@ -128,23 +137,28 @@ class CartScreen extends ConsumerWidget {
                             Text(
                               product.name,
                               style: const TextStyle(
-                                fontWeight: FontWeight.bold, 
+                                fontWeight: FontWeight.bold,
                                 fontSize: 14,
                               ),
                               maxLines: 2,
                               overflow: TextOverflow.ellipsis,
                             ),
-                            
+
                             const SizedBox(height: 4),
-                            
+
                             // 옵션 정보
                             if (item.variantName != null) ...[
                               Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 8,
+                                  vertical: 3,
+                                ),
                                 decoration: BoxDecoration(
                                   color: Colors.blue.shade50,
                                   borderRadius: BorderRadius.circular(12),
-                                  border: Border.all(color: Colors.blue.shade200),
+                                  border: Border.all(
+                                    color: Colors.blue.shade200,
+                                  ),
                                 ),
                                 child: Text(
                                   item.variantName!,
@@ -155,7 +169,8 @@ class CartScreen extends ConsumerWidget {
                                   ),
                                 ),
                               ),
-                              if (item.variantAdditionalPrice != null && item.variantAdditionalPrice! > 0) ...[
+                              if (item.variantAdditionalPrice != null &&
+                                  item.variantAdditionalPrice! > 0) ...[
                                 const SizedBox(height: 2),
                                 Text(
                                   '+${currencyFormat.format(item.variantAdditionalPrice)}',
@@ -169,7 +184,7 @@ class CartScreen extends ConsumerWidget {
                               const SizedBox(height: 8),
                             ] else
                               const SizedBox(height: 8),
-                            
+
                             // 가격 및 수량
                             Row(
                               mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -197,35 +212,61 @@ class CartScreen extends ConsumerWidget {
                                   mainAxisSize: MainAxisSize.min,
                                   children: [
                                     IconButton(
-                                      onPressed: () => ref.read(cartViewModelProvider.notifier)
-                                          .updateQuantity(item.id, item.quantity - 1),
-                                      icon: const Icon(Icons.remove_circle_outline),
+                                      onPressed: () => ref
+                                          .read(cartViewModelProvider.notifier)
+                                          .updateQuantity(
+                                            item.id,
+                                            item.quantity - 1,
+                                          ),
+                                      icon: const Icon(
+                                        Icons.remove_circle_outline,
+                                      ),
                                       iconSize: 22,
                                       padding: EdgeInsets.zero,
-                                      constraints: const BoxConstraints(minWidth: 30, minHeight: 30),
+                                      constraints: const BoxConstraints(
+                                        minWidth: 30,
+                                        minHeight: 30,
+                                      ),
                                     ),
                                     Container(
-                                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 12,
+                                        vertical: 4,
+                                      ),
                                       decoration: BoxDecoration(
-                                        border: Border.all(color: Colors.grey.shade300),
+                                        border: Border.all(
+                                          color: Colors.grey.shade300,
+                                        ),
                                         borderRadius: BorderRadius.circular(4),
                                       ),
                                       child: Text(
                                         '${item.quantity}',
-                                        style: const TextStyle(fontWeight: FontWeight.bold),
+                                        style: const TextStyle(
+                                          fontWeight: FontWeight.bold,
+                                        ),
                                       ),
                                     ),
                                     IconButton(
-                                      onPressed: () => ref.read(cartViewModelProvider.notifier)
-                                          .updateQuantity(item.id, item.quantity + 1),
-                                      icon: const Icon(Icons.add_circle_outline),
+                                      onPressed: () => ref
+                                          .read(cartViewModelProvider.notifier)
+                                          .updateQuantity(
+                                            item.id,
+                                            item.quantity + 1,
+                                          ),
+                                      icon: const Icon(
+                                        Icons.add_circle_outline,
+                                      ),
                                       iconSize: 22,
                                       padding: EdgeInsets.zero,
-                                      constraints: const BoxConstraints(minWidth: 30, minHeight: 30),
+                                      constraints: const BoxConstraints(
+                                        minWidth: 30,
+                                        minHeight: 30,
+                                      ),
                                     ),
                                     const SizedBox(width: 8),
                                     IconButton(
-                                      onPressed: () => ref.read(cartViewModelProvider.notifier)
+                                      onPressed: () => ref
+                                          .read(cartViewModelProvider.notifier)
                                           .removeProduct(item.id),
                                       icon: const Icon(Icons.close),
                                       iconSize: 20,
@@ -250,7 +291,11 @@ class CartScreen extends ConsumerWidget {
   }
 
   // 데스크탑용 레이아웃
-  Widget _buildWideLayout(BuildContext context, WidgetRef ref, CartState cartState) {
+  Widget _buildWideLayout(
+    BuildContext context,
+    WidgetRef ref,
+    CartState cartState,
+  ) {
     final cartItems = cartState.items;
     final selectedIds = cartState.selectedItemIds;
     final currencyFormat = NumberFormat.currency(locale: 'ko_KR', symbol: '₩');
@@ -262,12 +307,15 @@ class CartScreen extends ConsumerWidget {
           children: [
             Icon(Icons.shopping_cart_outlined, size: 120, color: Colors.grey),
             SizedBox(height: 24),
-            Text('장바구니가 비어있습니다.', style: TextStyle(fontSize: 24, color: Colors.grey)),
+            Text(
+              '장바구니가 비어있습니다.',
+              style: TextStyle(fontSize: 24, color: Colors.grey),
+            ),
           ],
         ),
       );
     }
-    
+
     return SingleChildScrollView(
       padding: const EdgeInsets.all(24),
       child: Column(
@@ -276,7 +324,9 @@ class CartScreen extends ConsumerWidget {
           const SizedBox(height: 16),
           SingleChildScrollView(
             child: ConstrainedBox(
-              constraints: BoxConstraints(minWidth: MediaQuery.of(context).size.width - 48),
+              constraints: BoxConstraints(
+                minWidth: MediaQuery.of(context).size.width - 48,
+              ),
               child: DataTable(
                 columnSpacing: 16,
                 headingRowHeight: 50,
@@ -286,22 +336,69 @@ class CartScreen extends ConsumerWidget {
                   borderRadius: BorderRadius.circular(8),
                 ),
                 columns: const [
-                  DataColumn(label: SizedBox(width: 500, child: Text('상품 정보', style: TextStyle(fontWeight: FontWeight.bold),textAlign: TextAlign.center))),
-                  DataColumn(label: SizedBox(width: 80, child: Text('판매가', style: TextStyle(fontWeight: FontWeight.bold),textAlign: TextAlign.center))),
-                  DataColumn(label: SizedBox(width: 100, child: Text('수량', style: TextStyle(fontWeight: FontWeight.bold),textAlign: TextAlign.center))),
-                  DataColumn(label: SizedBox(width: 80, child: Text('합계', style: TextStyle(fontWeight: FontWeight.bold),textAlign: TextAlign.center))),
-                  DataColumn(label: SizedBox(width: 60, child: Text('삭제', style: TextStyle(fontWeight: FontWeight.bold),textAlign: TextAlign.center))),
+                  DataColumn(
+                    label: SizedBox(
+                      width: 500,
+                      child: Text(
+                        '상품 정보',
+                        style: TextStyle(fontWeight: FontWeight.bold),
+                        textAlign: TextAlign.center,
+                      ),
+                    ),
+                  ),
+                  DataColumn(
+                    label: SizedBox(
+                      width: 80,
+                      child: Text(
+                        '판매가',
+                        style: TextStyle(fontWeight: FontWeight.bold),
+                        textAlign: TextAlign.center,
+                      ),
+                    ),
+                  ),
+                  DataColumn(
+                    label: SizedBox(
+                      width: 100,
+                      child: Text(
+                        '수량',
+                        style: TextStyle(fontWeight: FontWeight.bold),
+                        textAlign: TextAlign.center,
+                      ),
+                    ),
+                  ),
+                  DataColumn(
+                    label: SizedBox(
+                      width: 80,
+                      child: Text(
+                        '합계',
+                        style: TextStyle(fontWeight: FontWeight.bold),
+                        textAlign: TextAlign.center,
+                      ),
+                    ),
+                  ),
+                  DataColumn(
+                    label: SizedBox(
+                      width: 60,
+                      child: Text(
+                        '삭제',
+                        style: TextStyle(fontWeight: FontWeight.bold),
+                        textAlign: TextAlign.center,
+                      ),
+                    ),
+                  ),
                 ],
                 rows: cartItems.map((item) {
                   final product = item.product!;
                   final basePrice = product.discountPrice ?? product.price;
                   final variantPrice = item.variantAdditionalPrice ?? 0;
                   final finalPrice = basePrice + variantPrice;
-                  
+
                   return DataRow(
                     selected: selectedIds.contains(item.id),
                     onSelectChanged: (isSelected) {
-                      ref.read(cartViewModelProvider.notifier).toggleItemSelection(item.id);
+                      ref
+                          .read(cartViewModelProvider.notifier)
+                          .toggleItemSelection(item.id);
                     },
                     cells: [
                       DataCell(
@@ -310,9 +407,9 @@ class CartScreen extends ConsumerWidget {
                             ClipRRect(
                               borderRadius: BorderRadius.circular(8),
                               child: Image.network(
-                                product.imageUrl ?? '', 
-                                width: 70, 
-                                height: 70, 
+                                product.imageUrl ?? '',
+                                width: 70,
+                                height: 70,
                                 fit: BoxFit.cover,
                                 errorBuilder: (_, __, ___) => Container(
                                   width: 70,
@@ -330,18 +427,26 @@ class CartScreen extends ConsumerWidget {
                                 children: [
                                   Text(
                                     product.name,
-                                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                                    style: const TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 13,
+                                    ),
                                     maxLines: 1,
                                     overflow: TextOverflow.ellipsis,
                                   ),
                                   if (item.variantName != null) ...[
                                     const SizedBox(height: 4),
                                     Container(
-                                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 6,
+                                        vertical: 2,
+                                      ),
                                       decoration: BoxDecoration(
                                         color: Colors.blue.shade50,
                                         borderRadius: BorderRadius.circular(10),
-                                        border: Border.all(color: Colors.blue.shade200),
+                                        border: Border.all(
+                                          color: Colors.blue.shade200,
+                                        ),
                                       ),
                                       child: Text(
                                         item.variantName!,
@@ -352,7 +457,8 @@ class CartScreen extends ConsumerWidget {
                                         ),
                                       ),
                                     ),
-                                    if (item.variantAdditionalPrice != null && item.variantAdditionalPrice! > 0) ...[
+                                    if (item.variantAdditionalPrice != null &&
+                                        item.variantAdditionalPrice! > 0) ...[
                                       const SizedBox(height: 2),
                                       Text(
                                         '+${currencyFormat.format(item.variantAdditionalPrice)}',
@@ -382,31 +488,44 @@ class CartScreen extends ConsumerWidget {
                           mainAxisSize: MainAxisSize.min,
                           children: [
                             IconButton(
-                              onPressed: () => ref.read(cartViewModelProvider.notifier)
+                              onPressed: () => ref
+                                  .read(cartViewModelProvider.notifier)
                                   .updateQuantity(item.id, item.quantity - 1),
                               icon: const Icon(Icons.remove_circle_outline),
                               iconSize: 20,
                               padding: EdgeInsets.zero,
-                              constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                              constraints: const BoxConstraints(
+                                minWidth: 32,
+                                minHeight: 32,
+                              ),
                             ),
                             Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 8,
+                                vertical: 4,
+                              ),
                               decoration: BoxDecoration(
                                 border: Border.all(color: Colors.grey.shade300),
                                 borderRadius: BorderRadius.circular(4),
                               ),
                               child: Text(
                                 '${item.quantity}',
-                                style: const TextStyle(fontWeight: FontWeight.bold),
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                ),
                               ),
                             ),
                             IconButton(
-                              onPressed: () => ref.read(cartViewModelProvider.notifier)
+                              onPressed: () => ref
+                                  .read(cartViewModelProvider.notifier)
                                   .updateQuantity(item.id, item.quantity + 1),
                               icon: const Icon(Icons.add_circle_outline),
                               iconSize: 20,
                               padding: EdgeInsets.zero,
-                              constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                              constraints: const BoxConstraints(
+                                minWidth: 32,
+                                minHeight: 32,
+                              ),
                             ),
                           ],
                         ),
@@ -422,7 +541,9 @@ class CartScreen extends ConsumerWidget {
                           icon: const Icon(Icons.close),
                           iconSize: 20,
                           color: Colors.red,
-                          onPressed: () => ref.read(cartViewModelProvider.notifier).removeProduct(item.id),
+                          onPressed: () => ref
+                              .read(cartViewModelProvider.notifier)
+                              .removeProduct(item.id),
                         ),
                       ),
                     ],
@@ -437,9 +558,15 @@ class CartScreen extends ConsumerWidget {
   }
 
   // 전체 선택 헤더
-  Widget _buildSelectAllHeader(BuildContext context, WidgetRef ref, CartState cartState) {
-    final isAllSelected = cartState.selectedItemIds.length == cartState.items.length && cartState.items.isNotEmpty;
-    
+  Widget _buildSelectAllHeader(
+    BuildContext context,
+    WidgetRef ref,
+    CartState cartState,
+  ) {
+    final isAllSelected =
+        cartState.selectedItemIds.length == cartState.items.length &&
+        cartState.items.isNotEmpty;
+
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       decoration: BoxDecoration(
@@ -464,9 +591,7 @@ class CartScreen extends ConsumerWidget {
               onPressed: () => _showDeleteConfirmDialog(context, ref),
               icon: const Icon(Icons.delete_outline, size: 18),
               label: const Text('선택삭제'),
-              style: TextButton.styleFrom(
-                foregroundColor: Colors.red,
-              ),
+              style: TextButton.styleFrom(foregroundColor: Colors.red),
             ),
         ],
       ),
@@ -474,13 +599,19 @@ class CartScreen extends ConsumerWidget {
   }
 
   // 하단 결제 바
-  Widget _buildBottomBar(BuildContext context, WidgetRef ref, CartState cartState) {
+  Widget _buildBottomBar(
+    BuildContext context,
+    WidgetRef ref,
+    CartState cartState,
+  ) {
     final currencyFormat = NumberFormat.currency(locale: 'ko_KR', symbol: '₩');
     const int shippingFee = 3000;
     const int freeShippingThreshold = 50000;
 
-    final selectedItems = cartState.items.where((item) => cartState.selectedItemIds.contains(item.id)).toList();
-    
+    final selectedItems = cartState.items
+        .where((item) => cartState.selectedItemIds.contains(item.id))
+        .toList();
+
     int subtotal = 0;
     for (final item in selectedItems) {
       final basePrice = item.product?.discountPrice ?? item.product?.price ?? 0;
@@ -488,8 +619,9 @@ class CartScreen extends ConsumerWidget {
       final finalPrice = basePrice + variantPrice;
       subtotal += finalPrice * item.quantity;
     }
-    
-    final int currentShippingFee = (subtotal >= freeShippingThreshold || subtotal == 0) ? 0 : shippingFee;
+
+    final int currentShippingFee =
+        (subtotal >= freeShippingThreshold || subtotal == 0) ? 0 : shippingFee;
     final int totalAmount = subtotal + currentShippingFee;
 
     return Container(
@@ -498,10 +630,10 @@ class CartScreen extends ConsumerWidget {
         color: Theme.of(context).cardColor,
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.1),
+            color: Colors.black.withValues(alpha: 0.1),
             blurRadius: 10,
             offset: const Offset(0, -2),
-          )
+          ),
         ],
       ),
       child: SafeArea(
@@ -520,7 +652,11 @@ class CartScreen extends ConsumerWidget {
                 ),
                 child: Row(
                   children: [
-                    Icon(Icons.local_shipping, size: 16, color: Colors.orange.shade700),
+                    Icon(
+                      Icons.local_shipping,
+                      size: 16,
+                      color: Colors.orange.shade700,
+                    ),
                     const SizedBox(width: 8),
                     Expanded(
                       child: Text(
@@ -535,7 +671,7 @@ class CartScreen extends ConsumerWidget {
                   ],
                 ),
               ),
-            
+
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
@@ -554,10 +690,11 @@ class CartScreen extends ConsumerWidget {
                       children: [
                         Text(
                           currencyFormat.format(totalAmount),
-                          style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                            fontWeight: FontWeight.bold,
-                            color: Colors.deepOrange,
-                          ),
+                          style: Theme.of(context).textTheme.headlineSmall
+                              ?.copyWith(
+                                fontWeight: FontWeight.bold,
+                                color: Colors.deepOrange,
+                              ),
                         ),
                         if (currentShippingFee > 0) ...[
                           const SizedBox(width: 8),
@@ -575,15 +712,20 @@ class CartScreen extends ConsumerWidget {
                 ),
                 ElevatedButton(
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: selectedItems.isEmpty ? Colors.grey : Colors.deepOrange,
+                    backgroundColor: selectedItems.isEmpty
+                        ? Colors.grey
+                        : Colors.deepOrange,
                     foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 32,
+                      vertical: 16,
+                    ),
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(8),
                     ),
                   ),
-                  onPressed: selectedItems.isEmpty 
-                      ? null 
+                  onPressed: selectedItems.isEmpty
+                      ? null
                       : () => context.go('/shop/cart/checkout'),
                   child: Text(
                     selectedItems.isEmpty ? '상품을 선택하세요' : '주문하기',
@@ -613,7 +755,8 @@ class CartScreen extends ConsumerWidget {
           TextButton(
             onPressed: () {
               Navigator.of(dialogContext).pop();
-              final selectedIds = ref.read(cartViewModelProvider).value?.selectedItemIds ?? {};
+              final selectedIds =
+                  ref.read(cartViewModelProvider).value?.selectedItemIds ?? {};
               for (final id in selectedIds) {
                 ref.read(cartViewModelProvider.notifier).removeProduct(id);
               }

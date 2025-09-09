@@ -1,5 +1,4 @@
 // nanum_admin/lib/features/auth/viewmodel/auth_viewmodel.dart (최종 수정)
-import 'package:flutter/foundation.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 

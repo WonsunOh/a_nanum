@@ -42,17 +42,17 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
     super.initState();
 
     // ✅ 바로구매 모드 확인과 사용자 정보 자동 입력을 순차적으로 실행
-  WidgetsBinding.instance.addPostFrameCallback((_) {
-    _checkDirectPurchaseMode();
-    
-    // ✅ 조금 더 긴 지연시간으로 사용자 정보 로딩 완료 대기
-    Future.delayed(const Duration(milliseconds: 300), () {
-      if (mounted) {
-        _tryAutoFillUserInfo();
-      }
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _checkDirectPurchaseMode();
+
+      // ✅ 조금 더 긴 지연시간으로 사용자 정보 로딩 완료 대기
+      Future.delayed(const Duration(milliseconds: 300), () {
+        if (mounted) {
+          _tryAutoFillUserInfo();
+        }
+      });
     });
-  });
-}
+  }
 
   @override
   void dispose() {
@@ -66,142 +66,139 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
   }
 
   // 바로구매 모드 확인
- // _checkDirectPurchaseMode 메서드 전체 수정
-// _checkDirectPurchaseMode 메서드 수정
-void _checkDirectPurchaseMode() {
-  
-  // ✅ 전역 상태에서 바로구매 데이터 확인
-  final directData = ref.read(directPurchaseProvider);
-  
-  if (directData != null) {
-    // 데이터 구조를 기존 방식에 맞게 변환
-    directPurchaseData = directData.toJson();
-    
-    if (mounted) {
-      setState(() {}); // UI 업데이트
-    }
+  // _checkDirectPurchaseMode 메서드 전체 수정
+  // _checkDirectPurchaseMode 메서드 수정
+  void _checkDirectPurchaseMode() {
+    // ✅ 전역 상태에서 바로구매 데이터 확인
+    final directData = ref.read(directPurchaseProvider);
 
-    // 바로구매 상품이 없는 경우 장바구니로 리다이렉트
-    final items = directPurchaseData!['items'] as List?;
-    if (items == null || items.isEmpty) {
-      context.go('/shop/cart');
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('주문할 상품이 없습니다.')),
-      );
+    if (directData != null) {
+      // 데이터 구조를 기존 방식에 맞게 변환
+      directPurchaseData = directData.toJson();
+
+      if (mounted) {
+        setState(() {}); // UI 업데이트
+      }
+
+      // 바로구매 상품이 없는 경우 장바구니로 리다이렉트
+      final items = directPurchaseData!['items'] as List?;
+      if (items == null || items.isEmpty) {
+        context.go('/shop/cart');
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('주문할 상품이 없습니다.')));
+      } else {
+        // ✅ 사용 후 전역 상태 클리어
+        ref.read(directPurchaseProvider.notifier).state = null;
+      }
     } else {
-      // ✅ 사용 후 전역 상태 클리어
-      ref.read(directPurchaseProvider.notifier).state = null;
-    }
-  } else {
-    
-    // ✅ 기존 URL 파라미터 방식도 지원 (호환성)
-    final uri = GoRouterState.of(context).uri;
-    final directParam = uri.queryParameters['direct'];
-    
-    if (directParam != null) {
-      try {
-        final decodedString = Uri.decodeComponent(directParam);
-        directPurchaseData = jsonDecode(decodedString);
-        
-        if (mounted) {
-          setState(() {});
-        }
-        
-        final items = directPurchaseData!['items'] as List?;
-        if (items == null || items.isEmpty) {
-          context.go('/shop/cart');
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('주문할 상품이 없습니다.')),
-          );
-        }
-      } catch (e) {
-        WidgetsBinding.instance.addPostFrameCallback((_) {
+      // ✅ 기존 URL 파라미터 방식도 지원 (호환성)
+      final uri = GoRouterState.of(context).uri;
+      final directParam = uri.queryParameters['direct'];
+
+      if (directParam != null) {
+        try {
+          final decodedString = Uri.decodeComponent(directParam);
+          directPurchaseData = jsonDecode(decodedString);
+
           if (mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(content: Text('주문 정보를 불러올 수 없습니다: $e')),
-            );
-            context.go('/shop/cart');
+            setState(() {});
           }
-        });
+
+          final items = directPurchaseData!['items'] as List?;
+          if (items == null || items.isEmpty) {
+            context.go('/shop/cart');
+            ScaffoldMessenger.of(
+              context,
+            ).showSnackBar(const SnackBar(content: Text('주문할 상품이 없습니다.')));
+          }
+        } catch (e) {
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (mounted) {
+              ScaffoldMessenger.of(
+                context,
+              ).showSnackBar(SnackBar(content: Text('주문 정보를 불러올 수 없습니다: $e')));
+              context.go('/shop/cart');
+            }
+          });
+        }
       }
     }
   }
-  
-}
-
 
   // 레벨 2 이상 사용자 정보 자동 입력
   void _tryAutoFillUserInfo() {
-  
-  // ✅ userProvider를 watch로 변경하여 실시간 상태 감지
-  final userProfileAsync = ref.read(userProvider);
-  
-  userProfileAsync.when(
-    data: (userProfile) {
-      
-      if (userProfile != null && userProfile.level >= 2) {
-        
-        setState(() {
-          _nameController.text = userProfile.fullName ?? userProfile.nickname ?? '';
-          
-          if (userProfile.postcode != null && userProfile.postcode!.isNotEmpty) {
-            _postcodeController.text = userProfile.postcode!;
-          }
-          
-          if (userProfile.address != null && userProfile.address!.isNotEmpty) {
-            _parseAndFillAddress(userProfile.address!);
-          }
-          
-          if (userProfile.phoneNumber != null && userProfile.phoneNumber!.isNotEmpty) {
-            _phoneController.text = userProfile.phoneNumber!;
-          }
-          
-          _isAutoFilled = true;
-        });
+    // ✅ userProvider를 watch로 변경하여 실시간 상태 감지
+    final userProfileAsync = ref.read(userProvider);
 
-        if (userProfile.address != null && userProfile.address!.isNotEmpty) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Row(
-                children: [
-                  Icon(Icons.auto_awesome, color: Colors.white),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      '레벨 ${userProfile.level} 회원 혜택으로 배송 정보가 자동 입력되었습니다!',
+    userProfileAsync.when(
+      data: (userProfile) {
+        if (userProfile != null && userProfile.level >= 2) {
+          setState(() {
+            _nameController.text =
+                userProfile.fullName ?? userProfile.nickname ?? '';
+
+            if (userProfile.postcode != null &&
+                userProfile.postcode!.isNotEmpty) {
+              _postcodeController.text = userProfile.postcode!;
+            }
+
+            if (userProfile.address != null &&
+                userProfile.address!.isNotEmpty) {
+              _parseAndFillAddress(userProfile.address!);
+            }
+
+            if (userProfile.phoneNumber != null &&
+                userProfile.phoneNumber!.isNotEmpty) {
+              _phoneController.text = userProfile.phoneNumber!;
+            }
+
+            _isAutoFilled = true;
+          });
+
+          if (userProfile.address != null && userProfile.address!.isNotEmpty) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Row(
+                  children: [
+                    Icon(Icons.auto_awesome, color: Colors.white),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        '레벨 ${userProfile.level} 회원 혜택으로 배송 정보가 자동 입력되었습니다!',
+                      ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
+                backgroundColor: isDirectPurchase
+                    ? Colors.orange.shade600
+                    : Colors.blue.shade600,
+                behavior: SnackBarBehavior.floating,
+                action: SnackBarAction(
+                  label: '수정',
+                  textColor: Colors.white,
+                  onPressed: () {
+                    setState(() => _isEditMode = true);
+                  },
+                ),
               ),
-              backgroundColor: isDirectPurchase ? Colors.orange.shade600 : Colors.blue.shade600,
-              behavior: SnackBarBehavior.floating,
-              action: SnackBarAction(
-                label: '수정',
-                textColor: Colors.white,
-                onPressed: () {
-                  setState(() => _isEditMode = true);
-                },
-              ),
-            ),
-          );
+            );
+          }
         }
-        
-      } 
-    },
-    loading: () {
-      // ✅ 로딩 중일 때 재시도
-      Future.delayed(const Duration(milliseconds: 500), () {
-        if (mounted) {
-          _tryAutoFillUserInfo();
-        }
-      });
-    },
-    error: (error, stackTrace) {
-      print('사용자 프로필 로드 에러: $error');
-    },
-  );
-  
-}
+      },
+      loading: () {
+        // ✅ 로딩 중일 때 재시도
+        Future.delayed(const Duration(milliseconds: 500), () {
+          if (mounted) {
+            _tryAutoFillUserInfo();
+          }
+        });
+      },
+      error: (error, stackTrace) {
+        print('사용자 프로필 로드 에러: $error');
+      },
+    );
+  }
 
   // 주소 파싱
   void _parseAndFillAddress(String fullAddress) {
@@ -339,59 +336,61 @@ void _checkDirectPurchaseMode() {
 
   // 주문 제출
   // _submitOrder() 메서드에서 해당 부분 수정
-Future<void> _submitOrder() async {
-  if (!_formKey.currentState!.validate()) return;
+  Future<void> _submitOrder() async {
+    if (!_formKey.currentState!.validate()) return;
 
-  List<dynamic> orderItems;
-  int subtotal;
+    List<dynamic> orderItems;
+    int subtotal;
 
-  if (isDirectPurchase) {
-    // 바로구매 모드
-    orderItems = directPurchaseData!['items'];
-    subtotal = _calculateDirectPurchaseSubtotal(); // 바로구매용 계산 메서드 사용
-    
-    if (orderItems.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('주문할 상품 정보가 없습니다.')),
-      );
-      return;
+    if (isDirectPurchase) {
+      // 바로구매 모드
+      orderItems = directPurchaseData!['items'];
+      subtotal = _calculateDirectPurchaseSubtotal(); // 바로구매용 계산 메서드 사용
+
+      if (orderItems.isEmpty) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('주문할 상품 정보가 없습니다.')));
+        return;
+      }
+    } else {
+      // 장바구니 모드
+      final cartState = ref.read(cartViewModelProvider).valueOrNull;
+      if (cartState == null || cartState.selectedItemIds.isEmpty) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('주문할 상품을 선택해주세요.')));
+        return;
+      }
+
+      final cartItems = cartState.items
+          .where((item) => cartState.selectedItemIds.contains(item.id))
+          .cast<CartItemModel>()
+          .toList();
+
+      orderItems = cartItems; // 타입을 맞춰주기 위해 분리
+      subtotal = _calculateCartSubtotal(cartItems); // CartItemModel 리스트 전달
     }
-  } else {
-    // 장바구니 모드
-    final cartState = ref.read(cartViewModelProvider).valueOrNull;
-    if (cartState == null || cartState.selectedItemIds.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('주문할 상품을 선택해주세요.')),
-      );
-      return;
+
+    const int shippingFee = 3000;
+    const int freeShippingThreshold = 50000;
+    final int currentShippingFee = (subtotal >= freeShippingThreshold)
+        ? 0
+        : shippingFee;
+    final int totalAmount = subtotal + currentShippingFee;
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => Dialog.fullscreen(
+        child: _buildPaymentConfirmationScreen(totalAmount, orderItems),
+      ),
+    );
+
+    if (confirmed == true) {
+      await _processPayment(orderItems, totalAmount, currentShippingFee);
     }
-    
-    final cartItems = cartState.items
-        .where((item) => cartState.selectedItemIds.contains(item.id))
-        .cast<CartItemModel>()
-        .toList();
-    
-    orderItems = cartItems; // 타입을 맞춰주기 위해 분리
-    subtotal = _calculateCartSubtotal(cartItems); // CartItemModel 리스트 전달
   }
-
-  const int shippingFee = 3000;
-  const int freeShippingThreshold = 50000;
-  final int currentShippingFee = (subtotal >= freeShippingThreshold) ? 0 : shippingFee;
-  final int totalAmount = subtotal + currentShippingFee;
-
-  final confirmed = await showDialog<bool>(
-    context: context,
-    barrierDismissible: false,
-    builder: (context) => Dialog.fullscreen(
-      child: _buildPaymentConfirmationScreen(totalAmount, orderItems),
-    ),
-  );
-
-  if (confirmed == true) {
-    await _processPayment(orderItems, totalAmount, currentShippingFee);
-  }
-}
 
   // 결제 확인 화면
   Widget _buildPaymentConfirmationScreen(int totalAmount, List<dynamic> items) {
@@ -421,7 +420,7 @@ Future<void> _submitOrder() async {
               color: Colors.white,
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withOpacity(0.1),
+                  color: Colors.black.withValues(alpha: 0.1),
                   blurRadius: 10,
                   offset: const Offset(0, -2),
                 ),
@@ -565,194 +564,198 @@ Future<void> _submitOrder() async {
   }
 
   // 결제 처리
- Future<void> _processPayment(
-  List<dynamic> items,
-  int totalAmount,
-  int currentShippingFee,
-) async {
-  try {
-    final userEmail = "${_phoneController.text}@temp.com";
+  Future<void> _processPayment(
+    List<dynamic> items,
+    int totalAmount,
+    int currentShippingFee,
+  ) async {
+    try {
+      final userEmail = "${_phoneController.text}@temp.com";
 
-    Map<String, dynamic>? paymentResult;
+      Map<String, dynamic>? paymentResult;
 
-    paymentResult = await showDialog<Map<String, dynamic>>(
-      context: context,
-      barrierDismissible: false,
-      builder: (context) => Dialog.fullscreen(
-        child: PortOneWebHtmlScreen(
-          totalAmount: totalAmount,
-          orderName: isDirectPurchase
-              ? '바로구매 ${items.length}건'
-              : '소분쇼핑몰 주문 ${items.length}건',
-          customerName: _nameController.text,
-          customerPhone: _phoneController.text,
-          customerEmail: userEmail,
-          customerAddress: _addressController.text,
+      paymentResult = await showDialog<Map<String, dynamic>>(
+        context: context,
+        barrierDismissible: false,
+        builder: (context) => Dialog.fullscreen(
+          child: PortOneWebHtmlScreen(
+            totalAmount: totalAmount,
+            orderName: isDirectPurchase
+                ? '바로구매 ${items.length}건'
+                : '소분쇼핑몰 주문 ${items.length}건',
+            customerName: _nameController.text,
+            customerPhone: _phoneController.text,
+            customerEmail: userEmail,
+            customerAddress: _addressController.text,
+          ),
         ),
-      ),
-    );
+      );
 
-    if (paymentResult != null && paymentResult['success'] == true) {
-      // ✅ 결제 성공 시 실제 주문 생성
-      bool orderSuccess = false;
-      
-      if (isDirectPurchase) {
-        // 바로구매 주문 생성
-        orderSuccess = await _createDirectPurchaseOrder(
-          items: items,
-          totalAmount: totalAmount,
-          currentShippingFee: currentShippingFee,
-          paymentId: paymentResult['paymentId'],
-        );
-      } else {
-        // 장바구니 주문 생성
-        orderSuccess = await _createCartOrder(
-          items: items.cast<CartItemModel>(),
-          totalAmount: totalAmount,
-          currentShippingFee: currentShippingFee,
-          paymentId: paymentResult['paymentId'],
-        );
-      }
+      if (paymentResult != null && paymentResult['success'] == true) {
+        // ✅ 결제 성공 시 실제 주문 생성
+        bool orderSuccess = false;
 
-      if (mounted && orderSuccess) {
-        context.go('/shop');
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Row(
-              children: [
-                const Icon(Icons.check_circle, color: Colors.white),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        isDirectPurchase ? '바로구매 주문 완료!' : '주문 완료!',
-                        style: const TextStyle(fontWeight: FontWeight.bold),
-                      ),
-                      Text('${_formatAmount(totalAmount)}원 결제 및 주문 완료'),
-                    ],
+        if (isDirectPurchase) {
+          // 바로구매 주문 생성
+          orderSuccess = await _createDirectPurchaseOrder(
+            items: items,
+            totalAmount: totalAmount,
+            currentShippingFee: currentShippingFee,
+            paymentId: paymentResult['paymentId'],
+          );
+        } else {
+          // 장바구니 주문 생성
+          orderSuccess = await _createCartOrder(
+            items: items.cast<CartItemModel>(),
+            totalAmount: totalAmount,
+            currentShippingFee: currentShippingFee,
+            paymentId: paymentResult['paymentId'],
+          );
+        }
+
+        if (mounted && orderSuccess) {
+          context.go('/shop');
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Row(
+                children: [
+                  const Icon(Icons.check_circle, color: Colors.white),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          isDirectPurchase ? '바로구매 주문 완료!' : '주문 완료!',
+                          style: const TextStyle(fontWeight: FontWeight.bold),
+                        ),
+                        Text('${_formatAmount(totalAmount)}원 결제 및 주문 완료'),
+                      ],
+                    ),
                   ),
-                ),
-              ],
+                ],
+              ),
+              backgroundColor: Colors.green,
+              duration: const Duration(seconds: 4),
             ),
-            backgroundColor: Colors.green,
-            duration: const Duration(seconds: 4),
-          ),
-        );
-      } else if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('결제는 완료되었으나 주문 생성에 실패했습니다. 고객센터에 문의해주세요.'),
-            backgroundColor: Colors.orange,
-          ),
-        );
+          );
+        } else if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('결제는 완료되었으나 주문 생성에 실패했습니다. 고객센터에 문의해주세요.'),
+              backgroundColor: Colors.orange,
+            ),
+          );
+        }
+      } else if (paymentResult != null && paymentResult['cancelled'] == true) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('결제가 취소되었습니다.'),
+              backgroundColor: Colors.orange,
+            ),
+          );
+        }
+      } else {
+        final errorMessage = paymentResult?['error'] ?? '결제 처리 중 오류가 발생했습니다.';
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('결제 실패: $errorMessage'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
       }
-    } else if (paymentResult != null && paymentResult['cancelled'] == true) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('결제가 취소되었습니다.'),
-            backgroundColor: Colors.orange,
-          ),
-        );
-      }
-    } else {
-      final errorMessage = paymentResult?['error'] ?? '결제 처리 중 오류가 발생했습니다.';
+    } catch (e, stackTrace) {
+      print('결제 처리 에러: $e');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('결제 실패: $errorMessage'),
+            content: Text('결제 처리 중 오류: $e'),
             backgroundColor: Colors.red,
           ),
         );
       }
     }
-  } catch (e, stackTrace) {
-    print('결제 처리 에러: $e');
-    if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('결제 처리 중 오류: $e'),
-          backgroundColor: Colors.red,
-        ),
-      );
+  }
+
+  /// 장바구니 주문 생성
+  Future<bool> _createCartOrder({
+    required List<CartItemModel> items,
+    required int totalAmount,
+    required int currentShippingFee,
+    required String paymentId,
+  }) async {
+    try {
+      final success = await ref
+          .read(orderViewModelProvider.notifier)
+          .createOrder(
+            cartItems: items,
+            totalAmount: totalAmount,
+            shippingFee: currentShippingFee,
+            recipientName: _nameController.text,
+            recipientPhone: _phoneController.text,
+            shippingAddress: _fullAddress,
+            paymentId: paymentId,
+          );
+
+      if (success) {
+        print('✅ 장바구니 주문 생성 성공 - PaymentID: $paymentId');
+      }
+
+      return success;
+    } catch (e) {
+      print('❌ 장바구니 주문 생성 실패: $e');
+      return false;
     }
   }
-}
 
-/// 장바구니 주문 생성
-Future<bool> _createCartOrder({
-  required List<CartItemModel> items,
-  required int totalAmount,
-  required int currentShippingFee,
-  required String paymentId,
-}) async {
-  try {
-    final success = await ref.read(orderViewModelProvider.notifier).createOrder(
-      cartItems: items,
-      totalAmount: totalAmount,
-      shippingFee: currentShippingFee,
-      recipientName: _nameController.text,
-      recipientPhone: _phoneController.text,
-      shippingAddress: _fullAddress,
-      paymentId: paymentId,
-    );
-    
-    if (success) {
-      print('✅ 장바구니 주문 생성 성공 - PaymentID: $paymentId');
+  /// 바로구매 주문 생성
+  Future<bool> _createDirectPurchaseOrder({
+    required List<dynamic> items,
+    required int totalAmount,
+    required int currentShippingFee,
+    required String paymentId,
+  }) async {
+    try {
+      // 바로구매 데이터를 CartItemModel 형태로 변환
+      final cartItems = await _convertDirectPurchaseToCartItems(items);
+
+      final success = await ref
+          .read(orderViewModelProvider.notifier)
+          .createOrder(
+            cartItems: cartItems,
+            totalAmount: totalAmount,
+            shippingFee: currentShippingFee,
+            recipientName: _nameController.text,
+            recipientPhone: _phoneController.text,
+            shippingAddress: _fullAddress,
+            paymentId: paymentId,
+          );
+
+      if (success) {
+        print('✅ 바로구매 주문 생성 성공 - PaymentID: $paymentId');
+      }
+
+      return success;
+    } catch (e) {
+      print('❌ 바로구매 주문 생성 실패: $e');
+      return false;
     }
-    
-    return success;
-  } catch (e) {
-    print('❌ 장바구니 주문 생성 실패: $e');
-    return false;
   }
-}
 
-/// 바로구매 주문 생성
-Future<bool> _createDirectPurchaseOrder({
-  required List<dynamic> items,
-  required int totalAmount,
-  required int currentShippingFee,
-  required String paymentId,
-}) async {
-  try {
-    // 바로구매 데이터를 CartItemModel 형태로 변환
-    final cartItems = await _convertDirectPurchaseToCartItems(items);
-    
-    final success = await ref.read(orderViewModelProvider.notifier).createOrder(
-      cartItems: cartItems,
-      totalAmount: totalAmount,
-      shippingFee: currentShippingFee,
-      recipientName: _nameController.text,
-      recipientPhone: _phoneController.text,
-      shippingAddress: _fullAddress,
-      paymentId: paymentId, 
-    );
-    
-    if (success) {
-      print('✅ 바로구매 주문 생성 성공 - PaymentID: $paymentId');
-    }
-    
-    return success;
-  } catch (e) {
-    print('❌ 바로구매 주문 생성 실패: $e');
-    return false;
+  /// 바로구매 데이터를 CartItemModel로 변환
+  Future<List<CartItemModel>> _convertDirectPurchaseToCartItems(
+    List<dynamic> items,
+  ) async {
+    // 이 메서드는 바로구매 데이터 구조에 맞게 구현해야 합니다
+    // directPurchaseData의 구조를 확인하여 CartItemModel로 변환
+    // 현재는 간단한 예시로 작성
+
+    return []; // TODO: 실제 변환 로직 구현 필요
   }
-}
-
-/// 바로구매 데이터를 CartItemModel로 변환
-Future<List<CartItemModel>> _convertDirectPurchaseToCartItems(List<dynamic> items) async {
-  // 이 메서드는 바로구매 데이터 구조에 맞게 구현해야 합니다
-  // directPurchaseData의 구조를 확인하여 CartItemModel로 변환
-  // 현재는 간단한 예시로 작성
-  
-  return []; // TODO: 실제 변환 로직 구현 필요
-}
-
-
 
   String _formatAmount(int amount) {
     return amount.toString().replaceAllMapped(
@@ -802,7 +805,7 @@ Future<List<CartItemModel>> _convertDirectPurchaseToCartItems(List<dynamic> item
               color: Colors.white,
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withOpacity(0.1),
+                  color: Colors.black.withValues(alpha: 0.1),
                   blurRadius: 10,
                   offset: const Offset(0, -2),
                 ),
@@ -934,7 +937,7 @@ Future<List<CartItemModel>> _convertDirectPurchaseToCartItems(List<dynamic> item
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.05),
+            color: Colors.black.withValues(alpha: 0.05),
             blurRadius: 10,
             offset: const Offset(0, 2),
           ),
@@ -1203,7 +1206,7 @@ Future<List<CartItemModel>> _convertDirectPurchaseToCartItems(List<dynamic> item
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.05),
+            color: Colors.black.withValues(alpha: 0.05),
             blurRadius: 10,
             offset: const Offset(0, 2),
           ),
@@ -1438,7 +1441,7 @@ Future<List<CartItemModel>> _convertDirectPurchaseToCartItems(List<dynamic> item
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.05),
+            color: Colors.black.withValues(alpha: 0.05),
             blurRadius: 10,
             offset: const Offset(0, 2),
           ),

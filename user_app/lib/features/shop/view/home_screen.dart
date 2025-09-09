@@ -37,17 +37,18 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       builder: (context, constraints) {
         // 화면 크기별 구분점
         final bool isDesktop = constraints.maxWidth >= 1200;
-        final bool isTablet = constraints.maxWidth >= 768 && constraints.maxWidth < 1200;
+        final bool isTablet =
+            constraints.maxWidth >= 768 && constraints.maxWidth < 1200;
         final bool isMobile = constraints.maxWidth < 768;
 
         return Scaffold(
           key: _scaffoldKey,
           backgroundColor: Colors.grey.shade50,
           appBar: _buildAppBar(isMobile),
-          
+
           // 모바일/태블릿: Drawer 사용, 데스크톱: 사이드바 고정
           drawer: (isMobile || isTablet) ? _buildDrawer(categoriesAsync) : null,
-          
+
           body: isDesktop
               ? _buildDesktopLayout(categoriesAsync, productsAsync)
               : _buildMobileLayout(productsAsync, isTablet),
@@ -70,7 +71,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
             color: Colors.white,
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withOpacity(0.1),
+                color: Colors.black.withValues(alpha: 0.1),
                 blurRadius: 4,
                 offset: const Offset(2, 0),
               ),
@@ -86,7 +87,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
             error: (e, st) => Center(child: Text('카테고리 로드 실패')),
           ),
         ),
-        
+
         // 우측 상품 영역
         Expanded(
           child: _buildProductArea(productsAsync, 4), // 데스크톱: 4열
@@ -104,11 +105,11 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       children: [
         // 카테고리 필터 표시 (선택된 경우만)
         if (_selectedCategoryId != null) _buildSelectedCategoryChip(),
-        
+
         // 상품 영역
         Expanded(
           child: _buildProductArea(
-            productsAsync, 
+            productsAsync,
             isTablet ? 3 : 2, // 태블릿: 3열, 모바일: 2열
           ),
         ),
@@ -120,7 +121,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     return AppBar(
       backgroundColor: Colors.white,
       elevation: 1,
-      leading: isMobile 
+      leading: isMobile
           ? IconButton(
               icon: const Icon(Icons.menu, color: Colors.black87),
               onPressed: () => _scaffoldKey.currentState?.openDrawer(),
@@ -247,7 +248,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     );
   }
 
-  Widget _buildProductArea(AsyncValue<List<ProductModel>> productsAsync, int crossAxisCount) {
+  Widget _buildProductArea(
+    AsyncValue<List<ProductModel>> productsAsync,
+    int crossAxisCount,
+  ) {
     return productsAsync.when(
       data: (products) {
         final filteredProducts = _filterProducts(products);
@@ -263,15 +267,19 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
 
   void _onCategorySelected(int? categoryId) {
     setState(() => _selectedCategoryId = categoryId);
-    
+
     if (categoryId == null) {
       ref.read(productViewModelProvider.notifier).fetchAllProducts();
     } else {
       final categoryIds = _collectCategoryIds(categoryId);
       if (categoryIds.length == 1) {
-        ref.read(productViewModelProvider.notifier).fetchProductsByCategory(categoryId);
+        ref
+            .read(productViewModelProvider.notifier)
+            .fetchProductsByCategory(categoryId);
       } else {
-        ref.read(productViewModelProvider.notifier).fetchProductsByCategoryHierarchy(categoryIds);
+        ref
+            .read(productViewModelProvider.notifier)
+            .fetchProductsByCategoryHierarchy(categoryIds);
       }
     }
   }
@@ -302,7 +310,11 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     );
   }
 
-  void _collectChildrenIds(List<CategoryModel> categories, int parentId, List<int> result) {
+  void _collectChildrenIds(
+    List<CategoryModel> categories,
+    int parentId,
+    List<int> result,
+  ) {
     for (final category in categories) {
       if (category.id == parentId) {
         for (final child in category.children) {
