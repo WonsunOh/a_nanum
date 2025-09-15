@@ -65,10 +65,25 @@ final routerProvider = Provider<GoRouter>((ref) {
           );
         },
         routes: [
+          // ⭐️ 알림 관련 라우트 (맨 위에 배치)
+          GoRoute(
+            path: '/notifications',
+            builder: (context, state) => const NotificationListScreen(),
+            routes: [
+              GoRoute(
+                path: 'cancellation-rejected/:orderId',
+                builder: (context, state) {
+                  final orderId = int.parse(state.pathParameters['orderId']!);
+                  return OrderCancellationRejectedScreen(orderId: orderId);
+                },
+              ),
+            ],
+          ),
+
           // 쇼핑 관련 라우트들
           GoRoute(
             path: '/shop',
-            builder: (context, state) => const ShopScreen(), // 단순한 상품 그리드
+            builder: (context, state) => const ShopScreen(),
             routes: [
               // 장바구니 관련 라우트
               GoRoute(
@@ -136,7 +151,6 @@ final routerProvider = Provider<GoRouter>((ref) {
                     path: 'posts',
                     builder: (context, state) => const MyPostsScreen(),
                   ),
-                  // ⭐️ 레벨 업그레이드 라우터 추가
                   GoRoute(
                     path: 'level-upgrade',
                     builder: (context, state) => const LevelUpgradeFormScreen(),
@@ -185,21 +199,6 @@ final routerProvider = Provider<GoRouter>((ref) {
             path: '/propose',
             builder: (context, state) => const ProposeGroupBuyScreen(),
           ),
-
-          // ⭐️ 알림 관련 라우트 (새로 추가)
-          GoRoute(
-            path: '/notifications',
-            builder: (context, state) => const NotificationListScreen(),
-            routes: [
-              GoRoute(
-                path: 'cancellation-rejected/:orderId',
-                builder: (context, state) {
-                  final orderId = int.parse(state.pathParameters['orderId']!);
-                  return OrderCancellationRejectedScreen(orderId: orderId);
-                },
-              ),
-            ],
-          ),
         ],
       ),
     ],
@@ -211,8 +210,15 @@ final routerProvider = Provider<GoRouter>((ref) {
       final isAtSplash = state.matchedLocation == '/splash';
       final isGoingToLogin = state.matchedLocation == '/login';
 
+      // 디버깅 강화
+      print('🔍 Router Debug:');
+      print('  - 요청된 경로: ${state.matchedLocation}');
+      print('  - 전체 URI: ${state.uri}');
+      print('  - 경로 파라미터: ${state.pathParameters}');
+
       // 규칙 1: 스플래시 화면에서는 항상 쇼핑몰로 리디렉션
       if (isAtSplash) {
+        print('  - 스플래시에서 /shop으로 리디렉션');
         return '/shop';
       }
 
@@ -228,6 +234,7 @@ final routerProvider = Provider<GoRouter>((ref) {
       // 인증되지 않은 사용자를 보호된 라우트에서 로그인으로 리디렉션
       if (!isAuthenticated &&
           authRequiredRoutes.any((route) => state.matchedLocation.startsWith(route))) {
+        print('  - 인증 필요: /login으로 리디렉션');
         return '/login?from=${state.matchedLocation}';
       }
 
@@ -244,18 +251,24 @@ final routerProvider = Provider<GoRouter>((ref) {
                   decodedFrom.startsWith('/notifications') ||
                   decodedFrom.startsWith('/group-buy') ||
                   decodedFrom.startsWith('/propose')) {
+                print('  - 로그인 후 ${decodedFrom}으로 리디렉션');
                 return decodedFrom;
               }
             } catch (e) {
               // 디코딩 실패 시 기본 경로로
             }
           }
+          print('  - 로그인 상태에서 /shop으로 리디렉션');
           return '/shop';
         }
         // 로그인이 안 되어 있으면 로그인 페이지로 그냥 이동
         return null;
       }
 
+      print('  - 현재 경로: ${state.matchedLocation}');
+      print('  - 인증 상태: $isAuthenticated');
+      print('  - 사용자 ID: ${session?.user?.id}');
+      print('  - 리디렉션 없음');
       return null;
     },
   );

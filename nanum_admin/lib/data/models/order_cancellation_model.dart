@@ -1,5 +1,7 @@
 // nanum_admin/lib/data/models/order_cancellation_model.dart (새 파일)
 
+import 'package:flutter/foundation.dart';
+
 class OrderCancellation {
   final int id;
   final int orderId;
@@ -28,22 +30,26 @@ class OrderCancellation {
   });
 
   factory OrderCancellation.fromJson(Map<String, dynamic> json) {
-    return OrderCancellation(
-      id: json['id'],
-      orderId: json['order_id'],
-      userId: json['user_id'],
-      cancelReason: json['cancel_reason'] ?? '',
-      cancelDetail: json['cancel_detail'],
-      status: json['status'],
-      adminId: json['admin_id'],
-      adminNote: json['admin_note'],
-      processedAt: json['processed_at'] != null 
-          ? DateTime.parse(json['processed_at']) 
-          : null,
-      requestedAt: DateTime.parse(json['requested_at']),
-      createdAt: DateTime.parse(json['created_at']),
-    );
+    try {
+      return OrderCancellation(
+        id: json['id'],
+        orderId: json['order_id'],
+        userId: json['user_id'],
+        cancelReason: json['cancel_reason'] ?? '',
+        cancelDetail: json['cancel_detail'],
+        status: json['status'],
+        adminId: json['admin_id'],
+        adminNote: json['admin_note'],
+        processedAt: json['processed_at'] != null
+            ? DateTime.parse(json['processed_at'])
+            : null,
+        requestedAt: DateTime.parse(json['requested_at']),
+        createdAt: DateTime.parse(json['created_at']),
+      );
+    } catch (e) {
+      debugPrint('❌ OrderCancellation.fromJson error: $e');
+      debugPrint('Json data: $json');
+      rethrow;
+    }
   }
-
-  
 }

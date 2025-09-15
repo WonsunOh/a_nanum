@@ -1,4 +1,4 @@
-// user_app/lib/features/shop/viewmodel/category_viewmodel.dart (새 파일)
+// user_app/lib/features/shop/viewmodel/category_viewmodel.dart
 
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 import '../../../data/models/category_model.dart';
@@ -8,11 +8,12 @@ part 'category_viewmodel.g.dart';
 
 @Riverpod(keepAlive: true)
 class Categories extends _$Categories {
-  late final CategoryRepository _repository;
+  // ✅ late final 제거하고 getter로 변경
+  CategoryRepository get _repository => ref.watch(categoryRepositoryProvider);
 
   @override
   Future<List<CategoryModel>> build() async {
-    _repository = ref.watch(categoryRepositoryProvider);
+    // ✅ 초기화 코드 제거하고 직접 호출
     return _buildCategoryTree();
   }
 

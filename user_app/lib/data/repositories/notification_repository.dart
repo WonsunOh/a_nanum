@@ -15,21 +15,31 @@ class NotificationRepository {
   final SupabaseClient _client = Supabase.instance.client;
 
   /// 사용자의 모든 알림을 최신 순으로 가져옵니다
-  Future<List<NotificationModel>> fetchNotifications() async {
-    try {
-      final response = await _client
-          .from('notifications')
-          .select()
-          .eq('user_id', _client.auth.currentUser!.id)
-          .order('created_at', ascending: false);
+  // user_app/lib/data/repositories/notification_repository.dart
+Future<List<NotificationModel>> fetchNotifications() async {
+  try {
+    print('🔍 알림 조회 시작 - 사용자 ID: ${_client.auth.currentUser?.id}');
+    
+    final response = await _client
+        .from('notifications')
+        .select()
+        .eq('user_id', _client.auth.currentUser!.id)
+        .order('created_at', ascending: false);
 
-      return (response as List)
-          .map((json) => NotificationModel.fromJson(json))
-          .toList();
-    } catch (e) {
-      throw Exception('알림 목록을 불러오는데 실패했습니다: $e');
-    }
+    print('📦 알림 조회 결과: $response');
+    print('📊 알림 개수: ${(response as List).length}');
+
+    final notifications = (response as List)
+        .map((json) => NotificationModel.fromJson(json))
+        .toList();
+        
+    print('✅ 알림 파싱 완료: ${notifications.length}개');
+    return notifications;
+  } catch (e) {
+    print('❌ 알림 조회 에러: $e');
+    throw Exception('알림 목록을 불러오는데 실패했습니다: $e');
   }
+}
 
   /// 읽지 않은 알림만 가져옵니다
   Future<List<NotificationModel>> fetchUnreadNotifications() async {

@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import '../../../notifications/view/notification_list_screen.dart';
 import '../../auth/provider/auth_provider.dart';
 import '../../auth/viewmodel/auth_viewmodel.dart';
 import '../../../../providers/user_provider.dart';
@@ -86,7 +87,18 @@ class _MyPageScreenState extends ConsumerState<MyPageScreen> {
     final userProfileAsync = ref.watch(userProvider);
 
     return Scaffold(
-      appBar: AppBar(title: const Text('마이페이지'), centerTitle: true),
+      appBar: AppBar(title: const Text('마이페이지'), centerTitle: true, actions: [
+        ElevatedButton(
+  onPressed: () {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (context) => const NotificationListScreen(),
+      ),
+    );
+  },
+  child: const Text('알림 테스트'),
+),
+      ],),
       body: userProfileAsync.when(
         data: (profile) => _buildContent(profile),
         loading: () => const Center(child: CircularProgressIndicator()),

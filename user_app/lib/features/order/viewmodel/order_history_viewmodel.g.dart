@@ -7,7 +7,7 @@ part of 'order_history_viewmodel.dart';
 // **************************************************************************
 
 String _$orderHistoryViewModelHash() =>
-    r'3277df484e738b8a306d0b5e923525ebbdd18070';
+    r'ecef8aef2193a8b936df2c132281a545a4803088';
 
 /// See also [OrderHistoryViewModel].
 @ProviderFor(OrderHistoryViewModel)

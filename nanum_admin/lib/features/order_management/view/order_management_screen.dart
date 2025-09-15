@@ -171,31 +171,19 @@ class _OrderManagementScreenState extends ConsumerState<OrderManagementScreen> {
     future: ref.read(orderRepositoryProvider).fetchOrdersWithCancellations(),
     builder: (context, orderSnapshot) {
       final orderData = orderSnapshot.data ?? {};
-      
-      // 주문번호별로 그룹화
+
       Map<int, List<Order>> groupedOrders = {};
       Map<int, Map<String, dynamic>> orderInfo = {};
       
       for (final order in orders) {
-        int orderId;
-        if (order.participantId <= 8) {
-          orderId = 38;
-        } else if (order.participantId <= 11) {
-          orderId = 41;
-        } else if (order.participantId <= 14) {
-          orderId = 42;
-        } else {
-          orderId = 43;
-        }
+        final actualOrderId = order.orderId ?? order.participantId;
         
-        if (!groupedOrders.containsKey(orderId)) {
-          groupedOrders[orderId] = [];
+        if (!groupedOrders.containsKey(actualOrderId)) {
+          groupedOrders[actualOrderId] = [];
           
-          final orderInfo_data = orderData[orderId];
-          final actualOrderStatus = orderInfo_data?['order_status'] ?? 'confirmed';
-          final cancellation = orderInfo_data?['cancellation'] as OrderCancellation?;
+          final data = orderData[actualOrderId];
+          final cancellation = data?['cancellation'] as OrderCancellation?;
           
-          // ⭐️ 개선된 상태 결정 로직
           String displayStatus;
           if (cancellation != null) {
             switch (cancellation.status) {
@@ -206,40 +194,187 @@ class _OrderManagementScreenState extends ConsumerState<OrderManagementScreen> {
                 displayStatus = 'cancelled';
                 break;
               case 'rejected':
-                displayStatus = 'cancel_rejected'; // ⭐️ 새로운 상태
+                displayStatus = 'cancel_rejected';
                 break;
               default:
-                displayStatus = actualOrderStatus;
+                displayStatus = data?['order_status'] ?? 'confirmed';
             }
           } else {
-            displayStatus = actualOrderStatus;
+            displayStatus = data?['order_status'] ?? 'confirmed';
           }
           
-          orderInfo[orderId] = {
-            'recipient_name': order.userName,
-            'recipient_phone': order.userPhone,
-            'shipping_address': order.deliveryAddress,
+          orderInfo[actualOrderId] = {
+            'recipient_name': data?['recipient_name'] ?? order.userName,
+            'recipient_phone': data?['recipient_phone'] ?? order.userPhone,
+            'shipping_address': data?['shipping_address'] ?? order.deliveryAddress,
             'status': displayStatus,
-            'total_amount': orderId == 38 ? 51600 : 60700,
+            'total_amount': data?['total_amount'] ?? 0,
             'cancellation': cancellation,
           };
         }
-        groupedOrders[orderId]!.add(order);
+        groupedOrders[actualOrderId]!.add(order);
       }
 
-      return ListView.builder(
-        itemCount: groupedOrders.length,
-        itemBuilder: (context, index) {
-          final orderId = groupedOrders.keys.elementAt(index);
-          final orderItems = groupedOrders[orderId]!;
-          final info = orderInfo[orderId]!;
+      return Column(
+        children: [
+          // 테이블 헤더
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: Colors.grey[100],
+              border: Border.all(color: Colors.grey[300]!),
+            ),
+            child: Row(
+              children: [
+                Expanded(flex: 2, child: Text('주문번호', style: TextStyle(fontWeight: FontWeight.bold))),
+                Expanded(flex: 2, child: Text('고객정보', style: TextStyle(fontWeight: FontWeight.bold))),
+                Expanded(flex: 2, child: Text('상태', style: TextStyle(fontWeight: FontWeight.bold))),
+                Expanded(flex: 1, child: Text('상품수', style: TextStyle(fontWeight: FontWeight.bold))),
+                Expanded(flex: 2, child: Text('총액', style: TextStyle(fontWeight: FontWeight.bold))),
+                Expanded(flex: 2, child: Text('액션', style: TextStyle(fontWeight: FontWeight.bold))),
+              ],
+            ),
+          ),
           
-          return _buildOrderCard(orderId, orderItems, info);
-        },
+          // 테이블 데이터
+          Expanded(
+            child: ListView.builder(
+              itemCount: groupedOrders.length,
+              itemBuilder: (context, index) {
+                final orderId = groupedOrders.keys.elementAt(index);
+                final orderItems = groupedOrders[orderId]!;
+                final info = orderInfo[orderId]!;
+                
+                return _buildTableRow(orderId, orderItems, info);
+              },
+            ),
+          ),
+        ],
       );
     },
   );
 }
+
+Widget _buildTableRow(int orderId, List<Order> items, Map<String, dynamic> info) {
+  final status = info['status'] as String? ?? 'confirmed';
+  final totalAmount = (info['total_amount'] as num?)?.toInt() ?? 0;
+  final cancellation = info['cancellation'] as OrderCancellation?;
+
+  return Container(
+    padding: const EdgeInsets.all(16),
+    decoration: BoxDecoration(
+      border: Border(
+        bottom: BorderSide(color: Colors.grey[300]!),
+        left: BorderSide(color: Colors.grey[300]!),
+        right: BorderSide(color: Colors.grey[300]!),
+      ),
+      color: status == 'cancel_requested' ? Colors.orange[50] : Colors.white,
+    ),
+    child: Row(
+      children: [
+        // 주문번호 + 상품보기 버튼
+        Expanded(
+          flex: 2,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text('ORD-$orderId', style: TextStyle(fontWeight: FontWeight.bold)),
+              TextButton(
+                onPressed: () => _showOrderDetails(orderId, items, info),
+                child: Text('상품보기 (${items.length}개)', style: TextStyle(fontSize: 12)),
+              ),
+            ],
+          ),
+        ),
+        
+        // 고객정보
+        Expanded(
+          flex: 2,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text('${info['recipient_name'] ?? '정보없음'}'),
+              Text('${info['recipient_phone'] ?? '연락처없음'}', 
+                   style: TextStyle(fontSize: 12, color: Colors.grey[600])),
+            ],
+          ),
+        ),
+        
+        // 상태 + 취소요청 정보
+        Expanded(
+          flex: 2,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _buildStatusChip(status),
+              if (cancellation != null) ...[
+                SizedBox(height: 4),
+                Text('${cancellation.cancelReason}', 
+                     style: TextStyle(fontSize: 11, color: Colors.orange[700])),
+              ],
+            ],
+          ),
+        ),
+        
+        // 상품 개수
+        Expanded(
+          flex: 1,
+          child: Text('${items.length}개'),
+        ),
+        
+        // 총액
+        Expanded(
+          flex: 2,
+          child: Text('${totalAmount.toString()}원', style: TextStyle(fontWeight: FontWeight.bold)),
+        ),
+        
+        // 액션 버튼
+        Expanded(
+          flex: 2,
+          child: _buildActionButtons(status, cancellation),
+        ),
+      ],
+    ),
+  );
+}
+
+void _showOrderDetails(int orderId, List<Order> items, Map<String, dynamic> info) {
+  showDialog(
+    context: context,
+    builder: (context) => AlertDialog(
+      title: Text('주문 상세: ORD-$orderId'),
+      content: SizedBox(
+        width: 500,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('배송지: ${info['shipping_address'] ?? '주소없음'}'),
+            SizedBox(height: 16),
+            Text('주문 상품:', style: TextStyle(fontWeight: FontWeight.bold)),
+            SizedBox(height: 8),
+            ...items.map((item) => Padding(
+              padding: EdgeInsets.symmetric(vertical: 4),
+              child: Row(
+                children: [
+                  Expanded(child: Text(item.productName)),
+                  Text('수량: ${item.quantity}'),
+                ],
+              ),
+            )),
+          ],
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: Text('닫기'),
+        ),
+      ],
+    ),
+  );
+}
+
 
   Color _getStatusColor(String status) {
   switch (status) {
@@ -286,6 +421,16 @@ String _getStatusLabel(String status) {
     final status = info['status'] as String;
     final totalAmount = info['total_amount'] as int;
     final cancellation = info['cancellation'] as OrderCancellation?;
+
+    // 디버깅 추가
+  debugPrint('🔍 Building card for order $orderId:');
+  debugPrint('  - status: $status');
+  debugPrint('  - cancellation: ${cancellation != null ? 'exists' : 'null'}');
+  if (cancellation != null) {
+    debugPrint('  - cancellation.status: ${cancellation.status}');
+    debugPrint('  - cancellation.cancelReason: ${cancellation.cancelReason}');
+  }
+  
     
     return Card(
       margin: const EdgeInsets.only(bottom: 16),
@@ -401,6 +546,7 @@ String _getStatusLabel(String status) {
       ],
     ),
   ),
+
 ],
                 
                 const SizedBox(height: 12),

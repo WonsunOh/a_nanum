@@ -43,58 +43,61 @@ class OrderRepository {
 
   Future<List<Order>> fetchShopOrders() async {
   try {
-    debugPrint('🔍 Starting fetchShopOrders...');
-    
+    debugPrint('🔍 Fetching shop orders...');
+
     final response = await _client
-        .from('order_items')
+        .from('orders')
         .select('''
           id,
-          quantity,
-          order_id,
-          product_id,
-          price_per_item,
           status,
-          orders!inner (
+          recipient_name,
+          recipient_phone,
+          shipping_address,
+          total_amount,
+          order_items (
             id,
-            recipient_name,
-            recipient_phone,
-            status,
-            shipping_address,
-            total_amount,
-            shipping_fee
-          ),
-          products (
-            id,
-            name
+            product_id,
+            quantity,
+            products (name)
           )
-        ''');
-        // ⭐️ 필터링 조건 제거하여 모든 데이터 조회
-    
-    debugPrint('🔗 Shop orders query result: $response');
-    debugPrint('🔗 Result count: ${response.length}');
-    
-    if (response.isEmpty) {
-      debugPrint('❌ No order items found');
-      return [];
+        ''')
+        .order('created_at', ascending: false);
+
+    debugPrint('📦 Raw shop orders response: $response');
+
+    List<Order> orders = [];
+
+    for (final orderData in response) {
+      final orderId = orderData['id']; // 실제 주문 ID (44, 45, 46, 47)
+      final orderItems = orderData['order_items'] as List? ?? [];
+
+      if (orderItems.isEmpty) {
+        orders.add(Order(
+          participantId: orderId, // ⭐️ 주문 ID를 participantId로 사용
+          orderId: orderId, // ⭐️ orderId도 동일하게 설정
+          productName: '상품 정보 없음',
+          quantity: 1,
+          userName: orderData['recipient_name'],
+          userPhone: orderData['recipient_phone'],
+          deliveryAddress: orderData['shipping_address'] ?? '',
+        ));
+      } else {
+        for (final item in orderItems) {
+          orders.add(Order(
+            participantId: item['id'], // order_item의 id (18, 19, 20, 21)
+            orderId: orderId, // ⭐️ 실제 주문 ID (44, 45, 46, 47)
+            productName: item['products']?['name'] ?? 'Product ${item['product_id']}',
+            quantity: item['quantity'] ?? 1,
+            userName: orderData['recipient_name'],
+            userPhone: orderData['recipient_phone'],
+            deliveryAddress: orderData['shipping_address'] ?? '',
+          ));
+        }
+      }
     }
 
-    // ⭐️ 실제 DB 구조에 맞게 데이터 매핑
-    final orders = (response as List).map((data) {
-      debugPrint('🔄 Processing order item: $data');
-      
-      return Order(
-        participantId: data['id'], // order_items.id 사용
-        quantity: data['quantity'] ?? 0,
-        productName: data['products']?['name'] ?? 'N/A',
-        userName: data['orders']?['recipient_name'] ?? '정보없음',
-        deliveryAddress: data['orders']?['shipping_address'] ?? '주소정보없음', 
-        userPhone: data['orders']?['recipient_phone'] ?? '연락처없음',
-      );
-    }).toList();
-    
     debugPrint('✅ Successfully processed ${orders.length} shop orders');
     return orders;
-
   } catch (e, stackTrace) {
     debugPrint('💥 Error in fetchShopOrders: $e');
     debugPrint('📚 Stack trace: $stackTrace');
@@ -327,42 +330,86 @@ Future<void> _sendCancellationRejectedNotification(
 }
 
 // fetchOrdersWithCancellations 함수 수정
-Future<Map<int, Map<String, dynamic>>> fetchOrdersWithCancellations() async {
+  Future<Map<int, Map<String, dynamic>>> fetchOrdersWithCancellations() async {
   try {
-    // 1. 주문 상태 조회
+    debugPrint('🔍 Fetching orders with cancellations...');
+
+    // 1. 먼저 orders만 조회
     final ordersResponse = await _client
         .from('orders')
-        .select('id, status')
-        .inFilter('id', [38, 41, 42, 43]);
+        .select('id, status, total_amount, recipient_name, recipient_phone, shipping_address')
+        .order('created_at', ascending: false);
     
-    // 2. 모든 취소 요청 조회 (pending, approved, rejected 포함)
-    final cancellations = await fetchAllCancellations();
+    debugPrint('📦 Orders response: ${ordersResponse.length} orders');
+
+    // 2. order_cancellations 따로 조회
+    final cancellationsResponse = await _client
+        .from('order_cancellations')
+        .select('*')
+        .order('requested_at', ascending: false);
     
+    debugPrint('📦 Cancellations response: ${cancellationsResponse.length} cancellations');
+
     Map<int, Map<String, dynamic>> result = {};
-    
-    // 주문 상태 매핑
+
+    // 3. orders 먼저 처리
     for (final order in ordersResponse) {
       final orderId = order['id'] as int;
       result[orderId] = {
         'order_status': order['status'],
+        'total_amount': order['total_amount'],
+        'recipient_name': order['recipient_name'],
+        'recipient_phone': order['recipient_phone'],
+        'shipping_address': order['shipping_address'],
         'cancellation': null,
       };
     }
-    
-    // 취소 요청 정보 추가 (가장 최근 것만)
-    for (final cancellation in cancellations) {
-      if (result.containsKey(cancellation.orderId)) {
-        // 이미 다른 취소 요청이 있다면 더 최근 것으로 교체
-        final existing = result[cancellation.orderId]!['cancellation'] as OrderCancellation?;
-        if (existing == null || cancellation.createdAt.isAfter(existing.createdAt)) {
-          result[cancellation.orderId]!['cancellation'] = cancellation;
+
+    // 4. cancellations 매핑
+    for (final cancellationData in cancellationsResponse) {
+      try {
+        final orderId = cancellationData['order_id'] as int;
+        
+        debugPrint('Processing cancellation for order $orderId: ${cancellationData['status']}');
+        
+        if (result.containsKey(orderId)) {
+          final cancellation = OrderCancellation(
+            id: cancellationData['id'] as int,
+            orderId: orderId,
+            userId: cancellationData['user_id'] as String,
+            cancelReason: cancellationData['cancel_reason'] as String? ?? '사유없음',
+            cancelDetail: cancellationData['cancel_detail'] as String?,
+            status: cancellationData['status'] as String? ?? 'pending',
+            adminNote: cancellationData['admin_note'] as String?,
+            processedAt: cancellationData['processed_at'] != null 
+                ? DateTime.parse(cancellationData['processed_at'] as String)
+                : null,
+            requestedAt: cancellationData['requested_at'] != null 
+                ? DateTime.parse(cancellationData['requested_at'] as String)
+                : DateTime.now(),
+            createdAt: cancellationData['created_at'] != null 
+                ? DateTime.parse(cancellationData['created_at'] as String)
+                : DateTime.now(),
+          );
+          
+          result[orderId]!['cancellation'] = cancellation;
+          debugPrint('✅ Added cancellation for order $orderId');
         }
+      } catch (e) {
+        debugPrint('❌ Error processing cancellation: $e');
+        debugPrint('Cancellation data: $cancellationData');
       }
     }
-    
+
+    debugPrint('✅ Final result: ${result.keys.toList()}');
+    result.forEach((orderId, data) {
+      final cancellation = data['cancellation'] as OrderCancellation?;
+      debugPrint('Order $orderId: status=${data['order_status']}, has_cancellation=${cancellation != null}, cancel_status=${cancellation?.status}');
+    });
+
     return result;
   } catch (e) {
-    debugPrint('Error fetching orders with cancellations: $e');
+    debugPrint('❌ Error in fetchOrdersWithCancellations: $e');
     return {};
   }
 }

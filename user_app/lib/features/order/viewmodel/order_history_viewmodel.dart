@@ -8,11 +8,12 @@ part 'order_history_viewmodel.g.dart';
 
 @riverpod
 class OrderHistoryViewModel extends _$OrderHistoryViewModel {
-  late final OrderRepository _repository;
+  // ✅ late final 제거하고 getter로 변경
+  OrderRepository get _repository => ref.watch(orderRepositoryProvider);
 
   @override
   Future<List<OrderHistoryModel>> build() async {
-    _repository = ref.watch(orderRepositoryProvider);
+    // ✅ 초기화 코드 제거하고 직접 호출
     return await _fetchOrderHistory();
   }
 

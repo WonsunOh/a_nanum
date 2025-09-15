@@ -1,4 +1,4 @@
-// user_app/lib/features/user/auth/viewmodel/auth_viewmodel.dart (전체 교체)
+// user_app/lib/features/user/auth/viewmodel/auth_viewmodel.dart
 
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 import '../../../../core/errors/app_exception.dart';
@@ -10,14 +10,15 @@ part 'auth_viewmodel.g.dart';
 
 @riverpod
 class AuthViewModel extends _$AuthViewModel {
-  late AuthRepository _authRepository;
+  // ✅ late 제거하고 getter로 변경
+  AuthRepository get _authRepository => ref.watch(authRepositoryProvider);
 
   @override
   Future<void> build() async {
-    _authRepository = ref.watch(authRepositoryProvider);
+    // ✅ 초기화 코드 제거 - 빈 메서드
   }
 
-  // ✅ 1단계: 기존 기능 + 에러 처리 + 로깅
+  // ✅ 이메일/비밀번호 로그인
   Future<void> signInWithPassword(String email, String password) async {
     Logger.debug('이메일 로그인 시도: $email', 'AuthViewModel');
     
@@ -33,7 +34,7 @@ class AuthViewModel extends _$AuthViewModel {
     });
   }
 
-  // ⭐️ 3. signUp 메서드 추가
+  // ✅ 회원가입 (level 파라미터 포함)
   Future<void> signUp({
     required String email,
     required String password,
@@ -41,39 +42,39 @@ class AuthViewModel extends _$AuthViewModel {
     required String fullName,
     String? phoneNumber,
     String? address,
-    int level = 1,
+    int level = 1, // ✅ level 파라미터 추가
   }) async {
     Logger.debug('회원가입 시도: $email, 레벨: $level', 'AuthViewModel');
     
     state = const AsyncValue.loading();
     state = await AsyncValue.guard(() async {
       try {
-      await _authRepository.signUp(
-        email: email,
-        password: password,
-        nickname: nickname,
-        fullName: fullName,
-        phoneNumber: phoneNumber,
-        address: address,
-        level: level,
-      );
-      Logger.info('회원가입 성공: $email, 레벨: $level', 'AuthViewModel');
-    } catch (error, stackTrace) {
-      Logger.error('회원가입 실패', error, stackTrace, 'AuthViewModel');
-      
-      
-      // ⭐️ AuthenticationException은 그대로 전달
-      if (error is AuthenticationException) {
-        throw error;
+        await _authRepository.signUp(
+          email: email,
+          password: password,
+          nickname: nickname,
+          fullName: fullName,
+          phoneNumber: phoneNumber,
+          address: address,
+          level: level, // ✅ level 파라미터 전달
+        );
+        Logger.info('회원가입 성공: $email, 레벨: $level', 'AuthViewModel');
+      } catch (error, stackTrace) {
+        Logger.error('회원가입 실패', error, stackTrace, 'AuthViewModel');
+        
+        // ⭐️ AuthenticationException은 그대로 전달
+        if (error is AuthenticationException) {
+          throw error;
+        }
+        
+        // 다른 에러만 ErrorHandler 사용
+        throw ErrorHandler.handleSupabaseError(error);
       }
-      
-      // 다른 에러만 ErrorHandler 사용
-      throw ErrorHandler.handleSupabaseError(error);
-    }
-  });
-}
+    });
+  }
 
- Future<void> signInWithGoogle() async {
+  // ✅ 구글 로그인 메서드 추가
+  Future<void> signInWithGoogle() async {
     Logger.debug('구글 로그인 시도', 'AuthViewModel');
     
     state = const AsyncValue.loading();
@@ -88,6 +89,7 @@ class AuthViewModel extends _$AuthViewModel {
     });
   }
 
+  // ✅ 카카오 로그인 메서드 추가
   Future<void> signInWithKakao() async {
     Logger.debug('카카오 로그인 시도', 'AuthViewModel');
     
@@ -103,8 +105,7 @@ class AuthViewModel extends _$AuthViewModel {
     });
   }
 
-
-
+  // ✅ 로그아웃
   Future<void> signOut() async {
     Logger.debug('로그아웃 시도', 'AuthViewModel');
     
