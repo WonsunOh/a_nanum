@@ -265,11 +265,7 @@ final routerProvider = Provider<GoRouter>((ref) {
         return null;
       }
 
-      print('  - 현재 경로: ${state.matchedLocation}');
-      print('  - 인증 상태: $isAuthenticated');
-      print('  - 사용자 ID: ${session?.user?.id}');
-      print('  - 리디렉션 없음');
-      return null;
+           return null;
     },
   );
 });

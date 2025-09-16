@@ -85,79 +85,112 @@ class OrderRepository {
 }
 
 // 현재 사용자의 주문내역을 조회합니다.
-  Future<List<OrderHistoryModel>> fetchOrderHistory() async {
-    final userId = _client.auth.currentUser?.id;
-    if (userId == null) {
-      throw Exception('로그인이 필요합니다.');
-    }
+Future<List<OrderHistoryModel>> fetchOrderHistory() async {
+  final userId = _client.auth.currentUser?.id;
+  if (userId == null) {
+    throw Exception('로그인이 필요합니다.');
+  }
 
-    try {
-      final response = await _client
-          .from('orders')
-          .select('''
-            id,
-            created_at,
-            total_amount,
-            shipping_fee,
-            status,
-            recipient_name,
-            recipient_phone,
-            shipping_address,
-            tracking_number,
-            order_items(
+  try {
+    print('🔍 주문내역 조회 시작: 사용자 $userId');
+    
+    final response = await _client
+        .from('orders')
+        .select('''
+          id,
+          created_at,
+          total_amount,
+          shipping_fee,
+          status,
+          recipient_name,
+          recipient_phone,
+          shipping_address,
+          tracking_number,
+          order_items(
             id, 
-              product_id,
-              quantity,
-              price_per_item,
-              products(
-                name,
-                image_url
-              )
+            product_id,
+            quantity,
+            price_per_item,
+            status,
+            products(
+              name,
+              image_url
+            ),
+            order_item_cancellations(
+              id,
+              cancel_reason,
+              cancel_detail,
+              cancel_quantity,
+              refund_amount,
+              status,
+              requested_at,
+              created_at
             )
-          ''')
-          .eq('user_id', userId)
-          .order('created_at', ascending: false);
+          )
+        ''')
+        .eq('user_id', userId)
+        .order('created_at', ascending: false);
 
-      return response
-          .map<OrderHistoryModel>((order) => OrderHistoryModel.fromJson(order))
-          .toList();
-    } catch (e) {
-      print('❌ 주문내역 조회 에러: $e');
-      rethrow;
-    }
-  }
-
-  /// 특정 주문을 취소합니다.
-  Future<bool> cancelOrder(int orderId) async {
-    final userId = _client.auth.currentUser?.id;
-    if (userId == null) {
-      throw Exception('로그인이 필요합니다.');
-    }
-
-    try {
-      // 주문 상태가 'pending'인 경우에만 취소 가능
-      final orderResponse = await _client
-          .from('orders')
-          .select('status')
-          .eq('id', orderId)
-          .eq('user_id', userId)
-          .single();
-
-      if (orderResponse['status'] != 'pending') {
-        throw Exception('취소할 수 없는 주문입니다.');
+    print('✅ 주문내역 응답: ${response.length}개');
+    
+    // 각 주문의 부분취소 정보도 로그
+    for (final order in response) {
+      final orderItems = order['order_items'] as List;
+      for (final item in orderItems) {
+        final partialCancellations = item['order_item_cancellations'] as List?;
+        if (partialCancellations?.isNotEmpty == true) {
+          print('📦 주문아이템 ${item['id']}: ${partialCancellations!.length}개 부분취소');
+          for (final pc in partialCancellations) {
+            print('   - 부분취소 ${pc['id']}: ${pc['status']} (수량: ${pc['cancel_quantity']})');
+          }
+        }
       }
-
-      await _client
-          .from('orders')
-          .update({'status': 'cancelled'})
-          .eq('id', orderId)
-          .eq('user_id', userId);
-
-      return true;
-    } catch (e) {
-      print('❌ 주문 취소 에러: $e');
-      rethrow;
     }
+
+    return response
+        .map<OrderHistoryModel>((order) => OrderHistoryModel.fromJson(order))
+        .toList();
+  } catch (e) {
+    print('❌ 주문내역 조회 에러: $e');
+    rethrow;
   }
+}
+
+
+// 특정 주문을 취소합니다. 메서드 추가
+Future<bool> cancelOrder(int orderId) async {
+  final userId = _client.auth.currentUser?.id;
+  if (userId == null) {
+    throw Exception('로그인이 필요합니다.');
+  }
+
+  try {
+    // 주문 상태 확인
+    final orderResponse = await _client
+        .from('orders')
+        .select('status')
+        .eq('id', orderId)
+        .eq('user_id', userId)
+        .single();
+
+    final currentStatus = orderResponse['status'];
+    if (!['pending', 'confirmed'].contains(currentStatus)) {
+      throw Exception('취소할 수 없는 주문 상태입니다: $currentStatus');
+    }
+
+    // 주문 상태를 cancelled로 변경
+    await _client
+        .from('orders')
+        .update({'status': 'cancelled'})
+        .eq('id', orderId)
+        .eq('user_id', userId);
+
+    print('✅ 주문 $orderId 취소 완료');
+    return true;
+  } catch (e) {
+    print('❌ 주문 취소 에러: $e');
+    rethrow;
+  }
+}
 }
   

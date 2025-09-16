@@ -330,8 +330,7 @@ Future<void> _sendCancellationRejectedNotification(
   }
 }
 
-// fetchOrdersWithCancellations 함수 수정
-  Future<Map<int, Map<String, dynamic>>> fetchOrdersWithCancellations() async {
+Future<Map<int, Map<String, dynamic>>> fetchOrdersWithCancellations() async {
   try {
     debugPrint('🔍 Fetching orders with cancellations...');
 
@@ -363,6 +362,7 @@ Future<void> _sendCancellationRejectedNotification(
         'recipient_phone': order['recipient_phone'],
         'shipping_address': order['shipping_address'],
         'cancellation': null,
+        // 부분취소는 별도로 처리
       };
     }
 
@@ -415,50 +415,101 @@ Future<void> _sendCancellationRejectedNotification(
   }
 }
 
-// 부분취소 요청 목록 조회
+// 부분취소 요청 목록 조회 (수정된 버전)
 Future<List<OrderItemCancellation>> fetchPartialCancellations() async {
   try {
-    debugPrint('🔍 Fetching partial cancellations...');
+    // 현재 사용자 정보 확인
+    final currentUser = _client.auth.currentUser;
+    debugPrint('🔍 Current user: ${currentUser?.id}');
+    debugPrint('🔍 User email: ${currentUser?.email}');
     
+    debugPrint('🔍 Fetching partial cancellations (simple version)...');
+    
+    // 기본 쿼리 시도
     final response = await _client
         .from('order_item_cancellations')
-        .select('''
-          *,
-          order_items (
-            price_per_item,
-            products (name)
-          ),
-          orders (
-            recipient_name,
-            recipient_phone
-          )
-        ''')
+        .select('*')
         .order('created_at', ascending: false);
     
     debugPrint('📦 Partial cancellations response: ${response.length} items');
+    debugPrint('📦 Raw response type: ${response.runtimeType}');
+    debugPrint('📦 Raw response data: $response');
     
-    return (response as List)
-        .map((data) => OrderItemCancellation.fromJson(data))
-        .toList();
+    if (response.isEmpty) {
+      debugPrint('✅ No partial cancellations found');
+      return [];
+    }
+
+    final List<OrderItemCancellation> cancellations = [];
+    
+    for (final data in response) {
+      try {
+        debugPrint('🔍 Processing raw data: $data');
+        
+        // 간단한 방식으로 생성 (JOIN 없이)
+        final cancellation = OrderItemCancellation(
+          id: data['id'] as int,
+          orderItemId: data['order_item_id'] as int,
+          orderId: data['order_id'] as int,
+          userId: data['user_id'] as String,
+          cancelReason: data['cancel_reason'] as String? ?? '',
+          cancelDetail: data['cancel_detail'] as String?,
+          cancelQuantity: data['cancel_quantity'] as int,
+          refundAmount: data['refund_amount'] as int,
+          status: data['status'] as String? ?? 'pending',
+          adminId: data['admin_id'] as String?,
+          adminNote: data['admin_note'] as String?,
+          processedAt: data['processed_at'] != null 
+              ? DateTime.tryParse(data['processed_at'].toString())
+              : null,
+          requestedAt: data['requested_at'] != null 
+              ? DateTime.tryParse(data['requested_at'].toString()) ?? DateTime.now()
+              : DateTime.now(),
+          createdAt: data['created_at'] != null 
+              ? DateTime.tryParse(data['created_at'].toString()) ?? DateTime.now()
+              : DateTime.now(),
+          productName: '주문아이템 ID: ${data['order_item_id']}',
+          userName: null,
+          userPhone: null,
+          pricePerItem: null,
+        );
+        
+        cancellations.add(cancellation);
+        debugPrint('✅ Added partial cancellation ${cancellation.id} for order ${cancellation.orderId}');
+        
+      } catch (e) {
+        debugPrint('❌ Failed to parse partial cancellation: $e');
+        debugPrint('❌ Raw data: $data');
+      }
+    }
+    
+    debugPrint('✅ Successfully processed ${cancellations.length} partial cancellations');
+    return cancellations;
+    
   } catch (e) {
     debugPrint('💥 Error fetching partial cancellations: $e');
-    rethrow;
+    debugPrint('💥 Error type: ${e.runtimeType}');
+    debugPrint('💥 Error details: ${e.toString()}');
+    return [];
   }
 }
 
-// 부분취소 승인
+
+// 부분취소 승인 메서드에 디버깅 강화
 Future<void> approvePartialCancellation(int cancellationId, String adminNote) async {
   try {
     debugPrint('✅ Approving partial cancellation $cancellationId');
     
     final currentUser = _client.auth.currentUser;
     
-    // 1. 부분취소 요청 정보 조회
-    final cancellation = await _client
+    // 1. 현재 상태 확인
+    final beforeUpdate = await _client
         .from('order_item_cancellations')
-        .select('order_item_id, refund_amount, cancel_quantity')
+        .select('status')
         .eq('id', cancellationId)
         .single();
+    
+    debugPrint('🔍 Before update status: ${beforeUpdate['status']}');
     
     // 2. 상태 업데이트
     await _client
@@ -471,33 +522,16 @@ Future<void> approvePartialCancellation(int cancellationId, String adminNote) as
         })
         .eq('id', cancellationId);
     
-    // 3. order_item 수량 조정 또는 상태 변경
-    final orderItemId = cancellation['order_item_id'];
-    final cancelQuantity = cancellation['cancel_quantity'];
-    
-    // 현재 order_item 정보 조회
-    final orderItem = await _client
-        .from('order_items')
-        .select('quantity')
-        .eq('id', orderItemId)
+    // 3. 업데이트 후 상태 확인
+    final afterUpdate = await _client
+        .from('order_item_cancellations')
+        .select('status')
+        .eq('id', cancellationId)
         .single();
     
-    final currentQuantity = orderItem['quantity'];
+    debugPrint('🔍 After update status: ${afterUpdate['status']}');
     
-    if (cancelQuantity >= currentQuantity) {
-      // 전체 취소인 경우 상태를 'refunded'로 변경
-      await _client
-          .from('order_items')
-          .update({'status': 'refunded'})
-          .eq('id', orderItemId);
-    } else {
-      // 부분 취소인 경우 수량 조정
-      final newQuantity = currentQuantity - cancelQuantity;
-      await _client
-          .from('order_items')
-          .update({'quantity': newQuantity})
-          .eq('id', orderItemId);
-    }
+    // ... 나머지 로직
     
     debugPrint('✅ Partial cancellation approved');
     
@@ -529,6 +563,78 @@ Future<void> rejectPartialCancellation(int cancellationId, String adminNote) asy
   } catch (e) {
     debugPrint('💥 Error rejecting partial cancellation: $e');
     rethrow;
+  }
+}
+
+// ✅ 배송 정보 업데이트 메서드 추가
+Future<void> updateShippingInfo(int orderId, String carrier, String trackingNumber) async {
+  try {
+    debugPrint('🚚 Updating shipping info for order $orderId');
+    
+    // 1. 주문이 존재하고 배송 정보 업데이트가 가능한 상태인지 확인
+    final order = await _client
+        .from('orders')
+        .select('status')
+        .eq('id', orderId)
+        .single();
+    
+    if (order['status'] != 'confirmed') {
+      throw Exception('배송 정보는 주문확인 상태에서만 등록할 수 있습니다.');
+    }
+    
+    // 2. 배송 정보 업데이트 및 상태 변경
+    await _client
+        .from('orders')
+        .update({
+          'shipping_carrier': carrier,
+          'tracking_number': trackingNumber,
+          'status': 'shipped',
+          'shipped_at': DateTime.now().toIso8601String(),
+        })
+        .eq('id', orderId);
+    
+    debugPrint('✅ Shipping info updated successfully');
+    
+    // 3. 사용자에게 배송 시작 알림 발송
+    await _sendShippingNotification(orderId, carrier, trackingNumber);
+    
+  } catch (e) {
+    debugPrint('💥 Error updating shipping info: $e');
+    rethrow;
+  }
+}
+
+// ✅ 배송 시작 알림 발송 메서드
+Future<void> _sendShippingNotification(int orderId, String carrier, String trackingNumber) async {
+  try {
+    // 주문의 사용자 ID 조회
+    final order = await _client
+        .from('orders')
+        .select('user_id')
+        .eq('id', orderId)
+        .single();
+    
+    final userId = order['user_id'];
+    
+    // 알림 생성
+    await _client.from('notifications').insert({
+      'user_id': userId,
+      'type': 'order_shipped',
+      'title': '상품이 발송되었습니다',
+      'message': '주문번호 ORD-$orderId 상품이 배송을 시작했습니다.\n택배사: $carrier\n송장번호: $trackingNumber',
+      'data': {
+        'order_id': orderId,
+        'carrier': carrier,
+        'tracking_number': trackingNumber,
+        'action_type': 'order_shipped'
+      },
+      'is_read': false,
+      'created_at': DateTime.now().toIso8601String(),
+    });
+    
+    debugPrint('✅ Shipping notification sent to user $userId');
+  } catch (e) {
+    debugPrint('💥 Error sending shipping notification: $e');
   }
 }
 

@@ -1,4 +1,6 @@
-// nanum_admin/lib/data/models/order_item_cancellation_model.dart (새 파일)
+// nanum_admin/lib/data/models/order_item_cancellation_model.dart
+
+import 'package:flutter/foundation.dart';
 
 class OrderItemCancellation {
   final int id;
@@ -44,27 +46,55 @@ class OrderItemCancellation {
   });
 
   factory OrderItemCancellation.fromJson(Map<String, dynamic> json) {
+  try {
+    // 디버깅 로그 추가
+    debugPrint('🔍 Parsing OrderItemCancellation: ${json['id']} for order ${json['order_id']}');
+    
     return OrderItemCancellation(
-      id: json['id'],
-      orderItemId: json['order_item_id'],
-      orderId: json['order_id'],
-      userId: json['user_id'],
-      cancelReason: json['cancel_reason'],
-      cancelDetail: json['cancel_detail'],
-      cancelQuantity: json['cancel_quantity'],
-      refundAmount: json['refund_amount'],
-      status: json['status'] ?? 'pending',
-      adminId: json['admin_id'],
-      adminNote: json['admin_note'],
+      id: json['id'] as int? ?? 0,
+      orderItemId: json['order_item_id'] as int? ?? 0,
+      orderId: json['order_id'] as int? ?? 0,
+      userId: json['user_id'] as String? ?? '',
+      cancelReason: json['cancel_reason'] as String? ?? '',
+      cancelDetail: json['cancel_detail'] as String?,
+      cancelQuantity: json['cancel_quantity'] as int? ?? 1,
+      refundAmount: json['refund_amount'] as int? ?? 0,
+      status: json['status'] as String? ?? 'pending',
+      adminId: json['admin_id'] as String?,
+      adminNote: json['admin_note'] as String?,
       processedAt: json['processed_at'] != null 
-          ? DateTime.parse(json['processed_at']) 
+          ? DateTime.tryParse(json['processed_at'].toString())
           : null,
-      requestedAt: DateTime.parse(json['requested_at'] ?? json['created_at']),
-      createdAt: DateTime.parse(json['created_at']),
-      productName: json['order_items']?['products']?['name'],
-      userName: json['orders']?['recipient_name'],
-      userPhone: json['orders']?['recipient_phone'],
-      pricePerItem: json['order_items']?['price_per_item'],
+      requestedAt: json['requested_at'] != null 
+          ? DateTime.tryParse(json['requested_at'].toString()) ?? DateTime.now()
+          : (json['created_at'] != null 
+              ? DateTime.tryParse(json['created_at'].toString()) ?? DateTime.now()
+              : DateTime.now()),
+      createdAt: json['created_at'] != null 
+          ? DateTime.tryParse(json['created_at'].toString()) ?? DateTime.now()
+          : DateTime.now(),
+      productName: _getNestedValue(json, ['order_items', 'products', 'name']) as String?,
+      userName: _getNestedValue(json, ['orders', 'recipient_name']) as String?,
+      userPhone: _getNestedValue(json, ['orders', 'recipient_phone']) as String?,
+      pricePerItem: _getNestedValue(json, ['order_items', 'price_per_item']) as int?,
     );
+  } catch (e) {
+    debugPrint('❌ OrderItemCancellation.fromJson error: $e');
+    debugPrint('❌ Json data: $json');
+    rethrow;
+  }
+}
+
+  // ✅ 중첩된 객체에서 안전하게 값을 가져오는 헬퍼 메서드
+  static dynamic _getNestedValue(Map<String, dynamic> json, List<String> keys) {
+    dynamic current = json;
+    for (String key in keys) {
+      if (current is Map<String, dynamic> && current.containsKey(key)) {
+        current = current[key];
+      } else {
+        return null;
+      }
+    }
+    return current;
   }
 }

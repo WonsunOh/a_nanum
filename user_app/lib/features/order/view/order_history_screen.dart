@@ -4,11 +4,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
-import '../../../data/models/order_item_model.dart';
+import '../../../data/models/order_history_model.dart';
 import '../../../data/repositories/order_cancellation_repository.dart';
 import '../../../data/repositories/partial_cancel_repository.dart';
 import '../viewmodel/order_history_viewmodel.dart';
-import '../widgets/partial_cancel_dialog.dart';
 
 class OrderHistoryScreen extends ConsumerWidget {
   const OrderHistoryScreen({super.key});
@@ -16,11 +15,7 @@ class OrderHistoryScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final orderHistoryAsync = ref.watch(orderHistoryViewModelProvider);
-    // 취소 가능한 상태들 정의
-    bool _canCancelOrder(String status) {
-      return ['pending', 'confirmed', 'preparing'].contains(status);
-    }
-
+    
     return Scaffold(
       appBar: AppBar(
         title: const Text('주문내역'),
@@ -85,476 +80,352 @@ class OrderHistoryScreen extends ConsumerWidget {
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
                           Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                order.orderNumber,
-                                style: const TextStyle(
-                                  fontWeight: FontWeight.w600,
-                                  fontSize: 16,
-                                ),
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              order.orderNumber,
+                              style: const TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.bold,
                               ),
-                              const SizedBox(height: 4),
-                              Text(
-                                DateFormat(
-                                  'yyyy.MM.dd HH:mm',
-                                ).format(order.createdAt),
-                                style: TextStyle(
-                                  color: Colors.grey[600],
-                                  fontSize: 13,
-                                ),
+                            ),
+                            Text(
+                              DateFormat('yyyy.MM.dd HH:mm').format(order.createdAt),
+                              style: TextStyle(
+                                color: Colors.grey[600],
+                                fontSize: 13,
                               ),
+                            ),
+                          ],
+                        ),
+                        _buildStatusChip(order.status),
                             ],
                           ),
-                          // 주문 상태 배지
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 12,
-                              vertical: 6,
-                            ),
-                            decoration: BoxDecoration(
-                              color: _getStatusColor(order.status),
-                              borderRadius: BorderRadius.circular(16),
-                            ),
-                            child: Text(
-                              _getStatusText(order.status),
-                              style: const TextStyle(
-                                color: Colors.white,
-                                fontSize: 12,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
+                           const Divider(height: 24),
+
+                    // ✅ 상품 목록을 _buildOrderItem으로 표시
+                    Column(
+                      children: order.items.map((item) => _buildOrderItem(item)).toList(),
+                    ),
+
+                    const SizedBox(height: 12),
+
+                    // 배송 정보
+                    _buildInfoRow('받는분', order.recipientName),
+                    _buildInfoRow('연락처', order.recipientPhone),
+                    _buildInfoRow('배송지', order.shippingAddress),
+                    if (order.trackingNumber != null)
+                      _buildInfoRow('송장번호', order.trackingNumber!),
+
+                    const Divider(height: 24),
+
+                    // 총 금액
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        const Text(
+                          '총 주문금액',
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
                           ),
-                        ],
-                      ),
-
-                      const SizedBox(height: 16),
-
-                      // 주문 상품 목록
-                      ...order.items
-                          .map(
-                            (item) => Container(
-                              margin: const EdgeInsets.only(bottom: 12),
-                              child: Row(
-                                children: [
-                                  ClipRRect(
-                                    borderRadius: BorderRadius.circular(8),
-                                    child: Image.network(
-                                      item.productImageUrl ?? '',
-                                      width: 50,
-                                      height: 50,
-                                      fit: BoxFit.cover,
-                                      errorBuilder:
-                                          (context, error, stackTrace) =>
-                                              Container(
-                                                width: 50,
-                                                height: 50,
-                                                color: Colors.grey[200],
-                                                child: Icon(
-                                                  Icons.image_not_supported,
-                                                  color: Colors.grey[400],
-                                                  size: 20,
-                                                ),
-                                              ),
-                                    ),
-                                  ),
-                                  const SizedBox(width: 12),
-                                  Expanded(
-                                    child: Column(
-                                      crossAxisAlignment:
-                                          CrossAxisAlignment.start,
-                                      children: [
-                                        Text(
-                                          item.productName,
-                                          style: const TextStyle(
-                                            fontWeight: FontWeight.w500,
-                                            fontSize: 14,
-                                          ),
-                                          maxLines: 2,
-                                          overflow: TextOverflow.ellipsis,
-                                        ),
-                                        const SizedBox(height: 4),
-                                        Text(
-                                          '${NumberFormat('#,###').format(item.pricePerItem)}원 × ${item.quantity}개',
-                                          style: TextStyle(
-                                            color: Colors.grey[600],
-                                            fontSize: 12,
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                  Text(
-                                    '${NumberFormat('#,###').format(item.totalPrice)}원',
-                                    style: const TextStyle(
-                                      fontWeight: FontWeight.w600,
-                                      fontSize: 14,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          )
-                          .toList(),
-
-                      const Divider(),
-
-                      // 주문 요약 정보
-                      Container(
-                        padding: const EdgeInsets.all(12),
-                        decoration: BoxDecoration(
-                          color: Colors.grey[50],
-                          borderRadius: BorderRadius.circular(8),
                         ),
-                        child: Column(
-                          children: [
-                            _buildInfoRow(
-                              '총 주문금액',
-                              '${NumberFormat('#,###').format(order.totalAmount)}원',
-                            ),
-                            _buildInfoRow('받는분', order.recipientName),
-                            _buildInfoRow('연락처', order.recipientPhone),
-                            _buildInfoRow('배송지', order.shippingAddress),
-                            if (order.trackingNumber != null)
-                              _buildInfoRow('송장번호', order.trackingNumber!),
-                          ],
+                        Text(
+                          '${NumberFormat('#,###').format(order.totalAmount)}원',
+                          style: const TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.blue,
+                          ),
                         ),
-                      ),
+                      ],
+                    ),
 
-                      // 하단 버튼들
-                      const SizedBox(height: 12),
-                      Row(
-                        children: [
-                          if (_canCancelOrder(order.status)) ...[
-                            Expanded(
-                              child: OutlinedButton(
-                                onPressed: () {
-                                  _showCancelDialog(
-                                    context,
-                                    order.orderId,
-                                    ref,
-                                  );
-                                },
-                                style: OutlinedButton.styleFrom(
-                                  foregroundColor: Colors.red,
-                                  side: const BorderSide(color: Colors.red),
-                                ),
-                                child: Text(_getCancelButtonText(order.status)),
-                              ),
-                            ),
-                            const SizedBox(width: 8),
-                            Expanded(
-                              child: OutlinedButton(
-                                onPressed: () {
-                                  _showPartialCancelDialog(context, order, ref);
-                                },
-                                style: OutlinedButton.styleFrom(
-                                  foregroundColor: Colors.orange,
-                                  side: const BorderSide(color: Colors.orange),
-                                ),
-                                child: const Text('부분취소'),
-                              ),
-                            ),
-                            const SizedBox(width: 8),
-                          ],
-                          if (order.status == 'cancel_requested') ...[
-                            Container(
-                              padding: const EdgeInsets.all(12),
-                              decoration: BoxDecoration(
-                                color: Colors.orange.shade50,
-                                border: Border.all(color: Colors.orange),
-                                borderRadius: BorderRadius.circular(8),
-                              ),
-                              child: Row(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                children: [
-                                  Icon(
-                                    Icons.pending,
-                                    color: Colors.orange.shade600,
-                                    size: 16,
-                                  ),
-                                  const SizedBox(width: 4),
-                                  const Text(
-                                    '취소 처리 중',
-                                    style: TextStyle(
-                                      fontWeight: FontWeight.w500,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ],
+                    const SizedBox(height: 16),
+
+                    // 버튼들
+                    Row(
+                      children: [
+                        if (_canCancelOrder(order.status)) ...[
                           Expanded(
-                            child: ElevatedButton(
+                            child: OutlinedButton(
                               onPressed: () {
-                                if (order.items.isNotEmpty) {
-                                  context.go(
-                                    '/shop/${order.items.first.productId}',
-                                  );
-                                }
+                                _showCancelDialog(context, order.orderId, ref);
                               },
-                              child: const Text('상품보기'),
+                              style: OutlinedButton.styleFrom(
+                                foregroundColor: Colors.red,
+                                side: const BorderSide(color: Colors.red),
+                              ),
+                              child: Text(_getCancelButtonText(order.status)),
                             ),
-                          ),
-                        ],
-                      ),
-                    ],
-                  ),
-                ),
-              );
-            },
-          );
-        },
-        loading: () => const Center(child: CircularProgressIndicator()),
-        error: (error, stackTrace) {
-          return Center(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(Icons.error_outline, size: 60, color: Colors.red[300]),
-                const SizedBox(height: 16),
-                Text('주문내역을 불러오는 중 오류가 발생했습니다'),
-                const SizedBox(height: 8),
-                Text('$error', style: TextStyle(color: Colors.grey[600])),
-                const SizedBox(height: 16),
-                ElevatedButton(
-                  onPressed: () => ref
-                      .read(orderHistoryViewModelProvider.notifier)
-                      .refresh(),
-                  child: const Text('다시 시도'),
-                ),
-              ],
-            ),
-          );
-        },
-      ),
-    );
-  }
-
-  // ✅ 부분취소 다이얼로그 메서드
-  void _showPartialCancelDialog(
-    BuildContext context,
-    dynamic order,
-    WidgetRef ref,
-  ) {
-    final reasons = ['단순 변심', '더 저렴한 상품 발견', '배송 지연 우려', '상품 정보 오류', '기타'];
-
-    String selectedReason = reasons.first;
-    String detail = '';
-    Map<int, int> selectedItems = {}; // orderItemId -> 취소할 수량
-
-    showDialog(
-      context: context,
-      builder: (BuildContext dialogContext) {
-        return StatefulBuilder(
-          builder: (context, setState) {
-            return AlertDialog(
-              title: const Text('부분취소 요청'),
-              content: SizedBox(
-                width: double.maxFinite,
-                height: 500,
-                child: Column(
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.all(12),
-                      decoration: BoxDecoration(
-                        color: Colors.orange.shade50,
-                        border: Border.all(color: Colors.orange),
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: Row(
-                        children: [
-                          Icon(
-                            Icons.info_outline,
-                            color: Colors.orange.shade700,
                           ),
                           const SizedBox(width: 8),
                           Expanded(
-                            child: Text(
-                              '취소할 상품과 수량을 선택해주세요.',
-                              style: TextStyle(
-                                color: Colors.orange.shade700,
-                                fontSize: 12,
+                            child: OutlinedButton(
+                              onPressed: () {
+                                _showPartialCancelDialog(context, order, ref);
+                              },
+                              style: OutlinedButton.styleFrom(
+                                foregroundColor: Colors.orange,
+                                side: const BorderSide(color: Colors.orange),
                               ),
+                              child: const Text('부분취소'),
                             ),
                           ),
+                          const SizedBox(width: 8),
                         ],
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-
-                    Text(
-                      '선택된 상품: ${selectedItems.length}개',
-                      style: const TextStyle(fontWeight: FontWeight.bold),
-                    ),
-                    const SizedBox(height: 8),
-
-                    Expanded(
-                      child: ListView.builder(
-                        itemCount: order.items.length,
-                        itemBuilder: (context, index) {
-                          final item = order.items[index];
-                          final orderItemId = item.orderItemId;
-                          final isSelected = selectedItems.containsKey(
-                            orderItemId,
-                          );
-
-                          return Card(
-                            key: ValueKey('item_$orderItemId'),
-                            margin: const EdgeInsets.only(bottom: 8),
-                            child: CheckboxListTile(
-                              value: isSelected,
-                              onChanged: (bool? value) {
-                                setState(() {
-                                  if (value == true) {
-                                    selectedItems[orderItemId] = 1;
-                                  } else {
-                                    selectedItems.remove(orderItemId);
-                                  }
-                                });
-                              },
-                              title: Text(item.productName),
-                              subtitle: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    '${NumberFormat('#,###').format(item.pricePerItem)}원 × ${item.quantity}개',
-                                  ),
-                                  if (isSelected) ...[
-                                    const SizedBox(height: 8),
-                                    Row(
-                                      children: [
-                                        const Text('취소 수량: '),
-                                        DropdownButton<int>(
-                                          value:
-                                              selectedItems[orderItemId] ?? 1,
-                                          items:
-                                              List.generate(
-                                                    item.quantity,
-                                                    (i) => i + 1,
-                                                  )
-                                                  .map(
-                                                    (qty) => DropdownMenuItem(
-                                                      value: qty,
-                                                      child: Text('$qty개'),
-                                                    ),
-                                                  )
-                                                  .toList(),
-                                          onChanged: (value) {
-                                            setState(() {
-                                              selectedItems[orderItemId] =
-                                                  value!;
-                                            });
-                                          },
-                                        ),
-                                        const Spacer(),
-                                        Text(
-                                          '취소금액: ${NumberFormat('#,###').format(item.pricePerItem * (selectedItems[orderItemId] ?? 1))}원',
-                                          style: const TextStyle(
-                                            fontWeight: FontWeight.bold,
-                                            fontSize: 12,
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  ],
-                                ],
-                              ),
-                              secondary: ClipRRect(
-                                borderRadius: BorderRadius.circular(4),
-                                child: Image.network(
-                                  item.productImageUrl ?? '',
-                                  width: 50,
-                                  height: 50,
-                                  fit: BoxFit.cover,
-                                  errorBuilder: (_, __, ___) => Container(
-                                    width: 50,
-                                    height: 50,
-                                    color: Colors.grey[200],
-                                    child: const Icon(
-                                      Icons.image_not_supported,
-                                    ),
-                                  ),
-                                ),
-                              ),
-                            ),
-                          );
-                        },
-                      ),
-                    ),
-
-                    const SizedBox(height: 16),
-
-                    DropdownButton<String>(
-                      value: selectedReason,
-                      isExpanded: true,
-                      onChanged: (value) {
-                        setState(() {
-                          selectedReason = value!;
-                        });
-                      },
-                      items: reasons.map((reason) {
-                        return DropdownMenuItem(
-                          value: reason,
-                          child: Text(reason),
-                        );
-                      }).toList(),
-                    ),
-
-                    const SizedBox(height: 8),
-
-                    TextField(
-                      decoration: const InputDecoration(
-                        labelText: '상세 사유 (선택사항)',
-                        border: OutlineInputBorder(),
-                      ),
-                      maxLines: 2,
-                      onChanged: (value) {
-                        detail = value;
-                      },
+                        Expanded(
+                          child: ElevatedButton(
+                            onPressed: () {
+                              if (order.items.isNotEmpty) {
+                                context.go('/shop/${order.items.first.productId}');
+                              }
+                            },
+                            child: const Text('상품보기'),
+                          ),
+                        ),
+                      ],
                     ),
                   ],
                 ),
               ),
-              actions: [
-                TextButton(
-                  onPressed: () => Navigator.of(dialogContext).pop(),
-                  child: const Text('취소'),
-                ),
-                ElevatedButton(
-                  onPressed: selectedItems.isEmpty
-                      ? null
-                      : () async {
-                          try {
-                            await _submitPartialCancellationRequest(
-                              context,
-                              selectedItems,
-                              selectedReason,
-                              detail,
-                              ref,
-                            );
-
-                            if (context.mounted && dialogContext.mounted) {
-                              Navigator.of(dialogContext).pop();
-                            }
-                          } catch (e) {
-                            if (context.mounted && dialogContext.mounted) {
-                              Navigator.of(dialogContext).pop();
-                            }
-                          }
-                        },
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.orange,
-                  ),
-                  child: Text('부분취소 요청 (${selectedItems.length}개)'),
-                ),
-              ],
             );
           },
         );
       },
-    );
-  }
+      loading: () => const Center(child: CircularProgressIndicator()),
+      error: (error, stackTrace) {
+        return Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(Icons.error_outline, size: 60, color: Colors.red[300]),
+              const SizedBox(height: 16),
+              const Text('주문내역을 불러오는 중 오류가 발생했습니다'),
+              const SizedBox(height: 8),
+              Text('$error', style: TextStyle(color: Colors.grey[600])),
+              const SizedBox(height: 16),
+              ElevatedButton(
+                onPressed: () => ref.read(orderHistoryViewModelProvider.notifier).refresh(),
+                child: const Text('다시 시도'),
+              ),
+            ],
+          ),
+        );
+      },
+    ),
+  );
+}
+
+  // ✅ 부분취소 다이얼로그 메서드
+void _showPartialCancelDialog(BuildContext context, OrderHistoryModel order, WidgetRef ref) {
+  final reasons = ['단순 변심', '더 저렴한 상품 발견', '배송 지연 우려', '상품 정보 오류', '기타'];
+  String selectedReason = reasons.first;
+  String detail = '';
+  Map<int, int> selectedItems = {}; // orderItemId -> cancelQuantity
+
+  showDialog(
+    context: context,
+    builder: (BuildContext dialogContext) {
+      return StatefulBuilder(
+        builder: (context, setState) {
+          return AlertDialog(
+            title: const Text('부분취소 요청'),
+            content: SizedBox(
+              width: double.maxFinite,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: Colors.orange.shade50,
+                      border: Border.all(color: Colors.orange),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(Icons.info_outline, color: Colors.orange.shade700),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            '취소할 상품과 수량을 선택해주세요.',
+                            style: TextStyle(
+                              color: Colors.orange.shade700,
+                              fontSize: 12,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  
+                  const SizedBox(height: 16),
+                  
+                  // 상품 목록
+                  const Text('상품 선택:', style: TextStyle(fontWeight: FontWeight.bold)),
+                  const SizedBox(height: 8),
+                  
+                  Container(
+                    constraints: const BoxConstraints(maxHeight: 300),
+                    child: ListView.builder(
+                      shrinkWrap: true,
+                      itemCount: order.items.length,
+                      itemBuilder: (context, index) {
+                        final item = order.items[index];
+                        final isSelected = selectedItems.containsKey(item.orderItemId);
+                        final cancelQuantity = selectedItems[item.orderItemId] ?? 1;
+                        
+                        return Card(
+                          child: Padding(
+                            padding: const EdgeInsets.all(8),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Row(
+                                  children: [
+                                    Checkbox(
+                                      value: isSelected,
+                                      onChanged: (bool? value) {
+                                        setState(() {
+                                          if (value == true) {
+                                            selectedItems[item.orderItemId] = 1;
+                                          } else {
+                                            selectedItems.remove(item.orderItemId);
+                                          }
+                                        });
+                                      },
+                                    ),
+                                    Expanded(
+                                      child: Column(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        children: [
+                                          Text(
+                                            item.productName,
+                                            style: const TextStyle(fontWeight: FontWeight.w500),
+                                          ),
+                                          Text(
+                                            '${NumberFormat('#,###').format(item.pricePerItem)}원 × ${item.quantity}개',
+                                            style: TextStyle(color: Colors.grey[600], fontSize: 12),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                
+                                if (isSelected) ...[
+                                  const SizedBox(height: 8),
+                                  Row(
+                                    children: [
+                                      const Text('취소 수량: '),
+                                      SizedBox(
+                                        width: 100,
+                                        child: DropdownButton<int>(
+                                          value: cancelQuantity,
+                                          isExpanded: true,
+                                          onChanged: (int? newValue) {
+                                            if (newValue != null) {
+                                              setState(() {
+                                                selectedItems[item.orderItemId] = newValue;
+                                              });
+                                            }
+                                          },
+                                          items: List.generate(item.quantity, (i) => i + 1)
+                                              .map((quantity) => DropdownMenuItem(
+                                                    value: quantity,
+                                                    child: Text('${quantity}개'),
+                                                  ))
+                                              .toList(),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ],
+                              ],
+                            ),
+                          ),
+                        );
+                      },
+                    ),
+                  ),
+
+                  const SizedBox(height: 16),
+
+                  // 취소 사유
+                  const Text('취소 사유:', style: TextStyle(fontWeight: FontWeight.bold)),
+                  const SizedBox(height: 8),
+                  DropdownButton<String>(
+                    value: selectedReason,
+                    isExpanded: true,
+                    onChanged: (value) {
+                      setState(() {
+                        selectedReason = value!;
+                      });
+                    },
+                    items: reasons.map((reason) {
+                      return DropdownMenuItem(
+                        value: reason,
+                        child: Text(reason),
+                      );
+                    }).toList(),
+                  ),
+
+                  const SizedBox(height: 8),
+
+                  TextField(
+                    decoration: const InputDecoration(
+                      labelText: '상세 사유 (선택사항)',
+                      border: OutlineInputBorder(),
+                    ),
+                    maxLines: 2,
+                    onChanged: (value) {
+                      detail = value;
+                    },
+                  ),
+                ],
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(dialogContext).pop(),
+                child: const Text('취소'),
+              ),
+              ElevatedButton(
+                onPressed: selectedItems.isEmpty
+                    ? null
+                    : () async {
+                        try {
+                          await _submitPartialCancellationRequest(
+                            context,
+                            selectedItems,
+                            selectedReason,
+                            detail,
+                            ref,
+                          );
+
+                          if (context.mounted && dialogContext.mounted) {
+                            Navigator.of(dialogContext).pop();
+                          }
+                        } catch (e) {
+                          if (context.mounted && dialogContext.mounted) {
+                            Navigator.of(dialogContext).pop();
+                          }
+                        }
+                      },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.orange,
+                ),
+                child: Text('부분취소 요청 (${selectedItems.length}개)'),
+              ),
+            ],
+          );
+        },
+      );
+    },
+  );
+}
 
   // ✅ 부분취소 요청 제출 메서드
   Future<void> _submitPartialCancellationRequest(
@@ -622,6 +493,102 @@ class OrderHistoryScreen extends ConsumerWidget {
     }
   }
 
+
+Widget _buildStatusChip(String status) {
+  Color color = _getStatusColor(status);
+  String label = _getStatusText(status);
+
+  return Container(
+    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+    decoration: BoxDecoration(
+      color: color,
+      borderRadius: BorderRadius.circular(16),
+    ),
+    child: Text(
+      label,
+      style: const TextStyle(
+        color: Colors.white,
+        fontSize: 12,
+        fontWeight: FontWeight.bold,
+      ),
+    ),
+  );
+}
+
+Color _getStatusColor(String status) {
+  switch (status) {
+    case 'pending':
+      return Colors.orange;
+    case 'confirmed':
+      return Colors.blue;
+    case 'preparing':
+      return Colors.purple;
+    case 'shipped':
+      return Colors.green;
+    case 'delivered':
+      return Colors.grey[600]!;
+    case 'cancelled':
+      return Colors.red;
+    case 'cancel_requested':
+      return Colors.orange[700]!;
+    case 'refunded':
+      return Colors.grey;
+    default:
+      return Colors.grey;
+  }
+}
+
+String _getStatusText(String status) {
+  switch (status) {
+    case 'pending':
+      return '결제대기';
+    case 'confirmed':
+      return '주문확인';
+    case 'preparing':
+      return '상품준비중';
+    case 'shipped':
+      return '배송중';
+    case 'delivered':
+      return '배송완료';
+    case 'cancelled':
+      return '주문취소';
+    case 'cancel_requested':
+      return '취소요청중';
+    case 'refunded':
+      return '환불완료';
+    default:
+      return status;
+  }
+}
+
+// ✅ 부분취소 상태별 색상
+Color _getPartialCancelStatusColor(String status) {
+  switch (status) {
+    case 'pending':
+      return Colors.orange;
+    case 'approved':
+      return Colors.green;
+    case 'rejected':
+      return Colors.red;
+    default:
+      return Colors.grey;
+  }
+}
+
+// ✅ 부분취소 상태별 텍스트
+String _getPartialCancelStatusText(String status) {
+  switch (status) {
+    case 'pending':
+      return '취소대기';
+    case 'approved':
+      return '취소승인';
+    case 'rejected':
+      return '취소거부';
+    default:
+      return status;
+  }
+}
+
   Widget _buildInfoRow(String label, String value) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 4),
@@ -645,54 +612,6 @@ class OrderHistoryScreen extends ConsumerWidget {
       ),
     );
   }
-
-  Color _getStatusColor(String status) {
-    switch (status) {
-      case 'pending':
-        return Colors.orange;
-      case 'confirmed':
-        return Colors.blue;
-      case 'preparing':
-        return Colors.purple;
-      case 'shipped':
-        return Colors.green;
-      case 'delivered':
-        return Colors.grey[600]!;
-      case 'cancelled':
-        return Colors.red;
-      case 'cancel_requested': // ✅ 추가
-        return Colors.orange[700]!;
-      case 'refunded': // ✅ 추가
-        return Colors.grey;
-      default:
-        return Colors.grey;
-    }
-  }
-
-  String _getStatusText(String status) {
-    switch (status) {
-      case 'pending':
-        return '결제대기';
-      case 'confirmed':
-        return '주문확인';
-      case 'preparing':
-        return '상품준비중';
-      case 'shipped':
-        return '배송중';
-      case 'delivered':
-        return '배송완료';
-      case 'cancelled':
-        return '주문취소';
-      case 'cancel_requested': // ✅ 추가
-        return '취소요청중';
-      case 'refunded': // ✅ 추가
-        return '환불완료';
-      default:
-        return status;
-    }
-  }
-
-  // _showCancelDialog 메서드에 상태별 안내 추가
 
   void _showCancelDialog(BuildContext context, int orderId, WidgetRef ref) {
     final reasons = ['단순 변심', '더 저렴한 상품 발견', '배송 지연 우려', '상품 정보 오류', '기타'];
@@ -852,4 +771,109 @@ class OrderHistoryScreen extends ConsumerWidget {
       }
     }
   }
+
+  Widget _buildOrderItem(OrderHistoryItemModel item) {
+  return Container(
+    margin: const EdgeInsets.only(bottom: 8),
+    padding: const EdgeInsets.all(12),
+    decoration: BoxDecoration(
+      color: Colors.grey[50],
+      borderRadius: BorderRadius.circular(8),
+      border: Border.all(color: Colors.grey[200]!),
+    ),
+    child: Row(
+      children: [
+        // 상품 이미지
+        Container(
+          width: 50,
+          height: 50,
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(8),
+            color: Colors.grey[300],
+          ),
+          child: item.productImageUrl != null
+              ? ClipRRect(
+                  borderRadius: BorderRadius.circular(8),
+                  child: Image.network(
+                    item.productImageUrl!,
+                    fit: BoxFit.cover,
+                  ),
+                )
+              : Icon(Icons.image, color: Colors.grey[600]),
+        ),
+        const SizedBox(width: 12),
+        
+        // 상품 정보
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                item.productName,
+                style: const TextStyle(fontWeight: FontWeight.w500),
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+              ),
+              const SizedBox(height: 4),
+              Text(
+                '${NumberFormat('#,###').format(item.pricePerItem)}원 × ${item.effectiveQuantity}개',
+                style: TextStyle(color: Colors.grey[600], fontSize: 13),
+              ),
+              
+              // 부분취소 정보 표시
+              if (item.partialCancellations?.isNotEmpty == true) ...[
+                const SizedBox(height: 8),
+                Wrap(
+                  spacing: 4,
+                  runSpacing: 4,
+                  children: item.partialCancellations!.map((pc) => Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: _getPartialCancelStatusColor(pc.status),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Text(
+                      '${_getPartialCancelStatusText(pc.status)} ${pc.cancelQuantity}개 (${NumberFormat('#,###').format(pc.refundAmount)}원)',
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 11,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  )).toList(),
+                ),
+              ],
+            ],
+          ),
+        ),
+        
+        // 금액
+        Column(
+          crossAxisAlignment: CrossAxisAlignment.end,
+          children: [
+            Text(
+              '${NumberFormat('#,###').format(item.totalPrice)}원',
+              style: const TextStyle(fontWeight: FontWeight.bold),
+            ),
+            if (item.totalCancelledQuantity > 0) ...[
+              const SizedBox(height: 2),
+              Text(
+                '취소: ${item.totalCancelledQuantity}개',
+                style: TextStyle(
+                  color: Colors.red[600],
+                  fontSize: 11,
+                ),
+              ),
+            ],
+          ],
+        ),
+      ],
+    ),
+  );
+}
+
+// ✅ 취소 가능 여부 확인 메서드
+bool _canCancelOrder(String status) {
+  return ['pending', 'confirmed', 'preparing'].contains(status);
+}
 }
