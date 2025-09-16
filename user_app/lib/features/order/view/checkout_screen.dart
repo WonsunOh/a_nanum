@@ -1,12 +1,14 @@
-// user_app/lib/features/order/view/checkout_screen.dart (바로구매 기능 포함 완전 버전)
+// user_app/lib/features/order/view/checkout_screen.dart (기존 파일 기반 개선)
 
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../../data/models/cart_item_model.dart';
+import '../../../data/repositories/profile_repository.dart';
 import '../../../providers/user_provider.dart';
 import '../../cart/viewmodel/cart_viewmodel.dart';
 import '../../payment/views/portone_web_html_screen.dart';
@@ -23,12 +25,19 @@ class CheckoutScreen extends ConsumerStatefulWidget {
 
 class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
   final _formKey = GlobalKey<FormState>();
-  final _nameController = TextEditingController();
-  final _phoneController = TextEditingController();
+  
+  // ✅ 기존 변수명을 recipient로 변경 (수령인 정보)
+  final _recipientNameController = TextEditingController(); // 기존: _nameController
+  final _recipientPhoneController = TextEditingController(); // 기존: _phoneController
   final _postcodeController = TextEditingController();
   final _addressController = TextEditingController();
   final _detailAddressController = TextEditingController();
   final _deliveryRequestController = TextEditingController();
+
+  // ✅ 새로 추가된 상태 변수
+  bool _sameAsOrderer = false; // 주문자와 동일 여부
+  String _ordererName = '';   // 주문자 이름
+  String _ordererPhone = '';  // 주문자 전화번호
 
   bool _isAutoFilled = false;
   bool _isEditMode = false;
@@ -41,14 +50,13 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
   void initState() {
     super.initState();
 
-    // ✅ 바로구매 모드 확인과 사용자 정보 자동 입력을 순차적으로 실행
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _checkDirectPurchaseMode();
-
-      // ✅ 조금 더 긴 지연시간으로 사용자 정보 로딩 완료 대기
+      
+      // ✅ 기존 _tryAutoFillUserInfo를 _loadOrdererAndRecipientInfo로 대체
       Future.delayed(const Duration(milliseconds: 300), () {
         if (mounted) {
-          _tryAutoFillUserInfo();
+          _loadOrdererAndRecipientInfo();
         }
       });
     });
@@ -56,8 +64,8 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
 
   @override
   void dispose() {
-    _nameController.dispose();
-    _phoneController.dispose();
+    _recipientNameController.dispose();
+    _recipientPhoneController.dispose();
     _postcodeController.dispose();
     _addressController.dispose();
     _detailAddressController.dispose();
@@ -65,132 +73,30 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
     super.dispose();
   }
 
-  // 바로구매 모드 확인
-  // _checkDirectPurchaseMode 메서드 전체 수정
-  // _checkDirectPurchaseMode 메서드 수정
-  void _checkDirectPurchaseMode() {
-    // ✅ 전역 상태에서 바로구매 데이터 확인
-    final directData = ref.read(directPurchaseProvider);
-
-    if (directData != null) {
-      // 데이터 구조를 기존 방식에 맞게 변환
-      directPurchaseData = directData.toJson();
-
-      if (mounted) {
-        setState(() {}); // UI 업데이트
-      }
-
-      // 바로구매 상품이 없는 경우 장바구니로 리다이렉트
-      final items = directPurchaseData!['items'] as List?;
-      if (items == null || items.isEmpty) {
-        context.go('/shop/cart');
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(const SnackBar(content: Text('주문할 상품이 없습니다.')));
-      } else {
-        // ✅ 사용 후 전역 상태 클리어
-        ref.read(directPurchaseProvider.notifier).state = null;
-      }
-    } else {
-      // ✅ 기존 URL 파라미터 방식도 지원 (호환성)
-      final uri = GoRouterState.of(context).uri;
-      final directParam = uri.queryParameters['direct'];
-
-      if (directParam != null) {
-        try {
-          final decodedString = Uri.decodeComponent(directParam);
-          directPurchaseData = jsonDecode(decodedString);
-
-          if (mounted) {
-            setState(() {});
-          }
-
-          final items = directPurchaseData!['items'] as List?;
-          if (items == null || items.isEmpty) {
-            context.go('/shop/cart');
-            ScaffoldMessenger.of(
-              context,
-            ).showSnackBar(const SnackBar(content: Text('주문할 상품이 없습니다.')));
-          }
-        } catch (e) {
-          WidgetsBinding.instance.addPostFrameCallback((_) {
-            if (mounted) {
-              ScaffoldMessenger.of(
-                context,
-              ).showSnackBar(SnackBar(content: Text('주문 정보를 불러올 수 없습니다: $e')));
-              context.go('/shop/cart');
-            }
-          });
-        }
-      }
-    }
-  }
-
-  // 레벨 2 이상 사용자 정보 자동 입력
-  void _tryAutoFillUserInfo() {
-    // ✅ userProvider를 watch로 변경하여 실시간 상태 감지
+  // ✅ 새로운 메서드: 주문자 정보 로드 + 수령인 정보 자동 채움 (기존 _tryAutoFillUserInfo 포함)
+  void _loadOrdererAndRecipientInfo() {
     final userProfileAsync = ref.read(userProvider);
-
+    
     userProfileAsync.when(
       data: (userProfile) {
-        if (userProfile != null && userProfile.level >= 2) {
+        if (userProfile != null && mounted) {
           setState(() {
-            _nameController.text =
-                userProfile.fullName ?? userProfile.nickname ?? '';
-
-            if (userProfile.postcode != null &&
-                userProfile.postcode!.isNotEmpty) {
-              _postcodeController.text = userProfile.postcode!;
+            // 1. 주문자 정보 저장
+            _ordererName = userProfile.fullName ?? userProfile.nickname ?? '사용자';
+            _ordererPhone = userProfile.phoneNumber ?? '';
+            
+            // 2. 주문자와 동일한 경우 수령인 정보도 자동 채움 (레벨 2 이상)
+            if (_sameAsOrderer && userProfile.level >= 2) {
+              _fillRecipientWithOrdererInfo(userProfile);
             }
-
-            if (userProfile.address != null &&
-                userProfile.address!.isNotEmpty) {
-              _parseAndFillAddress(userProfile.address!);
-            }
-
-            if (userProfile.phoneNumber != null &&
-                userProfile.phoneNumber!.isNotEmpty) {
-              _phoneController.text = userProfile.phoneNumber!;
-            }
-
-            _isAutoFilled = true;
           });
-
-          if (userProfile.address != null && userProfile.address!.isNotEmpty) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Row(
-                  children: [
-                    Icon(Icons.auto_awesome, color: Colors.white),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
-                        '레벨 ${userProfile.level} 회원 혜택으로 배송 정보가 자동 입력되었습니다!',
-                      ),
-                    ),
-                  ],
-                ),
-                backgroundColor: isDirectPurchase
-                    ? Colors.orange.shade600
-                    : Colors.blue.shade600,
-                behavior: SnackBarBehavior.floating,
-                action: SnackBarAction(
-                  label: '수정',
-                  textColor: Colors.white,
-                  onPressed: () {
-                    setState(() => _isEditMode = true);
-                  },
-                ),
-              ),
-            );
-          }
         }
       },
       loading: () {
-        // ✅ 로딩 중일 때 재시도
+        // 로딩 중일 때 재시도
         Future.delayed(const Duration(milliseconds: 500), () {
           if (mounted) {
-            _tryAutoFillUserInfo();
+            _loadOrdererAndRecipientInfo();
           }
         });
       },
@@ -200,42 +106,111 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
     );
   }
 
-  // 주소 파싱
-  void _parseAndFillAddress(String fullAddress) {
-    final regexWithPostcode = RegExp(
-      r'\((\d{5})\)\s*(.+?)(\s+\d+동\s*\d+호|\s+\d+호|\s+\d+층.*|\s+아파트.*|\s+빌딩.*)?$',
-    );
-    final matchWithPostcode = regexWithPostcode.firstMatch(fullAddress);
+  // ✅ 주문자 정보로 수령인 정보 채우기 (기존 _tryAutoFillUserInfo 로직 활용)
+  void _fillRecipientWithOrdererInfo(dynamic userProfile) {
+  _recipientNameController.text = userProfile.fullName ?? userProfile.nickname ?? '';
+  _recipientPhoneController.text = userProfile.phoneNumber ?? '';
+  
+  if (userProfile.postcode != null && userProfile.postcode!.isNotEmpty) {
+    _postcodeController.text = userProfile.postcode!;
+  }
+  
+  // ✅ 파싱 없이 직접 할당
+  if (userProfile.address != null && userProfile.address!.isNotEmpty) {
+    _addressController.text = userProfile.address!;
+  }
+  
+  if (userProfile.detailAddress != null && userProfile.detailAddress!.isNotEmpty) {
+    _detailAddressController.text = userProfile.detailAddress!;
+  }
+  
+  _isAutoFilled = true;
+}
 
-    if (matchWithPostcode != null) {
-      final postcode = matchWithPostcode.group(1) ?? '';
-      final mainAddress = matchWithPostcode.group(2)?.trim() ?? '';
-      final detailAddress = matchWithPostcode.group(3)?.trim() ?? '';
-
-      if (postcode.isNotEmpty && _postcodeController.text.isEmpty) {
-        _postcodeController.text = postcode;
+  // ✅ "주문자와 동일" 체크박스 토글
+  void _toggleSameAsOrderer(bool? value) {
+    setState(() {
+      _sameAsOrderer = value ?? false;
+      
+      if (_sameAsOrderer) {
+        // 주문자 정보로 채우기
+        final userProfileAsync = ref.read(userProvider);
+        userProfileAsync.whenData((profile) {
+          if (profile != null && profile.level >= 2) {
+            _fillRecipientWithOrdererInfo(profile);
+          } else if (profile != null) {
+            // 레벨 2 미만인 경우 기본 정보만 채우기
+            _recipientNameController.text = profile.fullName ?? profile.nickname ?? '';
+            _recipientPhoneController.text = profile.phoneNumber ?? '';
+          }
+        });
+      } else {
+        // 수령인 정보 초기화
+        _recipientNameController.clear();
+        _recipientPhoneController.clear();
+        _postcodeController.clear();
+        _addressController.clear();
+        _detailAddressController.clear();
+        _isAutoFilled = false;
       }
-      _addressController.text = mainAddress;
-      _detailAddressController.text = detailAddress;
-      return;
-    }
-
-    final regexWithoutPostcode = RegExp(r'^(.+?)\s+(\d+동\s*\d+호|\d+호|\d+층.*)$');
-    final matchWithoutPostcode = regexWithoutPostcode.firstMatch(fullAddress);
-
-    if (matchWithoutPostcode != null) {
-      final mainAddress = matchWithoutPostcode.group(1)?.trim() ?? '';
-      final detailAddress = matchWithoutPostcode.group(2)?.trim() ?? '';
-
-      _addressController.text = mainAddress;
-      _detailAddressController.text = detailAddress;
-      return;
-    }
-
-    _addressController.text = fullAddress;
+      _isEditMode = !_sameAsOrderer;
+    });
   }
 
-  // 주소 검색 팝업
+  // 바로구매 모드 확인 (기존 코드 유지)
+  void _checkDirectPurchaseMode() {
+    final directData = ref.read(directPurchaseProvider);
+    
+    if (directData != null) {
+      directPurchaseData = directData.toJson();
+      
+      if (mounted) {
+        setState(() {});
+      }
+
+      final items = directPurchaseData!['items'] as List?;
+      if (items == null || items.isEmpty) {
+        context.go('/shop/cart');
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('주문할 상품이 없습니다.')),
+        );
+      } else {
+        ref.read(directPurchaseProvider.notifier).state = null;
+      }
+    } else {
+      final uri = GoRouterState.of(context).uri;
+      final directParam = uri.queryParameters['direct'];
+      
+      if (directParam != null) {
+        try {
+          final decodedString = Uri.decodeComponent(directParam);
+          directPurchaseData = jsonDecode(decodedString);
+          
+          if (mounted) {
+            setState(() {});
+          }
+          
+          final items = directPurchaseData!['items'] as List?;
+          if (items == null || items.isEmpty) {
+            context.go('/shop/cart');
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('주문할 상품이 없습니다.')),
+            );
+          }
+        } catch (e) {
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(content: Text('주문 정보를 불러올 수 없습니다: $e')),
+              );
+              context.go('/shop/cart');
+            }
+          });
+        }
+      }
+    }
+  }
+
   void _openAddressSearch() {
     final isWideScreen = MediaQuery.of(context).size.width > 768;
 
@@ -279,7 +254,6 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
     }
   }
 
-  // 주소 선택 완료 처리
   void _onAddressSelected(Map<String, String> addressData) {
     setState(() {
       _postcodeController.text = addressData['zonecode'] ?? '';
@@ -294,7 +268,6 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
     FocusScope.of(context).requestFocus(FocusNode());
   }
 
-  // 전체 주소 문자열 생성
   String get _fullAddress {
     final postcode = _postcodeController.text;
     final address = _addressController.text;
@@ -303,28 +276,21 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
     return '($postcode) $address $detailAddress'.trim();
   }
 
-  // 바로구매 소계 계산
+  // 기존 계산 메서드들 유지
   int _calculateDirectPurchaseSubtotal() {
     final basePrice =
         directPurchaseData!['productDiscountPrice'] ??
         directPurchaseData!['productPrice'];
     final items = directPurchaseData!['items'] as List;
 
-    // fold의 초기값이 int 타입(0)이므로, fold가 반환하는 타입은 int가 됩니다.
-    // 따라서 계산의 최종 결과를 .toInt()로 변환하여 타입을 일치시켜야 합니다.
     return items.fold<int>(0, (sum, item) {
       final variantPrice = item['additionalPrice'] ?? 0;
       final quantity = item['quantity'];
-
-      // 각 항목의 소계는 double일 수 있으므로 num 타입으로 계산합니다.
       final num itemSubtotal = (basePrice + variantPrice) * quantity;
-
-      // 최종적으로 sum(int)에 더하기 전에 itemSubtotal을 int로 변환합니다.
       return sum + itemSubtotal.toInt();
     });
   }
 
-  // 장바구니 소계 계산
   int _calculateCartSubtotal(List<CartItemModel> items) {
     return items.fold(0, (sum, item) {
       final basePrice = item.product?.discountPrice ?? item.product?.price ?? 0;
@@ -334,8 +300,7 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
     });
   }
 
-  // 주문 제출
-  // _submitOrder() 메서드에서 해당 부분 수정
+  // 주문 제출 메서드 (변수명만 recipient로 변경)
   Future<void> _submitOrder() async {
     if (!_formKey.currentState!.validate()) return;
 
@@ -343,40 +308,36 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
     int subtotal;
 
     if (isDirectPurchase) {
-      // 바로구매 모드
       orderItems = directPurchaseData!['items'];
-      subtotal = _calculateDirectPurchaseSubtotal(); // 바로구매용 계산 메서드 사용
-
+      subtotal = _calculateDirectPurchaseSubtotal();
+      
       if (orderItems.isEmpty) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(const SnackBar(content: Text('주문할 상품 정보가 없습니다.')));
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('주문할 상품 정보가 없습니다.')),
+        );
         return;
       }
     } else {
-      // 장바구니 모드
       final cartState = ref.read(cartViewModelProvider).valueOrNull;
       if (cartState == null || cartState.selectedItemIds.isEmpty) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(const SnackBar(content: Text('주문할 상품을 선택해주세요.')));
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('주문할 상품을 선택해주세요.')),
+        );
         return;
       }
-
+      
       final cartItems = cartState.items
           .where((item) => cartState.selectedItemIds.contains(item.id))
           .cast<CartItemModel>()
           .toList();
-
-      orderItems = cartItems; // 타입을 맞춰주기 위해 분리
-      subtotal = _calculateCartSubtotal(cartItems); // CartItemModel 리스트 전달
+      
+      orderItems = cartItems;
+      subtotal = _calculateCartSubtotal(cartItems);
     }
 
     const int shippingFee = 3000;
     const int freeShippingThreshold = 50000;
-    final int currentShippingFee = (subtotal >= freeShippingThreshold)
-        ? 0
-        : shippingFee;
+    final int currentShippingFee = (subtotal >= freeShippingThreshold) ? 0 : shippingFee;
     final int totalAmount = subtotal + currentShippingFee;
 
     final confirmed = await showDialog<bool>(
@@ -392,7 +353,556 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
     }
   }
 
-  // 결제 확인 화면
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: Colors.grey.shade50,
+      appBar: AppBar(
+        title: Row(
+          children: [
+            if (isDirectPurchase) ...[
+              Icon(Icons.flash_on, color: Colors.orange.shade600, size: 20),
+              const SizedBox(width: 8),
+              const Text('바로구매'),
+            ] else
+              const Text('주문/결제'),
+          ],
+        ),
+        backgroundColor: Colors.white,
+        foregroundColor: Colors.black,
+        elevation: 0,
+        bottom: PreferredSize(
+          preferredSize: const Size.fromHeight(1),
+          child: Container(height: 1, color: Colors.grey.shade200),
+        ),
+      ),
+      body: LayoutBuilder(
+        builder: (context, constraints) {
+          bool isWideScreen = constraints.maxWidth > 768;
+          return isWideScreen ? _buildWideLayout() : _buildNarrowLayout();
+        },
+      ),
+      bottomNavigationBar: LayoutBuilder(
+        builder: (context, constraints) {
+          if (constraints.maxWidth > 768) {
+            return const SizedBox.shrink();
+          }
+          final orderState = ref.watch(orderViewModelProvider);
+          return Container(
+            padding: const EdgeInsets.all(16.0),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha:0.1),
+                  blurRadius: 10,
+                  offset: const Offset(0, -2),
+                ),
+              ],
+            ),
+            child: ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: isDirectPurchase
+                    ? Colors.orange.shade600
+                    : Colors.blue.shade600,
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(vertical: 16),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              ),
+              onPressed: orderState.isLoading ? null : _submitOrder,
+              child: orderState.isLoading
+                  ? const CircularProgressIndicator(color: Colors.white)
+                  : Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        if (isDirectPurchase) ...[
+                          const Icon(Icons.flash_on, size: 20),
+                          const SizedBox(width: 8),
+                          const Text(
+                            '바로결제',
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ] else
+                          const Text(
+                            '결제하기',
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                      ],
+                    ),
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  Widget _buildNarrowLayout() {
+    return SingleChildScrollView(
+      child: Column(
+        children: [
+          // ✅ 주문자 정보 섹션 추가
+          _buildOrdererInfoSection(),
+          const SizedBox(height: 8),
+          _buildShippingForm(),
+          const SizedBox(height: 8),
+          _buildOrderSummary(),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildWideLayout() {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Expanded(
+          flex: 2,
+          child: SingleChildScrollView(
+            child: Column(
+              children: [
+                // ✅ 주문자 정보 섹션 추가
+                _buildOrdererInfoSection(),
+                const SizedBox(height: 8),
+                _buildShippingForm(),
+              ],
+            ),
+          ),
+        ),
+        Expanded(
+          flex: 1,
+          child: Column(
+            children: [
+              Expanded(
+                child: SingleChildScrollView(child: _buildOrderSummary()),
+              ),
+              Container(
+                padding: const EdgeInsets.all(24.0),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  border: Border(top: BorderSide(color: Colors.grey.shade200)),
+                ),
+                child: Consumer(
+                  builder: (context, ref, child) {
+                    final orderState = ref.watch(orderViewModelProvider);
+                    return ElevatedButton(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: isDirectPurchase
+                            ? Colors.orange.shade600
+                            : Colors.blue.shade600,
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(vertical: 16),
+                        minimumSize: const Size(double.infinity, 50),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                      ),
+                      onPressed: orderState.isLoading ? null : _submitOrder,
+                      child: orderState.isLoading
+                          ? const CircularProgressIndicator(color: Colors.white)
+                          : Text(
+                              isDirectPurchase ? '바로결제' : '결제하기',
+                              style: const TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                    );
+                  },
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  // ✅ 새로 추가: 주문자 정보 섹션
+  Widget _buildOrdererInfoSection() {
+    return Container(
+      margin: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha:0.05),
+            blurRadius: 10,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: Colors.blue.shade50,
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Icon(Icons.person, color: Colors.blue.shade600),
+                ),
+                const SizedBox(width: 12),
+                const Text(
+                  '주문자 정보',
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            
+            Row(
+              children: [
+                const SizedBox(
+                  width: 80,
+                  child: Text('이름', style: TextStyle(
+                    fontWeight: FontWeight.w500, color: Colors.grey,
+                  )),
+                ),
+                Text(_ordererName.isNotEmpty ? _ordererName : '로딩중...'),
+              ],
+            ),
+            const SizedBox(height: 8),
+            
+            Row(
+              children: [
+                const SizedBox(
+                  width: 80,
+                  child: Text('연락처', style: TextStyle(
+                    fontWeight: FontWeight.w500, color: Colors.grey,
+                  )),
+                ),
+                Text(_ordererPhone.isNotEmpty ? _ordererPhone : '등록된 연락처 없음'),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // ✅ 개선된 배송지 정보 폼 (주문자와 동일 체크박스 추가)
+  Widget _buildShippingForm() {
+    final userProfileAsync = ref.watch(userProvider);
+
+    return Container(
+      margin: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha:0.05),
+            blurRadius: 10,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: Form(
+          key: _formKey,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // 헤더
+              Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: isDirectPurchase
+                          ? Colors.orange.shade50
+                          : Colors.blue.shade50,
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Icon(
+                      Icons.local_shipping,
+                      color: isDirectPurchase
+                          ? Colors.orange.shade600
+                          : Colors.blue.shade600,
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text(
+                          '배송지 정보',
+                          style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        userProfileAsync.when(
+                          data: (profile) {
+                            if (profile != null &&
+                                profile.level >= 2 &&
+                                _isAutoFilled) {
+                              return Row(
+                                children: [
+                                  Icon(
+                                    Icons.auto_awesome,
+                                    size: 14,
+                                    color: Colors.blue.shade600,
+                                  ),
+                                  const SizedBox(width: 4),
+                                  Text(
+                                    '레벨 ${profile.level} 회원 혜택 적용',
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      color: Colors.blue.shade600,
+                                      fontWeight: FontWeight.w500,
+                                    ),
+                                  ),
+                                ],
+                              );
+                            }
+                            return const SizedBox.shrink();
+                          },
+                          loading: () => const SizedBox.shrink(),
+                          error: (_, __) => const SizedBox.shrink(),
+                        ),
+                      ],
+                    ),
+                  ),
+                  if (_isAutoFilled && !_isEditMode)
+                    TextButton.icon(
+                      onPressed: () => setState(() => _isEditMode = true),
+                      icon: const Icon(Icons.edit, size: 16),
+                      label: const Text('수정'),
+                      style: TextButton.styleFrom(
+                        foregroundColor: Colors.blue.shade600,
+                      ),
+                    ),
+                ],
+              ),
+
+              const SizedBox(height: 20),
+
+              // ✅ "주문자와 동일" 체크박스 추가
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Colors.grey.shade50,
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: Colors.grey.shade200),
+                ),
+                child: Row(
+                  children: [
+                    Checkbox(
+                      value: _sameAsOrderer,
+                      onChanged: _toggleSameAsOrderer,
+                      activeColor: isDirectPurchase 
+                          ? Colors.orange.shade600 
+                          : Colors.blue.shade600,
+                    ),
+                    const SizedBox(width: 8),
+                    const Expanded(
+                      child: Text(
+                        '주문자와 동일한 정보로 입력',
+                        style: TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
+                      ),
+                    ),
+                    if (_sameAsOrderer && _isAutoFilled)
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: Colors.green.shade100,
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Text(
+                          '자동 입력됨',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: Colors.green.shade700,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+
+              const SizedBox(height: 24),
+
+              // ✅ 받는 사람 (변수명 변경)
+              _buildTextField(
+                controller: _recipientNameController,
+                label: '받는 사람',
+                hint: '받는 분의 성함을 입력하세요',
+                icon: Icons.person_outline,
+                readOnly: _sameAsOrderer && _isAutoFilled && !_isEditMode,
+                validator: (v) => v!.isEmpty ? '받는 사람을 입력해주세요' : null,
+              ),
+
+              const SizedBox(height: 16),
+
+              // ✅ 연락처 (변수명 변경)
+              _buildTextField(
+                controller: _recipientPhoneController,
+                label: '연락처',
+                hint: '010-1234-5678',
+                icon: Icons.phone_outlined,
+                keyboardType: TextInputType.phone,
+                readOnly: _sameAsOrderer && _isAutoFilled && !_isEditMode,
+                validator: (v) => v!.isEmpty ? '연락처를 입력해주세요' : null,
+              ),
+
+              const SizedBox(height: 24),
+
+              // 기존 주소 입력 필드들 (동일하게 유지)
+              const Text(
+                '배송 주소',
+                style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+              ),
+              const SizedBox(height: 12),
+
+              Row(
+                children: [
+                  Expanded(
+                    flex: 2,
+                    child: _buildTextField(
+                      controller: _postcodeController,
+                      label: '우편번호',
+                      hint: '12345',
+                      icon: Icons.markunread_mailbox_outlined,
+                      readOnly: true,
+                      validator: (v) => v!.isEmpty ? '주소를 검색해주세요' : null,
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: ElevatedButton.icon(
+                      onPressed: (_sameAsOrderer && !_isEditMode) ? null : _openAddressSearch,
+                      icon: const Icon(Icons.search, size: 18),
+                      label: const Text('주소 찾기'),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: isDirectPurchase
+                            ? Colors.orange.shade600
+                            : Colors.blue.shade600,
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(vertical: 16),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+
+              const SizedBox(height: 16),
+
+              _buildTextField(
+                controller: _addressController,
+                label: '기본 주소',
+                hint: '주소 검색을 통해 자동 입력됩니다',
+                icon: Icons.location_on_outlined,
+                readOnly: true,
+                validator: (v) => v!.isEmpty ? '주소를 검색해주세요' : null,
+              ),
+
+              const SizedBox(height: 16),
+
+              _buildTextField(
+                controller: _detailAddressController,
+                label: '상세 주소',
+                hint: '동/호수를 입력하세요 (예: 101동 1201호)',
+                icon: Icons.home_outlined,
+                readOnly: _sameAsOrderer && _isAutoFilled && !_isEditMode,
+                validator: (v) => v!.isEmpty ? '상세 주소를 입력해주세요' : null,
+              ),
+
+              const SizedBox(height: 24),
+
+              const Text(
+                '배송 요청사항',
+                style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+              ),
+              const SizedBox(height: 12),
+
+              _buildTextField(
+                controller: _deliveryRequestController,
+                label: '배송 요청사항 (선택)',
+                hint: '예: 문 앞에 놓아주세요, 부재 시 경비실에 맡겨주세요',
+                icon: Icons.comment_outlined,
+                maxLines: 2,
+                isRequired: false,
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  // 기존 텍스트 필드, 주문 요약 등 나머지 메서드들은 동일하게 유지
+  Widget _buildTextField({
+    required TextEditingController controller,
+    required String label,
+    required String hint,
+    required IconData icon,
+    TextInputType? keyboardType,
+    bool readOnly = false,
+    bool isRequired = true,
+    int maxLines = 1,
+    String? Function(String?)? validator,
+  }) {
+    return TextFormField(
+      controller: controller,
+      maxLines: maxLines,
+      decoration: InputDecoration(
+        labelText: label,
+        hintText: hint,
+        prefixIcon: Icon(icon, color: Colors.grey.shade600),
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: BorderSide(color: Colors.grey.shade300),
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: BorderSide(color: Colors.grey.shade300),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: BorderSide(
+            color: isDirectPurchase
+                ? Colors.orange.shade600
+                : Colors.blue.shade600,
+            width: 2,
+          ),
+        ),
+        filled: readOnly,
+        fillColor: readOnly ? Colors.grey.shade50 : null,
+        contentPadding: EdgeInsets.symmetric(
+          horizontal: 16,
+          vertical: maxLines > 1 ? 16 : 16,
+        ),
+      ),
+      keyboardType: keyboardType,
+      readOnly: readOnly,
+      validator: isRequired ? validator : null,
+    );
+  }
+
+  // ✅ 나머지 메서드들 (결제 확인, 주문 요약 등)은 기존 코드와 동일하게 유지
+  // (기존 파일의 _buildPaymentConfirmationScreen, _buildOrderSummary 등 그대로 사용)
+
   Widget _buildPaymentConfirmationScreen(int totalAmount, List<dynamic> items) {
     return Scaffold(
       appBar: AppBar(
@@ -420,7 +930,7 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
               color: Colors.white,
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.1),
+                  color: Colors.black.withValues(alpha:0.1),
                   blurRadius: 10,
                   offset: const Offset(0, -2),
                 ),
@@ -462,7 +972,6 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
     );
   }
 
-  // 결제 확인 카드
   Widget _buildPaymentConfirmationCard(int totalAmount, List<dynamic> items) {
     return Card(
       margin: const EdgeInsets.all(16),
@@ -491,8 +1000,8 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
             ),
             const Divider(height: 24),
             _buildPaymentInfoRow('선택 상품', '${items.length}개'),
-            _buildPaymentInfoRow('받는 분', _nameController.text),
-            _buildPaymentInfoRow('연락처', _phoneController.text),
+            _buildPaymentInfoRow('받는 분', _recipientNameController.text), // ✅ 변경됨
+            _buildPaymentInfoRow('연락처', _recipientPhoneController.text), // ✅ 변경됨
             _buildPaymentInfoRow(
               '배송지',
               '${_addressController.text} ${_detailAddressController.text}',
@@ -563,14 +1072,17 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
     );
   }
 
-  // 결제 처리
+  // ✅ 나머지 메서드들 (_processPayment, _buildOrderSummary 등)은 
+  // 기존 파일의 코드를 그대로 사용하되 _nameController -> _recipientNameController, 
+  // _phoneController -> _recipientPhoneController로만 변경
+
   Future<void> _processPayment(
     List<dynamic> items,
     int totalAmount,
     int currentShippingFee,
   ) async {
     try {
-      final userEmail = "${_phoneController.text}@temp.com";
+      final userEmail = "${_recipientPhoneController.text}@temp.com"; // ✅ 변경됨
 
       Map<String, dynamic>? paymentResult;
 
@@ -583,8 +1095,8 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
             orderName: isDirectPurchase
                 ? '바로구매 ${items.length}건'
                 : '소분쇼핑몰 주문 ${items.length}건',
-            customerName: _nameController.text,
-            customerPhone: _phoneController.text,
+            customerName: _recipientNameController.text, // ✅ 변경됨
+            customerPhone: _recipientPhoneController.text, // ✅ 변경됨
             customerEmail: userEmail,
             customerAddress: _addressController.text,
           ),
@@ -592,11 +1104,9 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
       );
 
       if (paymentResult != null && paymentResult['success'] == true) {
-        // ✅ 결제 성공 시 실제 주문 생성
         bool orderSuccess = false;
-
+        
         if (isDirectPurchase) {
-          // 바로구매 주문 생성
           orderSuccess = await _createDirectPurchaseOrder(
             items: items,
             totalAmount: totalAmount,
@@ -604,7 +1114,6 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
             paymentId: paymentResult['paymentId'],
           );
         } else {
-          // 장바구니 주문 생성
           orderSuccess = await _createCartOrder(
             items: items.cast<CartItemModel>(),
             totalAmount: totalAmount,
@@ -614,6 +1123,9 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
         }
 
         if (mounted && orderSuccess) {
+          // ✅ 주문 성공 후 자동 레벨업 체크
+        await _checkAndUpgradeLevel();
+
           context.go('/shop');
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
@@ -668,7 +1180,7 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
           );
         }
       }
-    } catch (e, stackTrace) {
+    } catch (e) {
       print('결제 처리 에러: $e');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -681,7 +1193,91 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
     }
   }
 
-  /// 장바구니 주문 생성
+  // 3. ✅ 새로 추가: 레벨1 회원 자동 레벨업 메서드
+  // checkout_screen.dart - 수정된 _checkAndUpgradeLevel 메서드
+
+// ✅ 수정된 레벨업 메서드: 입력된 수령인 정보를 프로필에 저장
+Future<void> _checkAndUpgradeLevel() async {
+  try {
+    final userProfileAsync = ref.read(userProvider);
+    await userProfileAsync.when(
+      data: (userProfile) async {
+        if (userProfile != null && userProfile.level == 1) {
+          // 레벨 1 회원인 경우 자동으로 레벨 2로 업그레이드 + 입력 정보 저장
+          final profileRepository = ref.read(profileRepositoryProvider);
+          
+          // 현재 입력된 수령인 정보 수집
+          final recipientName = _recipientNameController.text.trim();
+          final recipientPhone = _recipientPhoneController.text.trim();
+          final postcode = _postcodeController.text.trim();
+          final address = _addressController.text.trim();
+          final detailAddress = _detailAddressController.text.trim();
+          
+                    
+          // ✅ 별도 필드로 저장
+          await profileRepository.updateProfileAndLevel(
+            fullName: recipientName.isNotEmpty ? recipientName : null,
+            phoneNumber: recipientPhone.isNotEmpty ? recipientPhone : null,
+            address: address.isNotEmpty ? address : null,
+            detailAddress: detailAddress.isNotEmpty ? detailAddress : null, // ✅ 추가
+            postcode: postcode.isNotEmpty ? postcode : null,
+            newLevel: 2,
+          );
+          
+          // 사용자 정보 새로고침
+          ref.invalidate(userProvider);
+          
+          // 레벨업 성공 메시지 표시
+          if (mounted) {
+            // 기존 SnackBar를 덮어쓰지 않도록 잠시 지연
+            Future.delayed(const Duration(seconds: 1), () {
+              if (mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Row(
+                      children: [
+                        Icon(Icons.celebration, color: Colors.white),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Text(
+                                '🎉 레벨업 완료!',
+                                style: TextStyle(fontWeight: FontWeight.bold),
+                              ),
+                              const Text('레벨 1 → 레벨 2로 승급! 배송정보가 저장되었습니다.'),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                    backgroundColor: Colors.purple,
+                    duration: const Duration(seconds: 5),
+                  ),
+                );
+              }
+            });
+          }
+          
+        
+        }
+      },
+      loading: () async {
+        // 로딩 중이면 잠시 대기 후 재시도
+        await Future.delayed(const Duration(milliseconds: 500));
+        await _checkAndUpgradeLevel();
+      },
+      error: (error, stackTrace) async {
+        print('❌ 레벨업 체크 중 에러: $error');
+      },
+    );
+  } catch (e) {
+    print('❌ 자동 레벨업 처리 중 에러: $e');
+  }
+}
+
   Future<bool> _createCartOrder({
     required List<CartItemModel> items,
     required int totalAmount,
@@ -689,22 +1285,20 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
     required String paymentId,
   }) async {
     try {
-      final success = await ref
-          .read(orderViewModelProvider.notifier)
-          .createOrder(
-            cartItems: items,
-            totalAmount: totalAmount,
-            shippingFee: currentShippingFee,
-            recipientName: _nameController.text,
-            recipientPhone: _phoneController.text,
-            shippingAddress: _fullAddress,
-            paymentId: paymentId,
-          );
-
+      final success = await ref.read(orderViewModelProvider.notifier).createOrder(
+        cartItems: items,
+        totalAmount: totalAmount,
+        shippingFee: currentShippingFee,
+        recipientName: _recipientNameController.text, // ✅ 변경됨
+        recipientPhone: _recipientPhoneController.text, // ✅ 변경됨
+        shippingAddress: _fullAddress,
+        paymentId: paymentId,
+      );
+      
       if (success) {
         print('✅ 장바구니 주문 생성 성공 - PaymentID: $paymentId');
       }
-
+      
       return success;
     } catch (e) {
       print('❌ 장바구니 주문 생성 실패: $e');
@@ -712,7 +1306,6 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
     }
   }
 
-  /// 바로구매 주문 생성
   Future<bool> _createDirectPurchaseOrder({
     required List<dynamic> items,
     required int totalAmount,
@@ -720,25 +1313,22 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
     required String paymentId,
   }) async {
     try {
-      // 바로구매 데이터를 CartItemModel 형태로 변환
       final cartItems = await _convertDirectPurchaseToCartItems(items);
-
-      final success = await ref
-          .read(orderViewModelProvider.notifier)
-          .createOrder(
-            cartItems: cartItems,
-            totalAmount: totalAmount,
-            shippingFee: currentShippingFee,
-            recipientName: _nameController.text,
-            recipientPhone: _phoneController.text,
-            shippingAddress: _fullAddress,
-            paymentId: paymentId,
-          );
-
+      
+      final success = await ref.read(orderViewModelProvider.notifier).createOrder(
+        cartItems: cartItems,
+        totalAmount: totalAmount,
+        shippingFee: currentShippingFee,
+        recipientName: _recipientNameController.text, // ✅ 변경됨
+        recipientPhone: _recipientPhoneController.text, // ✅ 변경됨
+        shippingAddress: _fullAddress,
+        paymentId: paymentId, 
+      );
+      
       if (success) {
         print('✅ 바로구매 주문 생성 성공 - PaymentID: $paymentId');
       }
-
+      
       return success;
     } catch (e) {
       print('❌ 바로구매 주문 생성 실패: $e');
@@ -746,16 +1336,56 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
     }
   }
 
-  /// 바로구매 데이터를 CartItemModel로 변환
-  Future<List<CartItemModel>> _convertDirectPurchaseToCartItems(
-    List<dynamic> items,
-  ) async {
-    // 이 메서드는 바로구매 데이터 구조에 맞게 구현해야 합니다
-    // directPurchaseData의 구조를 확인하여 CartItemModel로 변환
-    // 현재는 간단한 예시로 작성
-
-    return []; // TODO: 실제 변환 로직 구현 필요
+  // ✅ 바로주문 데이터를 CartItemModel로 변환 (수정된 버전)
+Future<List<CartItemModel>> _convertDirectPurchaseToCartItems(List<dynamic> items) async {
+  final userId = Supabase.instance.client.auth.currentUser?.id;
+  if (userId == null || directPurchaseData == null) {
+    print('❌ 사용자 ID 또는 바로주문 데이터가 없음');
+    return [];
   }
+
+  try {
+    print('바로주문 데이터 변환 시작: ${items.length}개 아이템');
+    
+    final List<CartItemModel> cartItems = [];
+    
+    // 바로주문 기본 정보 추출
+    final productId = directPurchaseData!['productId'] as int;
+    
+    // 각 바로주문 아이템을 CartItemModel로 변환
+    for (int index = 0; index < items.length; index++) {
+      final item = items[index];
+      
+      final quantity = item['quantity'] as int? ?? 1;
+      final variantName = item['variantName'] as String?;
+      final additionalPrice = item['additionalPrice'] as int? ?? 0;
+      
+      // CartItemModel 생성 (임시 ID 사용)
+      final cartItem = CartItemModel(
+        id: -(index + 1), // 음수 임시 ID (실제 DB ID와 구분)
+        userId: userId,
+        productId: productId,
+        quantity: quantity,
+        createdAt: DateTime.now(),
+        product: null, // 주문 생성 시 product 정보는 productId로 조회됨
+        variantId: null,
+        variantName: variantName,
+        variantAdditionalPrice: additionalPrice,
+      );
+      
+      cartItems.add(cartItem);
+      print('CartItem 생성: 상품ID=$productId, 변형=$variantName, 수량=$quantity');
+    }
+    
+    print('바로주문 데이터 변환 완료: ${cartItems.length}개 CartItem 생성');
+    return cartItems;
+    
+  } catch (e) {
+    print('바로주문 데이터 변환 실패: $e');
+    print('DirectPurchaseData: $directPurchaseData');
+    return [];
+  }
+}
 
   String _formatAmount(int amount) {
     return amount.toString().replaceAllMapped(
@@ -764,189 +1394,55 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
     );
   }
 
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: Colors.grey.shade50,
-      appBar: AppBar(
-        title: Row(
-          children: [
-            if (isDirectPurchase) ...[
-              Icon(Icons.flash_on, color: Colors.orange.shade600, size: 20),
-              const SizedBox(width: 8),
-              const Text('바로구매'),
-            ] else
-              const Text('주문/결제'),
-          ],
-        ),
-        backgroundColor: Colors.white,
-        foregroundColor: Colors.black,
-        elevation: 0,
-        bottom: PreferredSize(
-          preferredSize: const Size.fromHeight(1),
-          child: Container(height: 1, color: Colors.grey.shade200),
-        ),
-      ),
-      body: LayoutBuilder(
-        builder: (context, constraints) {
-          bool isWideScreen = constraints.maxWidth > 768;
-          return isWideScreen ? _buildWideLayout() : _buildNarrowLayout();
-        },
-      ),
-      bottomNavigationBar: LayoutBuilder(
-        builder: (context, constraints) {
-          if (constraints.maxWidth > 768) {
-            return const SizedBox.shrink();
-          }
-          final orderState = ref.watch(orderViewModelProvider);
-          return Container(
-            padding: const EdgeInsets.all(16.0),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.1),
-                  blurRadius: 10,
-                  offset: const Offset(0, -2),
-                ),
-              ],
-            ),
-            child: ElevatedButton(
-              style: ElevatedButton.styleFrom(
-                backgroundColor: isDirectPurchase
-                    ? Colors.orange.shade600
-                    : Colors.blue.shade600,
-                foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(vertical: 16),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-              ),
-              onPressed: orderState.isLoading ? null : _submitOrder,
-              child: orderState.isLoading
-                  ? const CircularProgressIndicator(color: Colors.white)
-                  : Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        if (isDirectPurchase) ...[
-                          const Icon(Icons.flash_on, size: 20),
-                          const SizedBox(width: 8),
-                          const Text(
-                            '바로결제',
-                            style: TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                        ] else
-                          const Text(
-                            '결제하기',
-                            style: TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                      ],
-                    ),
-            ),
-          );
-        },
-      ),
-    );
+  // checkout_screen.dart에 추가할 누락된 메서드들 (변수명만 수정됨)
+
+// 주문 요약 (기존 코드 + 변수명 변경)
+Widget _buildOrderSummary() {
+  // 바로구매 모드인 경우
+  if (isDirectPurchase && directPurchaseData != null) {
+    return _buildDirectPurchaseOrderSummary();
   }
 
-  // 좁은 화면용 레이아웃
-  Widget _buildNarrowLayout() {
-    return SingleChildScrollView(
-      child: Column(
-        children: [
-          _buildShippingForm(),
-          const SizedBox(height: 8),
-          _buildOrderSummary(),
-        ],
-      ),
-    );
-  }
+  // 장바구니 모드 (기존 로직)
+  final cartAsync = ref.watch(cartViewModelProvider);
+  final currencyFormat = NumberFormat.currency(locale: 'ko_KR', symbol: '₩');
 
-  // 넓은 화면용 레이아웃
-  Widget _buildWideLayout() {
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Expanded(
-          flex: 2,
-          child: SingleChildScrollView(child: _buildShippingForm()),
-        ),
-        Expanded(
-          flex: 1,
-          child: Column(
-            children: [
-              Expanded(
-                child: SingleChildScrollView(child: _buildOrderSummary()),
-              ),
-              Container(
-                padding: const EdgeInsets.all(24.0),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  border: Border(top: BorderSide(color: Colors.grey.shade200)),
-                ),
-                child: Consumer(
-                  builder: (context, ref, child) {
-                    final orderState = ref.watch(orderViewModelProvider);
-                    return ElevatedButton(
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: isDirectPurchase
-                            ? Colors.orange.shade600
-                            : Colors.blue.shade600,
-                        foregroundColor: Colors.white,
-                        padding: const EdgeInsets.symmetric(vertical: 16),
-                        minimumSize: const Size(double.infinity, 50),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                      ),
-                      onPressed: orderState.isLoading ? null : _submitOrder,
-                      child: orderState.isLoading
-                          ? const CircularProgressIndicator(color: Colors.white)
-                          : Text(
-                              isDirectPurchase ? '바로결제' : '결제하기',
-                              style: const TextStyle(
-                                fontSize: 16,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                    );
-                  },
-                ),
-              ),
-            ],
-          ),
+  return Container(
+    margin: const EdgeInsets.all(16),
+    decoration: BoxDecoration(
+      color: Colors.white,
+      borderRadius: BorderRadius.circular(16),
+      boxShadow: [
+        BoxShadow(
+          color: Colors.black.withValues(alpha:0.05),
+          blurRadius: 10,
+          offset: const Offset(0, 2),
         ),
       ],
-    );
-  }
+    ),
+    child: cartAsync.when(
+      data: (cartState) {
+        final selectedItems = cartState.items
+            .where((item) => cartState.selectedItemIds.contains(item.id))
+            .toList();
+        if (selectedItems.isEmpty) {
+          return const Padding(
+            padding: EdgeInsets.all(24),
+            child: Text('주문할 상품이 없습니다.'),
+          );
+        }
 
-  // 배송지 정보 폼
-  Widget _buildShippingForm() {
-    final userProfileAsync = ref.watch(userProvider);
+        const int shippingFee = 3000;
+        const int freeShippingThreshold = 50000;
 
-    return Container(
-      margin: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.05),
-            blurRadius: 10,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
-      child: Padding(
-        padding: const EdgeInsets.all(24),
-        child: Form(
-          key: _formKey,
+        final int subtotal = _calculateCartSubtotal(selectedItems);
+        final int currentShippingFee = (subtotal >= freeShippingThreshold)
+            ? 0
+            : shippingFee;
+        final int totalAmount = subtotal + currentShippingFee;
+
+        return Padding(
+          padding: const EdgeInsets.all(24),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -956,541 +1452,50 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
                   Container(
                     padding: const EdgeInsets.all(8),
                     decoration: BoxDecoration(
-                      color: isDirectPurchase
-                          ? Colors.orange.shade50
-                          : Colors.blue.shade50,
+                      color: Colors.green.shade50,
                       borderRadius: BorderRadius.circular(8),
                     ),
                     child: Icon(
-                      Icons.local_shipping,
-                      color: isDirectPurchase
-                          ? Colors.orange.shade600
-                          : Colors.blue.shade600,
+                      Icons.receipt_long,
+                      color: Colors.green.shade600,
                     ),
                   ),
                   const SizedBox(width: 12),
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Text(
-                        '배송지 정보',
-                        style: TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                      userProfileAsync.when(
-                        data: (profile) {
-                          if (profile != null &&
-                              profile.level >= 2 &&
-                              _isAutoFilled) {
-                            return Row(
-                              children: [
-                                Icon(
-                                  Icons.auto_awesome,
-                                  size: 14,
-                                  color: Colors.blue.shade600,
-                                ),
-                                const SizedBox(width: 4),
-                                Text(
-                                  '레벨 ${profile.level} 회원 혜택 적용',
-                                  style: TextStyle(
-                                    fontSize: 12,
-                                    color: Colors.blue.shade600,
-                                    fontWeight: FontWeight.w500,
-                                  ),
-                                ),
-                              ],
-                            );
-                          }
-                          return const SizedBox.shrink();
-                        },
-                        loading: () => const SizedBox.shrink(),
-                        error: (_, __) => const SizedBox.shrink(),
-                      ),
-                    ],
-                  ),
-                  const Spacer(),
-                  if (_isAutoFilled && !_isEditMode)
-                    TextButton.icon(
-                      onPressed: () => setState(() => _isEditMode = true),
-                      icon: const Icon(Icons.edit, size: 16),
-                      label: const Text('수정'),
-                      style: TextButton.styleFrom(
-                        foregroundColor: Colors.blue.shade600,
-                      ),
-                    ),
-                ],
-              ),
-
-              const SizedBox(height: 24),
-
-              // 받는 사람
-              _buildTextField(
-                controller: _nameController,
-                label: '받는 사람',
-                hint: '받는 분의 성함을 입력하세요',
-                icon: Icons.person_outline,
-                readOnly: _isAutoFilled && !_isEditMode,
-                validator: (v) => v!.isEmpty ? '받는 사람을 입력해주세요' : null,
-              ),
-
-              const SizedBox(height: 16),
-
-              // 연락처
-              _buildTextField(
-                controller: _phoneController,
-                label: '연락처',
-                hint: '010-1234-5678',
-                icon: Icons.phone_outlined,
-                keyboardType: TextInputType.phone,
-                readOnly: _isAutoFilled && !_isEditMode,
-                validator: (v) => v!.isEmpty ? '연락처를 입력해주세요' : null,
-              ),
-
-              const SizedBox(height: 24),
-
-              // 주소 섹션
-              const Text(
-                '배송 주소',
-                style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
-              ),
-              const SizedBox(height: 12),
-
-              // 우편번호 + 주소 찾기
-              Row(
-                children: [
-                  Expanded(
-                    flex: 2,
-                    child: _buildTextField(
-                      controller: _postcodeController,
-                      label: '우편번호',
-                      hint: '12345',
-                      icon: Icons.markunread_mailbox_outlined,
-                      readOnly: true,
-                      validator: (v) => v!.isEmpty ? '주소를 검색해주세요' : null,
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: ElevatedButton.icon(
-                      onPressed: _openAddressSearch,
-                      icon: const Icon(Icons.search, size: 18),
-                      label: const Text('주소 찾기'),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: isDirectPurchase
-                            ? Colors.orange.shade600
-                            : Colors.blue.shade600,
-                        foregroundColor: Colors.white,
-                        padding: const EdgeInsets.symmetric(vertical: 16),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                      ),
+                  const Text(
+                    '주문 요약',
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
                     ),
                   ),
                 ],
               ),
 
-              const SizedBox(height: 16),
+              const SizedBox(height: 20),
 
-              // 기본 주소
-              _buildTextField(
-                controller: _addressController,
-                label: '기본 주소',
-                hint: '주소 검색을 통해 자동 입력됩니다',
-                icon: Icons.location_on_outlined,
-                readOnly: true,
-                validator: (v) => v!.isEmpty ? '주소를 검색해주세요' : null,
-              ),
+              // 상품 리스트
+              ...selectedItems.map((item) {
+                final product = item.product;
+                if (product == null) return const SizedBox.shrink();
 
-              const SizedBox(height: 16),
+                final basePrice = product.discountPrice ?? product.price;
+                final variantPrice = item.variantAdditionalPrice ?? 0;
+                final finalPrice = basePrice + variantPrice;
 
-              // 상세 주소
-              _buildTextField(
-                controller: _detailAddressController,
-                label: '상세 주소',
-                hint: '동/호수를 입력하세요 (예: 101동 1201호)',
-                icon: Icons.home_outlined,
-                validator: (v) => v!.isEmpty ? '상세 주소를 입력해주세요' : null,
-              ),
-
-              const SizedBox(height: 24),
-
-              // 배송 요청사항
-              const Text(
-                '배송 요청사항',
-                style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
-              ),
-              const SizedBox(height: 12),
-
-              _buildTextField(
-                controller: _deliveryRequestController,
-                label: '배송 요청사항 (선택)',
-                hint: '예: 문 앞에 놓아주세요, 부재 시 경비실에 맡겨주세요',
-                icon: Icons.comment_outlined,
-                maxLines: 2,
-                isRequired: false,
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  // 텍스트 필드 위젯
-  Widget _buildTextField({
-    required TextEditingController controller,
-    required String label,
-    required String hint,
-    required IconData icon,
-    TextInputType? keyboardType,
-    bool readOnly = false,
-    bool isRequired = true,
-    int maxLines = 1,
-    String? Function(String?)? validator,
-  }) {
-    return TextFormField(
-      controller: controller,
-      maxLines: maxLines,
-      decoration: InputDecoration(
-        labelText: label,
-        hintText: hint,
-        prefixIcon: Icon(icon, color: Colors.grey.shade600),
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: BorderSide(color: Colors.grey.shade300),
-        ),
-        enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: BorderSide(color: Colors.grey.shade300),
-        ),
-        focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: BorderSide(
-            color: isDirectPurchase
-                ? Colors.orange.shade600
-                : Colors.blue.shade600,
-            width: 2,
-          ),
-        ),
-        filled: readOnly,
-        fillColor: readOnly ? Colors.grey.shade50 : null,
-        contentPadding: EdgeInsets.symmetric(
-          horizontal: 16,
-          vertical: maxLines > 1 ? 16 : 16,
-        ),
-      ),
-      keyboardType: keyboardType,
-      readOnly: readOnly,
-      validator: isRequired ? validator : null,
-    );
-  }
-
-  // 주문 요약
-  Widget _buildOrderSummary() {
-    // 바로구매 모드인 경우
-    if (isDirectPurchase && directPurchaseData != null) {
-      return _buildDirectPurchaseOrderSummary();
-    }
-
-    // 장바구니 모드 (기존 로직)
-    final cartAsync = ref.watch(cartViewModelProvider);
-    final currencyFormat = NumberFormat.currency(locale: 'ko_KR', symbol: '₩');
-
-    return Container(
-      margin: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.05),
-            blurRadius: 10,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
-      child: cartAsync.when(
-        data: (cartState) {
-          final selectedItems = cartState.items
-              .where((item) => cartState.selectedItemIds.contains(item.id))
-              .toList();
-          if (selectedItems.isEmpty) {
-            return const Padding(
-              padding: EdgeInsets.all(24),
-              child: Text('주문할 상품이 없습니다.'),
-            );
-          }
-
-          const int shippingFee = 3000;
-          const int freeShippingThreshold = 50000;
-
-          final int subtotal = _calculateCartSubtotal(selectedItems);
-          final int currentShippingFee = (subtotal >= freeShippingThreshold)
-              ? 0
-              : shippingFee;
-          final int totalAmount = subtotal + currentShippingFee;
-
-          return Padding(
-            padding: const EdgeInsets.all(24),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // 헤더
-                Row(
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.all(8),
-                      decoration: BoxDecoration(
-                        color: Colors.green.shade50,
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: Icon(
-                        Icons.receipt_long,
-                        color: Colors.green.shade600,
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    const Text(
-                      '주문 요약',
-                      style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ],
-                ),
-
-                const SizedBox(height: 20),
-
-                // 상품 리스트
-                ...selectedItems.map((item) {
-                  final product = item.product;
-                  if (product == null) return const SizedBox.shrink();
-
-                  final basePrice = product.discountPrice ?? product.price;
-                  final variantPrice = item.variantAdditionalPrice ?? 0;
-                  final finalPrice = basePrice + variantPrice;
-
-                  return Container(
-                    margin: const EdgeInsets.only(bottom: 16),
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      color: Colors.grey.shade50,
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: Colors.grey.shade200),
-                    ),
-                    child: Row(
-                      children: [
-                        ClipRRect(
-                          borderRadius: BorderRadius.circular(8),
-                          child: Image.network(
-                            product.imageUrl ?? '',
-                            width: 50,
-                            height: 50,
-                            fit: BoxFit.cover,
-                            errorBuilder: (_, __, ___) => Container(
-                              width: 50,
-                              height: 50,
-                              color: Colors.grey.shade200,
-                              child: const Icon(
-                                Icons.image_not_supported,
-                                size: 20,
-                              ),
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                product.name,
-                                style: const TextStyle(
-                                  fontWeight: FontWeight.w500,
-                                  fontSize: 14,
-                                ),
-                                maxLines: 2,
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                              if (item.variantName != null) ...[
-                                const SizedBox(height: 4),
-                                Container(
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 6,
-                                    vertical: 2,
-                                  ),
-                                  decoration: BoxDecoration(
-                                    color: Colors.blue.shade50,
-                                    borderRadius: BorderRadius.circular(8),
-                                  ),
-                                  child: Text(
-                                    item.variantName!,
-                                    style: TextStyle(
-                                      fontSize: 10,
-                                      color: Colors.blue.shade700,
-                                    ),
-                                  ),
-                                ),
-                              ],
-                              const SizedBox(height: 4),
-                              Text(
-                                '${currencyFormat.format(finalPrice)} × ${item.quantity}개',
-                                style: TextStyle(
-                                  fontSize: 12,
-                                  color: Colors.grey.shade600,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                        Text(
-                          currencyFormat.format(finalPrice * item.quantity),
-                          style: const TextStyle(
-                            fontWeight: FontWeight.bold,
-                            fontSize: 14,
-                          ),
-                        ),
-                      ],
-                    ),
-                  );
-                }).toList(),
-
-                const Divider(height: 32),
-                _buildPriceRow('총 상품 금액', currencyFormat.format(subtotal)),
-                const SizedBox(height: 8),
-                _buildPriceRow(
-                  '배송비',
-                  currencyFormat.format(currentShippingFee),
-                ),
-                const Divider(height: 24),
-                _buildPriceRow(
-                  '최종 결제 금액',
-                  currencyFormat.format(totalAmount),
-                  isTotal: true,
-                ),
-
-                if (subtotal >= freeShippingThreshold) ...[
-                  const SizedBox(height: 16),
-                  Container(
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      color: Colors.green.shade50,
-                      borderRadius: BorderRadius.circular(8),
-                      border: Border.all(color: Colors.green.shade200),
-                    ),
-                    child: Row(
-                      children: [
-                        Icon(
-                          Icons.local_shipping,
-                          color: Colors.green.shade600,
-                          size: 16,
-                        ),
-                        const SizedBox(width: 8),
-                        Text(
-                          '무료배송 혜택 적용',
-                          style: TextStyle(
-                            color: Colors.green.shade700,
-                            fontWeight: FontWeight.w500,
-                            fontSize: 12,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ],
-            ),
-          );
-        },
-        loading: () => const Padding(
-          padding: EdgeInsets.all(24),
-          child: Center(child: CircularProgressIndicator()),
-        ),
-        error: (e, st) => const Padding(
-          padding: EdgeInsets.all(24),
-          child: Text('장바구니 정보를 불러올 수 없습니다.'),
-        ),
-      ),
-    );
-  }
-
-  // 바로구매 주문 요약
-  Widget _buildDirectPurchaseOrderSummary() {
-    final currencyFormat = NumberFormat.currency(locale: 'ko_KR', symbol: '₩');
-    final items = directPurchaseData!['items'] as List;
-    final basePrice =
-        directPurchaseData!['productDiscountPrice'] ??
-        directPurchaseData!['productPrice'];
-
-    const int shippingFee = 3000;
-    const int freeShippingThreshold = 50000;
-    final int subtotal = _calculateDirectPurchaseSubtotal();
-    final int currentShippingFee = (subtotal >= freeShippingThreshold)
-        ? 0
-        : shippingFee;
-    final int totalAmount = subtotal + currentShippingFee;
-
-    return Container(
-      margin: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.05),
-            blurRadius: 10,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
-      child: Padding(
-        padding: const EdgeInsets.all(24),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // 헤더 (바로구매 표시)
-            Row(
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(8),
+                return Container(
+                  margin: const EdgeInsets.only(bottom: 16),
+                  padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(
-                    color: Colors.orange.shade50,
-                    borderRadius: BorderRadius.circular(8),
+                    color: Colors.grey.shade50,
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: Colors.grey.shade200),
                   ),
-                  child: Icon(Icons.flash_on, color: Colors.orange.shade600),
-                ),
-                const SizedBox(width: 12),
-                const Text(
-                  '바로구매 주문',
-                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                ),
-              ],
-            ),
-
-            const SizedBox(height: 20),
-
-            // 상품 정보
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: Colors.grey.shade50,
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: Colors.grey.shade200),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
+                  child: Row(
                     children: [
-                      // 상품 이미지
                       ClipRRect(
                         borderRadius: BorderRadius.circular(8),
                         child: Image.network(
-                          directPurchaseData!['productImage'] ?? '',
+                          product.imageUrl ?? '',
                           width: 50,
                           height: 50,
                           fit: BoxFit.cover,
@@ -1507,115 +1512,317 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
                       ),
                       const SizedBox(width: 12),
                       Expanded(
-                        child: Text(
-                          directPurchaseData!['productName'],
-                          style: const TextStyle(
-                            fontWeight: FontWeight.w500,
-                            fontSize: 16,
-                          ),
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              product.name,
+                              style: const TextStyle(
+                                fontWeight: FontWeight.w500,
+                                fontSize: 14,
+                              ),
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                            if (item.variantName != null) ...[
+                              const SizedBox(height: 4),
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 6,
+                                  vertical: 2,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: Colors.blue.shade50,
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                child: Text(
+                                  item.variantName!,
+                                  style: TextStyle(
+                                    fontSize: 10,
+                                    color: Colors.blue.shade700,
+                                  ),
+                                ),
+                              ),
+                            ],
+                            const SizedBox(height: 4),
+                            Text(
+                              '${currencyFormat.format(finalPrice)} × ${item.quantity}개',
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: Colors.grey.shade600,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      Text(
+                        currencyFormat.format(finalPrice * item.quantity),
+                        style: const TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 14,
                         ),
                       ),
                     ],
                   ),
+                );
+              }).toList(),
 
-                  const SizedBox(height: 12),
-
-                  // 선택된 옵션들
-                  ...items.map((item) {
-                    final variantPrice = item['additionalPrice'] ?? 0;
-                    final quantity = item['quantity'];
-                    final itemTotal = (basePrice + variantPrice) * quantity;
-
-                    return Padding(
-                      padding: const EdgeInsets.only(bottom: 8),
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  item['variantName'],
-                                  style: const TextStyle(
-                                    fontWeight: FontWeight.w500,
-                                    fontSize: 14,
-                                  ),
-                                ),
-                                Text(
-                                  '${currencyFormat.format(basePrice + variantPrice)} × ${quantity}개',
-                                  style: TextStyle(
-                                    fontSize: 12,
-                                    color: Colors.grey.shade600,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                          Text(
-                            currencyFormat.format(itemTotal),
-                            style: const TextStyle(
-                              fontWeight: FontWeight.bold,
-                              fontSize: 14,
-                            ),
-                          ),
-                        ],
-                      ),
-                    );
-                  }).toList(),
-                ],
+              const Divider(height: 32),
+              _buildPriceRow('총 상품 금액', currencyFormat.format(subtotal)),
+              const SizedBox(height: 8),
+              _buildPriceRow(
+                '배송비',
+                currencyFormat.format(currentShippingFee),
               ),
-            ),
+              const Divider(height: 24),
+              _buildPriceRow(
+                '최종 결제 금액',
+                currencyFormat.format(totalAmount),
+                isTotal: true,
+              ),
 
-            const Divider(height: 32),
-            _buildPriceRow('총 상품 금액', currencyFormat.format(subtotal)),
-            const SizedBox(height: 8),
-            _buildPriceRow('배송비', currencyFormat.format(currentShippingFee)),
-            const Divider(height: 24),
-            _buildPriceRow(
-              '최종 결제 금액',
-              currencyFormat.format(totalAmount),
-              isTotal: true,
-            ),
-
-            if (subtotal >= freeShippingThreshold) ...[
-              const SizedBox(height: 16),
-              Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: Colors.green.shade50,
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: Colors.green.shade200),
+              if (subtotal >= freeShippingThreshold) ...[
+                const SizedBox(height: 16),
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: Colors.green.shade50,
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: Colors.green.shade200),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(
+                        Icons.local_shipping,
+                        color: Colors.green.shade600,
+                        size: 16,
+                      ),
+                      const SizedBox(width: 8),
+                      Text(
+                        '무료배송 혜택 적용',
+                        style: TextStyle(
+                          color: Colors.green.shade700,
+                          fontWeight: FontWeight.w500,
+                          fontSize: 12,
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
-                child: Row(
+              ],
+            ],
+          ),
+        );
+      },
+      loading: () => const Padding(
+        padding: EdgeInsets.all(24),
+        child: Center(child: CircularProgressIndicator()),
+      ),
+      error: (e, st) => const Padding(
+        padding: EdgeInsets.all(24),
+        child: Text('장바구니 정보를 불러올 수 없습니다.'),
+      ),
+    ),
+  );
+}
+
+// 바로구매 주문 요약 (기존 코드 유지)
+Widget _buildDirectPurchaseOrderSummary() {
+  final currencyFormat = NumberFormat.currency(locale: 'ko_KR', symbol: '₩');
+  final items = directPurchaseData!['items'] as List;
+  final basePrice =
+      directPurchaseData!['productDiscountPrice'] ??
+      directPurchaseData!['productPrice'];
+
+  const int shippingFee = 3000;
+  const int freeShippingThreshold = 50000;
+  final int subtotal = _calculateDirectPurchaseSubtotal();
+  final int currentShippingFee = (subtotal >= freeShippingThreshold)
+      ? 0
+      : shippingFee;
+  final int totalAmount = subtotal + currentShippingFee;
+
+  return Container(
+    margin: const EdgeInsets.all(16),
+    decoration: BoxDecoration(
+      color: Colors.white,
+      borderRadius: BorderRadius.circular(16),
+      boxShadow: [
+        BoxShadow(
+          color: Colors.black.withValues(alpha:0.05),
+          blurRadius: 10,
+          offset: const Offset(0, 2),
+        ),
+      ],
+    ),
+    child: Padding(
+      padding: const EdgeInsets.all(24),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // 헤더 (바로구매 표시)
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: Colors.orange.shade50,
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Icon(Icons.flash_on, color: Colors.orange.shade600),
+              ),
+              const SizedBox(width: 12),
+              const Text(
+                '바로구매 주문',
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+              ),
+            ],
+          ),
+
+          const SizedBox(height: 20),
+
+          // 상품 정보
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: Colors.grey.shade50,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: Colors.grey.shade200),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
                   children: [
-                    Icon(
-                      Icons.local_shipping,
-                      color: Colors.green.shade600,
-                      size: 16,
+                    // 상품 이미지
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(8),
+                      child: Image.network(
+                        directPurchaseData!['productImage'] ?? '',
+                        width: 50,
+                        height: 50,
+                        fit: BoxFit.cover,
+                        errorBuilder: (_, __, ___) => Container(
+                          width: 50,
+                          height: 50,
+                          color: Colors.grey.shade200,
+                          child: const Icon(
+                            Icons.image_not_supported,
+                            size: 20,
+                          ),
+                        ),
+                      ),
                     ),
-                    const SizedBox(width: 8),
-                    Text(
-                      '무료배송 혜택 적용',
-                      style: TextStyle(
-                        color: Colors.green.shade700,
-                        fontWeight: FontWeight.w500,
-                        fontSize: 12,
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Text(
+                        directPurchaseData!['productName'],
+                        style: const TextStyle(
+                          fontWeight: FontWeight.w500,
+                          fontSize: 16,
+                        ),
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
                       ),
                     ),
                   ],
                 ),
-              ),
-            ],
-          ],
-        ),
-      ),
-    );
-  }
 
-  // 가격 행 위젯
+                const SizedBox(height: 12),
+
+                // 선택된 옵션들
+                ...items.map((item) {
+                  final variantPrice = item['additionalPrice'] ?? 0;
+                  final quantity = item['quantity'];
+                  final itemTotal = (basePrice + variantPrice) * quantity;
+
+                  return Padding(
+                    padding: const EdgeInsets.only(bottom: 8),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                item['variantName'],
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.w500,
+                                  fontSize: 14,
+                                ),
+                              ),
+                              Text(
+                                '${currencyFormat.format(basePrice + variantPrice)} × ${quantity}개',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: Colors.grey.shade600,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        Text(
+                          currencyFormat.format(itemTotal),
+                          style: const TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 14,
+                          ),
+                        ),
+                      ],
+                    ),
+                  );
+                }).toList(),
+              ],
+            ),
+          ),
+
+          const Divider(height: 32),
+          _buildPriceRow('총 상품 금액', currencyFormat.format(subtotal)),
+          const SizedBox(height: 8),
+          _buildPriceRow('배송비', currencyFormat.format(currentShippingFee)),
+          const Divider(height: 24),
+          _buildPriceRow(
+            '최종 결제 금액',
+            currencyFormat.format(totalAmount),
+            isTotal: true,
+          ),
+
+          if (subtotal >= freeShippingThreshold) ...[
+            const SizedBox(height: 16),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Colors.green.shade50,
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: Colors.green.shade200),
+              ),
+              child: Row(
+                children: [
+                  Icon(
+                    Icons.local_shipping,
+                    color: Colors.green.shade600,
+                    size: 16,
+                  ),
+                  const SizedBox(width: 8),
+                  Text(
+                    '무료배송 혜택 적용',
+                    style: TextStyle(
+                      color: Colors.green.shade700,
+                      fontWeight: FontWeight.w500,
+                      fontSize: 12,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ],
+      ),
+    ),
+  );
+}
+
   Widget _buildPriceRow(String title, String price, {bool isTotal = false}) {
     final style = TextStyle(
       fontSize: isTotal ? 16 : 14,

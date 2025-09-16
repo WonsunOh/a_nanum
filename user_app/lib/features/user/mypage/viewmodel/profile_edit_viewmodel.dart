@@ -43,6 +43,7 @@ class ProfileEditViewModel extends StateNotifier<ProfileEditState> {
     String? fullName,
     String? phoneNumber,
     String? address,
+    String? detailAddress,
     String? postcode,
   }) async {
     state = state.copyWith(isLoading: true, errorMessage: null, isSuccess: false);
@@ -74,6 +75,7 @@ class ProfileEditViewModel extends StateNotifier<ProfileEditState> {
     required String fullName,
     required String phoneNumber,
     required String address,
+    required String detailAddress,
     required String postcode,
     String? nickname,
   }) async {

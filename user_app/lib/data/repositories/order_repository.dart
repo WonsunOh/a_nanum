@@ -105,6 +105,7 @@ class OrderRepository {
             shipping_address,
             tracking_number,
             order_items(
+            id, 
               product_id,
               quantity,
               price_per_item,

@@ -44,6 +44,7 @@ class OrderHistoryModel {
 }
 
 class OrderHistoryItemModel {
+  final int orderItemId; // ✅ 추가
   final int productId;
   final String productName;
   final String? productImageUrl;
@@ -52,6 +53,7 @@ class OrderHistoryItemModel {
   final int totalPrice;
 
   OrderHistoryItemModel({
+    required this.orderItemId, // ✅ 추가
     required this.productId,
     required this.productName,
     this.productImageUrl,
@@ -65,6 +67,7 @@ class OrderHistoryItemModel {
     final quantity = json['quantity'] ?? 0;
     
     return OrderHistoryItemModel(
+      orderItemId: json['id'] ?? json['order_item_id'] ?? 0, // ✅ 추가
       productId: json['product_id'],
       productName: json['products']?['name'] ?? '상품명 없음',
       productImageUrl: json['products']?['image_url'],

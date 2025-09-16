@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../models/order_cancellation_model.dart';
+import '../models/order_item_cancellation_model.dart';
 import '../models/order_model.dart';
 
 // ⭐️ 1. 주문 타입을 구분하기 위한 Enum을 만듭니다.
@@ -411,6 +412,123 @@ Future<void> _sendCancellationRejectedNotification(
   } catch (e) {
     debugPrint('❌ Error in fetchOrdersWithCancellations: $e');
     return {};
+  }
+}
+
+// 부분취소 요청 목록 조회
+Future<List<OrderItemCancellation>> fetchPartialCancellations() async {
+  try {
+    debugPrint('🔍 Fetching partial cancellations...');
+    
+    final response = await _client
+        .from('order_item_cancellations')
+        .select('''
+          *,
+          order_items (
+            price_per_item,
+            products (name)
+          ),
+          orders (
+            recipient_name,
+            recipient_phone
+          )
+        ''')
+        .order('created_at', ascending: false);
+    
+    debugPrint('📦 Partial cancellations response: ${response.length} items');
+    
+    return (response as List)
+        .map((data) => OrderItemCancellation.fromJson(data))
+        .toList();
+  } catch (e) {
+    debugPrint('💥 Error fetching partial cancellations: $e');
+    rethrow;
+  }
+}
+
+// 부분취소 승인
+Future<void> approvePartialCancellation(int cancellationId, String adminNote) async {
+  try {
+    debugPrint('✅ Approving partial cancellation $cancellationId');
+    
+    final currentUser = _client.auth.currentUser;
+    
+    // 1. 부분취소 요청 정보 조회
+    final cancellation = await _client
+        .from('order_item_cancellations')
+        .select('order_item_id, refund_amount, cancel_quantity')
+        .eq('id', cancellationId)
+        .single();
+    
+    // 2. 상태 업데이트
+    await _client
+        .from('order_item_cancellations')
+        .update({
+          'status': 'approved',
+          'admin_id': currentUser?.id,
+          'admin_note': adminNote,
+          'processed_at': DateTime.now().toIso8601String(),
+        })
+        .eq('id', cancellationId);
+    
+    // 3. order_item 수량 조정 또는 상태 변경
+    final orderItemId = cancellation['order_item_id'];
+    final cancelQuantity = cancellation['cancel_quantity'];
+    
+    // 현재 order_item 정보 조회
+    final orderItem = await _client
+        .from('order_items')
+        .select('quantity')
+        .eq('id', orderItemId)
+        .single();
+    
+    final currentQuantity = orderItem['quantity'];
+    
+    if (cancelQuantity >= currentQuantity) {
+      // 전체 취소인 경우 상태를 'refunded'로 변경
+      await _client
+          .from('order_items')
+          .update({'status': 'refunded'})
+          .eq('id', orderItemId);
+    } else {
+      // 부분 취소인 경우 수량 조정
+      final newQuantity = currentQuantity - cancelQuantity;
+      await _client
+          .from('order_items')
+          .update({'quantity': newQuantity})
+          .eq('id', orderItemId);
+    }
+    
+    debugPrint('✅ Partial cancellation approved');
+    
+  } catch (e) {
+    debugPrint('💥 Error approving partial cancellation: $e');
+    rethrow;
+  }
+}
+
+// 부분취소 거부
+Future<void> rejectPartialCancellation(int cancellationId, String adminNote) async {
+  try {
+    debugPrint('❌ Rejecting partial cancellation $cancellationId');
+    
+    final currentUser = _client.auth.currentUser;
+    
+    await _client
+        .from('order_item_cancellations')
+        .update({
+          'status': 'rejected',
+          'admin_id': currentUser?.id,
+          'admin_note': adminNote,
+          'processed_at': DateTime.now().toIso8601String(),
+        })
+        .eq('id', cancellationId);
+    
+    debugPrint('✅ Partial cancellation rejected');
+    
+  } catch (e) {
+    debugPrint('💥 Error rejecting partial cancellation: $e');
+    rethrow;
   }
 }
 

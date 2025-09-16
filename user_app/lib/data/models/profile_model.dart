@@ -5,6 +5,7 @@ class ProfileModel {
   final String? nickname;
   final String? phoneNumber;
   final String? address;
+  final String? detailAddress;
   final String? postcode; // ⭐️ 우편번호 필드 추가
   final int level;
   final int points; // ⭐️ 포인트 필드 추가
@@ -15,6 +16,7 @@ class ProfileModel {
     this.nickname,
     this.phoneNumber,
     this.address,
+    this.detailAddress,
     this.postcode, // ⭐️ 생성자에 추가
     required this.level,
     this.points = 0, // ⭐️ 생성자에 추가
@@ -27,6 +29,7 @@ class ProfileModel {
       nickname: json['nickname'] as String?,
       phoneNumber: json['phone'] as String?,
       address: json['address'] as String?,
+      detailAddress: json['detail_address'],
       postcode: json['postcode'] as String?, // ⭐️ fromJson에 추가
       level: json['level'] as int? ?? 1,
       points: json['points'] as int? ?? 0, // ⭐️ fromJson에 추가

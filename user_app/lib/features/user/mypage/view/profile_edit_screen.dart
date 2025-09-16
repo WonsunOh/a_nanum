@@ -396,9 +396,7 @@ class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
   }
 
   void _initializeFields(dynamic profile) {
-    print('🔍 Profile 데이터 확인:');
-  print('- Phone Number: ${profile?.phoneNumber}');
-
+  
     if (profile == null) return;
   setState(() {
     // 기본 정보 초기화
@@ -425,13 +423,8 @@ class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
       _postcodeController.text = '';
     }
     
-    // ✅ 주소 처리 - 기존 데이터가 "(우편번호) 주소" 형태일 수 있으므로 파싱
-    if (profile?.address != null && profile!.address!.isNotEmpty) {
-      _parseAndFillAddress(profile.address!);
-    } else {
-      _addressController.text = '';
-      _detailAddressController.text = '';
-    }
+    _addressController.text = profile?.address ?? ''; // ✅ 기본주소만
+    _detailAddressController.text = profile?.detailAddress ?? ''; // ✅ 상세주소 별도
   });
 }
 
@@ -453,9 +446,6 @@ void _parseAndFillAddress(String fullAddress) {
     
     remainingAddress = match.group(2)?.trim() ?? '';
   }
-  
-  print('📮 우편번호: ${_postcodeController.text}');
-  print('🏠 남은 주소: $remainingAddress');
   
   // 2단계: 상세주소 분리 (여러 패턴 시도)
   String baseAddress = remainingAddress;
@@ -607,7 +597,8 @@ void _parseAndFillAddress(String fullAddress) {
           .upgradeToLevel2(
             fullName: _fullNameController.text,
             phoneNumber: _phoneController.text,
-            address: fullAddress, // ✅ 전체 주소 (기본주소 + 상세주소)
+            address: address, // ✅ 기본주소만
+      detailAddress: detailAddress, // ✅ 상세주소 별도
             postcode: postcode, // ✅ 우편번호
             nickname: _nicknameController.text.isNotEmpty
                 ? _nicknameController.text
@@ -624,8 +615,9 @@ void _parseAndFillAddress(String fullAddress) {
                 ? _fullNameController.text
                 : null,
             phoneNumber: phoneNumber.isNotEmpty ? phoneNumber : null,
-            address: fullAddress.isNotEmpty ? fullAddress : null, // ✅ 전체 주소
-            postcode: postcode.isNotEmpty ? postcode : null, // ✅ 우편번호
+            address: address.isNotEmpty ? address : null, // ✅ 기본주소만
+      detailAddress: detailAddress.isNotEmpty ? detailAddress : null, // ✅ 상세주소 별도
+      postcode: postcode.isNotEmpty ? postcode : null,
           );
     }
   }

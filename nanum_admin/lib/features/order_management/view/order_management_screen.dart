@@ -1,12 +1,14 @@
 // nanum_admin/lib/features/order_management/view/order_management_screen.dart (전체파일)
 
 import 'package:file_picker/file_picker.dart';
+import 'package:intl/intl.dart';
 import 'package:web/web.dart' as web;
 import 'package:excel/excel.dart' hide Border;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/main_layout.dart';
+import '../../../data/models/order_item_cancellation_model.dart';
 import '../../../data/models/order_model.dart';
 import '../../../data/models/order_cancellation_model.dart';
 import '../../../data/repositories/order_repository.dart';
@@ -25,6 +27,7 @@ class OrderManagementScreen extends ConsumerStatefulWidget {
 
 class _OrderManagementScreenState extends ConsumerState<OrderManagementScreen> {
   String _adminNote = '';
+  List<OrderItemCancellation> _partialCancellations = []; // ✅ 추가
 
   // 엑셀 내보내기 함수
   void _exportToExcel(List<Order> orders) {
@@ -167,10 +170,14 @@ class _OrderManagementScreenState extends ConsumerState<OrderManagementScreen> {
     );
   }
 
-  return FutureBuilder<Map<int, Map<String, dynamic>>>(
-    future: ref.read(orderRepositoryProvider).fetchOrdersWithCancellations(),
-    builder: (context, orderSnapshot) {
-      final orderData = orderSnapshot.data ?? {};
+ return FutureBuilder<List<dynamic>>( // ✅ 두 개의 Future를 처리
+    future: Future.wait([
+      ref.read(orderRepositoryProvider).fetchOrdersWithCancellations(),
+      ref.read(orderRepositoryProvider).fetchPartialCancellations(), // ✅ 추가
+    ]),
+    builder: (context, snapshot) {
+      final orderData = snapshot.hasData ? snapshot.data![0] as Map<int, Map<String, dynamic>> : <int, Map<String, dynamic>>{};
+      final partialCancellations = snapshot.hasData ? snapshot.data![1] as List<OrderItemCancellation> : <OrderItemCancellation>[];
 
       Map<int, List<Order>> groupedOrders = {};
       Map<int, Map<String, dynamic>> orderInfo = {};
@@ -210,6 +217,7 @@ class _OrderManagementScreenState extends ConsumerState<OrderManagementScreen> {
             'status': displayStatus,
             'total_amount': data?['total_amount'] ?? 0,
             'cancellation': cancellation,
+            'partial_cancellations': partialCancellations.where((pc) => pc.orderId == actualOrderId).toList(), // ✅ 추가
           };
         }
         groupedOrders[actualOrderId]!.add(order);
@@ -217,7 +225,7 @@ class _OrderManagementScreenState extends ConsumerState<OrderManagementScreen> {
 
       return Column(
         children: [
-          // 테이블 헤더
+          // 테이블 헤더 (기존과 동일)
           Container(
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
@@ -230,7 +238,7 @@ class _OrderManagementScreenState extends ConsumerState<OrderManagementScreen> {
                 Expanded(flex: 2, child: Text('고객정보', style: TextStyle(fontWeight: FontWeight.bold))),
                 Expanded(flex: 2, child: Text('상태', style: TextStyle(fontWeight: FontWeight.bold))),
                 Expanded(flex: 1, child: Text('상품수', style: TextStyle(fontWeight: FontWeight.bold))),
-                Expanded(flex: 2, child: Text('총액', style: TextStyle(fontWeight: FontWeight.bold))),
+                Expanded(flex: 2, child: Text('이액', style: TextStyle(fontWeight: FontWeight.bold))),
                 Expanded(flex: 2, child: Text('액션', style: TextStyle(fontWeight: FontWeight.bold))),
               ],
             ),
@@ -255,10 +263,13 @@ class _OrderManagementScreenState extends ConsumerState<OrderManagementScreen> {
   );
 }
 
-Widget _buildTableRow(int orderId, List<Order> items, Map<String, dynamic> info) {
+  Widget _buildTableRow(int orderId, List<Order> items, Map<String, dynamic> info) {
   final status = info['status'] as String? ?? 'confirmed';
   final totalAmount = (info['total_amount'] as num?)?.toInt() ?? 0;
   final cancellation = info['cancellation'] as OrderCancellation?;
+  final partialCancellations = info['partial_cancellations'] as List<OrderItemCancellation>? ?? [];
+
+  final pendingPartialCancels = partialCancellations.where((pc) => pc.status == 'pending').length;
 
   return Container(
     padding: const EdgeInsets.all(16),
@@ -268,11 +279,12 @@ Widget _buildTableRow(int orderId, List<Order> items, Map<String, dynamic> info)
         left: BorderSide(color: Colors.grey[300]!),
         right: BorderSide(color: Colors.grey[300]!),
       ),
-      color: status == 'cancel_requested' ? Colors.orange[50] : Colors.white,
+      color: status == 'cancel_requested' || pendingPartialCancels > 0 
+          ? Colors.orange[50] 
+          : Colors.white,
     ),
     child: Row(
       children: [
-        // 주문번호 + 상품보기 버튼
         Expanded(
           flex: 2,
           child: Column(
@@ -287,7 +299,6 @@ Widget _buildTableRow(int orderId, List<Order> items, Map<String, dynamic> info)
           ),
         ),
         
-        // 고객정보
         Expanded(
           flex: 2,
           child: Column(
@@ -300,7 +311,6 @@ Widget _buildTableRow(int orderId, List<Order> items, Map<String, dynamic> info)
           ),
         ),
         
-        // 상태 + 취소요청 정보
         Expanded(
           flex: 2,
           child: Column(
@@ -309,29 +319,29 @@ Widget _buildTableRow(int orderId, List<Order> items, Map<String, dynamic> info)
               _buildStatusChip(status),
               if (cancellation != null) ...[
                 SizedBox(height: 4),
-                Text('${cancellation.cancelReason}', 
+                Text('전체취소: ${cancellation.cancelReason}', 
                      style: TextStyle(fontSize: 11, color: Colors.orange[700])),
+              ],
+              if (partialCancellations.isNotEmpty) ...[
+                SizedBox(height: 4),
+                Text('부분취소: ${partialCancellations.length}건 (대기: $pendingPartialCancels)', 
+                     style: TextStyle(fontSize: 11, color: Colors.blue[700])),
               ],
             ],
           ),
         ),
         
-        // 상품 개수
-        Expanded(
-          flex: 1,
-          child: Text('${items.length}개'),
-        ),
+        Expanded(flex: 1, child: Text('${items.length}개')),
         
-        // 총액
         Expanded(
           flex: 2,
           child: Text('${totalAmount.toString()}원', style: TextStyle(fontWeight: FontWeight.bold)),
         ),
         
-        // 액션 버튼
+        // ✅ 3개 파라미터로 호출
         Expanded(
           flex: 2,
-          child: _buildActionButtons(status, cancellation),
+          child: _buildActionButtons(status, cancellation, partialCancellations, orderId, items, info),
         ),
       ],
     ),
@@ -339,18 +349,21 @@ Widget _buildTableRow(int orderId, List<Order> items, Map<String, dynamic> info)
 }
 
 void _showOrderDetails(int orderId, List<Order> items, Map<String, dynamic> info) {
+  final partialCancellations = info['partial_cancellations'] as List<OrderItemCancellation>? ?? []; // ✅ 여기서 정의
+  
   showDialog(
     context: context,
     builder: (context) => AlertDialog(
       title: Text('주문 상세: ORD-$orderId'),
       content: SizedBox(
-        width: 500,
+        width: 600,
+        height: 500,
         child: Column(
-          mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text('배송지: ${info['shipping_address'] ?? '주소없음'}'),
             SizedBox(height: 16),
+            
             Text('주문 상품:', style: TextStyle(fontWeight: FontWeight.bold)),
             SizedBox(height: 8),
             ...items.map((item) => Padding(
@@ -362,6 +375,72 @@ void _showOrderDetails(int orderId, List<Order> items, Map<String, dynamic> info
                 ],
               ),
             )),
+            
+            // ✅ partialCancellations 사용 (위에서 정의됨)
+            if (partialCancellations.isNotEmpty) ...[
+              SizedBox(height: 20),
+              Text('부분취소 요청:', style: TextStyle(fontWeight: FontWeight.bold)),
+              SizedBox(height: 8),
+              Expanded(
+                child: ListView.builder(
+                  itemCount: partialCancellations.length,
+                  itemBuilder: (context, index) {
+                    final pc = partialCancellations[index];
+                    return Card(
+                      margin: EdgeInsets.only(bottom: 8),
+                      child: Padding(
+                        padding: EdgeInsets.all(12),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                Text(pc.productName ?? '상품명 없음', 
+                                     style: TextStyle(fontWeight: FontWeight.w500)),
+                                _buildPartialCancelStatusChip(pc.status),
+                              ],
+                            ),
+                            SizedBox(height: 4),
+                            Text('취소 수량: ${pc.cancelQuantity}개'),
+                            Text('환불 금액: ${NumberFormat('#,###').format(pc.refundAmount)}원'),
+                            Text('사유: ${pc.cancelReason}'),
+                            if (pc.cancelDetail != null)
+                              Text('상세: ${pc.cancelDetail}'),
+                            
+                            if (pc.status == 'pending') ...[
+                              SizedBox(height: 8),
+                              Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  TextButton(
+                                    onPressed: () {
+                                      Navigator.pop(context);
+                                      _handlePartialCancelAction(pc, false);
+                                    },
+                                    style: TextButton.styleFrom(foregroundColor: Colors.red),
+                                    child: Text('거부'),
+                                  ),
+                                  SizedBox(width: 8),
+                                  ElevatedButton(
+                                    onPressed: () {
+                                      Navigator.pop(context);
+                                      _handlePartialCancelAction(pc, true);
+                                    },
+                                    style: ElevatedButton.styleFrom(backgroundColor: Colors.blue),
+                                    child: Text('승인'),
+                                  ),
+                                ],
+                              ),
+                            ],
+                          ],
+                        ),
+                      ),
+                    );
+                  },
+                ),
+              ),
+            ],
           ],
         ),
       ),
@@ -375,8 +454,162 @@ void _showOrderDetails(int orderId, List<Order> items, Map<String, dynamic> info
   );
 }
 
+  // ✅ 부분취소 상태 칩
+Widget _buildPartialCancelStatusChip(String status) {
+  Color color;
+  String label;
+  
+  switch (status) {
+    case 'pending':
+      color = Colors.orange;
+      label = '대기';
+      break;
+    case 'approved':
+      color = Colors.green;
+      label = '승인';
+      break;
+    case 'rejected':
+      color = Colors.red;
+      label = '거부';
+      break;
+    default:
+      color = Colors.grey;
+      label = status;
+  }
 
-  Color _getStatusColor(String status) {
+  return Container(
+    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+    decoration: BoxDecoration(
+      color: color,
+      borderRadius: BorderRadius.circular(12),
+    ),
+    child: Text(
+      label,
+      style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold),
+    ),
+  );
+}
+
+// ✅ 부분취소 액션 처리
+void _handlePartialCancelAction(OrderItemCancellation pc, bool approve) async {
+  String adminNote = '';
+  final action = approve ? '승인' : '거부';
+
+  final result = await showDialog<String>(
+    context: context,
+    builder: (context) => AlertDialog(
+      title: Text('부분취소 $action'),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text('상품: ${pc.productName}'),
+          Text('취소 수량: ${pc.cancelQuantity}개'),
+          Text('환불 금액: ${NumberFormat('#,###').format(pc.refundAmount)}원'),
+          const SizedBox(height: 16),
+          const Text('관리자 메모:'),
+          const SizedBox(height: 8),
+          TextField(
+            decoration: InputDecoration(
+              hintText: '$action 사유를 입력해주세요',
+              border: const OutlineInputBorder(),
+            ),
+            maxLines: 3,
+            onChanged: (value) => adminNote = value,
+          ),
+        ],
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: const Text('취소'),
+        ),
+        ElevatedButton(
+          onPressed: () => Navigator.of(context).pop(adminNote),
+          style: ElevatedButton.styleFrom(
+            backgroundColor: approve ? Colors.blue : Colors.red,
+          ),
+          child: Text(action),
+        ),
+      ],
+    ),
+  );
+
+  if (result != null) {
+    try {
+      if (approve) {
+        await ref.read(orderRepositoryProvider)
+            .approvePartialCancellation(pc.id, result);
+      } else {
+        await ref.read(orderRepositoryProvider)
+            .rejectPartialCancellation(pc.id, result);
+      }
+      
+      // 목록 새로고침
+      ref.read(orderViewModelProvider(widget.orderType).notifier).fetchOrders();
+      
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('부분취소 요청이 $action되었습니다.'),
+            backgroundColor: approve ? Colors.blue : Colors.red,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('오류: $e'), backgroundColor: Colors.red),
+        );
+      }
+    }
+  }
+}
+
+
+Widget _buildActionButtons(String status, OrderCancellation? cancellation, 
+    List<OrderItemCancellation> partialCancellations, int orderId, List<Order> items, Map<String, dynamic> info) {
+  final pendingPartialCancels = partialCancellations.where((pc) => pc.status == 'pending').toList();
+  
+  if (status == 'cancel_requested' && cancellation != null) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        ElevatedButton.icon(
+          onPressed: () => _handleCancelApproval(cancellation, false),
+          icon: const Icon(Icons.close, size: 16),
+          label: const Text('거부'),
+          style: ElevatedButton.styleFrom(
+            backgroundColor: Colors.red,
+            foregroundColor: Colors.white,
+          ),
+        ),
+        const SizedBox(width: 8),
+        ElevatedButton.icon(
+          onPressed: () => _handleCancelApproval(cancellation, true),
+          icon: const Icon(Icons.check, size: 16),
+          label: const Text('승인'),
+          style: ElevatedButton.styleFrom(
+            backgroundColor: Colors.orange,
+            foregroundColor: Colors.white,
+          ),
+        ),
+      ],
+    );
+  }
+  
+  if (pendingPartialCancels.isNotEmpty) {
+    return ElevatedButton(
+      onPressed: () => _showOrderDetails(orderId, items, info),
+      style: ElevatedButton.styleFrom(backgroundColor: Colors.blue),
+      child: Text('부분취소 처리 (${pendingPartialCancels.length})'),
+    );
+  }
+  
+  return Text(_getStatusLabel(status), style: TextStyle(color: Colors.grey[600]));
+}
+
+Color _getStatusColor(String status) {
   switch (status) {
     case 'cancel_requested': return Colors.orange;
     case 'cancelled': return Colors.red;
@@ -400,7 +633,7 @@ String _getStatusLabel(String status) {
   }
 }
 
-  Widget _buildStatusChip(String status) {
+Widget _buildStatusChip(String status) {
     Color color = _getStatusColor(status);
     String label = _getStatusLabel(status);
 
@@ -417,171 +650,157 @@ String _getStatusLabel(String status) {
     );
   }
 
-  Widget _buildOrderCard(int orderId, List<Order> items, Map<String, dynamic> info) {
+Widget _buildOrderCard(int orderId, List<Order> items, Map<String, dynamic> info) {
     final status = info['status'] as String;
-    final totalAmount = info['total_amount'] as int;
-    final cancellation = info['cancellation'] as OrderCancellation?;
-
-    // 디버깅 추가
-  debugPrint('🔍 Building card for order $orderId:');
-  debugPrint('  - status: $status');
-  debugPrint('  - cancellation: ${cancellation != null ? 'exists' : 'null'}');
-  if (cancellation != null) {
-    debugPrint('  - cancellation.status: ${cancellation.status}');
-    debugPrint('  - cancellation.cancelReason: ${cancellation.cancelReason}');
-  }
-  
+  final totalAmount = info['total_amount'] as int;
+  final cancellation = info['cancellation'] as OrderCancellation?;
+  final partialCancellations = info['partial_cancellations'] as List<OrderItemCancellation>? ?? []; // ✅ 추가
     
     return Card(
-      margin: const EdgeInsets.only(bottom: 16),
-      elevation: 2,
-      child: Column(
-        children: [
-          Container(
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: _getStatusColor(status).withValues(alpha: 0.1),
-              borderRadius: const BorderRadius.only(
-                topLeft: Radius.circular(8),
-                topRight: Radius.circular(8),
-              ),
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          '주문번호: ORD-$orderId',
-                          style: const TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                        Text(
-                          '고객: ${info['recipient_name']} (${info['recipient_phone']})',
-                          style: TextStyle(color: Colors.grey[700]),
-                        ),
-                      ],
-                    ),
-                    _buildStatusChip(status),
-                  ],
-                ),
-                
-                const SizedBox(height: 8),
-                Text(
-                  '배송지: ${info['shipping_address']}',
-                  style: TextStyle(color: Colors.grey[600]),
-                ),
-                
-                // 취소 요청 정보 표시
-                if (cancellation != null) ...[
-  const SizedBox(height: 12),
-  Container(
-    padding: const EdgeInsets.all(12),
-    decoration: BoxDecoration(
-      color: _getCancellationBackgroundColor(cancellation.status),
-      borderRadius: BorderRadius.circular(8),
-      border: Border.all(color: _getCancellationBorderColor(cancellation.status)),
-    ),
+    margin: const EdgeInsets.only(bottom: 16),
+    elevation: 2,
     child: Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Row(
-          children: [
-            Icon(
-              _getCancellationIcon(cancellation.status), 
-              color: _getCancellationIconColor(cancellation.status), 
-              size: 20
-            ),
-            const SizedBox(width: 8),
-            Text(
-              _getCancellationTitle(cancellation.status),
-              style: TextStyle(
-                fontWeight: FontWeight.bold,
-                color: _getCancellationIconColor(cancellation.status),
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 8),
-        Text('사유: ${cancellation.cancelReason}'),
-        if (cancellation.cancelDetail != null)
-          Text('상세: ${cancellation.cancelDetail}'),
-        Text(
-          '요청일: ${cancellation.requestedAt.toString().substring(0, 19)}',
-          style: TextStyle(color: Colors.grey[600], fontSize: 12),
-        ),
-        // ⭐️ 처리 완료된 경우 관리자 정보 표시
-        if (cancellation.status != 'pending') ...[
-          const SizedBox(height: 8),
-          Container(
-            padding: const EdgeInsets.all(8),
-            decoration: BoxDecoration(
-              color: Colors.grey[100],
-              borderRadius: BorderRadius.circular(4),
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  '처리 결과: ${cancellation.status == 'approved' ? '승인됨' : '거부됨'}',
-                  style: const TextStyle(fontWeight: FontWeight.bold),
-                ),
-                if (cancellation.adminNote != null && cancellation.adminNote!.isNotEmpty)
-                  Text('관리자 메모: ${cancellation.adminNote}'),
-                if (cancellation.processedAt != null)
-                  Text(
-                    '처리일: ${cancellation.processedAt!.toString().substring(0, 19)}',
-                    style: TextStyle(color: Colors.grey[600], fontSize: 12),
-                  ),
-              ],
+        Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: _getStatusColor(status).withValues(alpha: 0.1),
+            borderRadius: const BorderRadius.only(
+              topLeft: Radius.circular(8),
+              topRight: Radius.circular(8),
             ),
           ),
-        ],
-      ],
-    ),
-  ),
-
-],
-                
-                const SizedBox(height: 12),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text(
-                      '총 ${items.length}개 상품 • 총액: ${totalAmount.toString()}원',
-                      style: const TextStyle(fontWeight: FontWeight.bold),
-                    ),
-                    _buildActionButtons(status, cancellation),
-                  ],
-                ),
-              ],
-            ),
-          ),
-          
-          // 상품 목록
-          ExpansionTile(
-            title: Text('상품 목록 (${items.length}개)'),
-            initiallyExpanded: false,
-            children: items.map((item) => Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-              child: Row(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Expanded(child: Text(item.productName)),
-                  Text('수량: ${item.quantity}', style: TextStyle(color: Colors.grey[600])),
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        '주문번호: ORD-$orderId',
+                        style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                      ),
+                      Text(
+                        '고객: ${info['recipient_name']} (${info['recipient_phone']})',
+                        style: TextStyle(color: Colors.grey[700]),
+                      ),
+                    ],
+                  ),
+                  _buildStatusChip(status),
                 ],
               ),
-            )).toList(),
+              
+              const SizedBox(height: 8),
+              Text(
+                '배송지: ${info['shipping_address']}',
+                style: TextStyle(color: Colors.grey[600]),
+              ),
+              
+              if (cancellation != null) ...[
+                const SizedBox(height: 12),
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: _getCancellationBackgroundColor(cancellation.status),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: _getCancellationBorderColor(cancellation.status)),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Icon(
+                            _getCancellationIcon(cancellation.status), 
+                            color: _getCancellationIconColor(cancellation.status), 
+                            size: 20
+                          ),
+                          const SizedBox(width: 8),
+                          Text(
+                            _getCancellationTitle(cancellation.status),
+                            style: TextStyle(
+                              fontWeight: FontWeight.bold,
+                              color: _getCancellationIconColor(cancellation.status),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 8),
+                      Text('사유: ${cancellation.cancelReason}'),
+                      if (cancellation.cancelDetail != null)
+                        Text('상세: ${cancellation.cancelDetail}'),
+                      Text(
+                        '요청일: ${cancellation.requestedAt.toString().substring(0, 19)}',
+                        style: TextStyle(color: Colors.grey[600], fontSize: 12),
+                      ),
+                      if (cancellation.status != 'pending') ...[
+                        const SizedBox(height: 8),
+                        Container(
+                          padding: const EdgeInsets.all(8),
+                          decoration: BoxDecoration(
+                            color: Colors.grey[100],
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                '처리 결과: ${cancellation.status == 'approved' ? '승인됨' : '거부됨'}',
+                                style: const TextStyle(fontWeight: FontWeight.bold),
+                              ),
+                              if (cancellation.adminNote != null && cancellation.adminNote!.isNotEmpty)
+                                Text('관리자 메모: ${cancellation.adminNote}'),
+                              if (cancellation.processedAt != null)
+                                Text(
+                                  '처리일: ${cancellation.processedAt!.toString().substring(0, 19)}',
+                                  style: TextStyle(color: Colors.grey[600], fontSize: 12),
+                                ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+              ],
+              
+              const SizedBox(height: 12),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    '총 ${items.length}개 상품 • 이액: ${totalAmount.toString()}원',
+                    style: const TextStyle(fontWeight: FontWeight.bold),
+                  ),
+                  // ✅ 6개 파라미터로 호출
+                  _buildActionButtons(status, cancellation, partialCancellations, orderId, items, info),
+                ],
+              ),
+            ],
           ),
-        ],
-      ),
-    );
-  }
+        ),
+        
+        ExpansionTile(
+          title: Text('상품 목록 (${items.length}개)'),
+          initiallyExpanded: false,
+          children: items.map((item) => Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+            child: Row(
+              children: [
+                Expanded(child: Text(item.productName)),
+                Text('수량: ${item.quantity}', style: TextStyle(color: Colors.grey[600])),
+              ],
+            ),
+          )).toList(),
+        ),
+      ],
+    ),
+  );
+}
+
 
   Color _getCancellationBackgroundColor(String status) {
   switch (status) {
@@ -627,38 +846,6 @@ String _getCancellationTitle(String status) {
     default: return '취소 관련';
   }
 }
-
-  Widget _buildActionButtons(String status, OrderCancellation? cancellation) {
-    if (status == 'cancel_requested' && cancellation != null) {
-      return Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          ElevatedButton.icon(
-            onPressed: () => _handleCancelApproval(cancellation, false),
-            icon: const Icon(Icons.close, size: 16),
-            label: const Text('거부'),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.red,
-              foregroundColor: Colors.white,
-            ),
-          ),
-          const SizedBox(width: 8),
-          ElevatedButton.icon(
-            onPressed: () => _handleCancelApproval(cancellation, true),
-            icon: const Icon(Icons.check, size: 16),
-            label: const Text('승인'),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.orange,
-              foregroundColor: Colors.white,
-            ),
-          ),
-        ],
-      );
-    }
-    
-    return Text(_getStatusLabel(status), style: TextStyle(color: Colors.grey[600]));
-  }
-
   void _handleCancelApproval(OrderCancellation cancellation, bool approve) async {
     final action = approve ? '승인' : '거부';
     

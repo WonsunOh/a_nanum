@@ -45,6 +45,7 @@ Future<ProfileModel?> getProfile() async {
     String? fullName,
     String? phoneNumber,
     String? address,
+    String? detailAddress,
     String? postcode, // ✅ 우편번호 파라미터 추가
   }) async {
     final userId = _client.auth.currentUser?.id;
@@ -55,6 +56,7 @@ Future<ProfileModel?> getProfile() async {
     if (fullName != null) updates['full_name'] = fullName;
     if (phoneNumber != null) updates['phone'] = phoneNumber;
     if (address != null) updates['address'] = address;
+    if (detailAddress != null) updates['detail_address'] = detailAddress;
     if (postcode != null) updates['postcode'] = postcode; // ✅ 우편번호 업데이트
     
     if (updates.isNotEmpty) {
@@ -68,6 +70,7 @@ Future<ProfileModel?> getProfile() async {
     String? fullName,
     String? phoneNumber,
     String? address,
+    String? detailAddress,
     String? postcode,
     int? newLevel,
   }) async {
@@ -79,6 +82,7 @@ Future<ProfileModel?> getProfile() async {
     if (fullName != null) updates['full_name'] = fullName;
     if (phoneNumber != null) updates['phone'] = phoneNumber;
     if (address != null) updates['address'] = address;
+    if (detailAddress != null) updates['detail_address'] = detailAddress;
     if (postcode != null) updates['postcode'] = postcode;
     if (newLevel != null) updates['level'] = newLevel; // ✅ 레벨 업데이트
     
