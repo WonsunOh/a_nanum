@@ -16,115 +16,162 @@ class OrderRepository {
 
   OrderRepository(this._supabase);
 
-  Future<List<OrderModel>> getOrders({
-    required int page,
-    String? query,
-    String? status,
-    String? period,
-  }) async {
-    const pageSize = 20;
-    final offset = page * pageSize;
 
-    var queryBuilder = _supabase.from('orders').select('''
-      order_number,
-      created_at,
-      user_id,
-      recipient_name,
-      total_amount,
-      status,
-      shipping_address,
-      recipient_phone,
-      order_type,
-      users:admin_users!inner(username, email), 
-      order_items!inner(*, products(name))
-    ''');
+Future<List<OrderModel>> getOrders({
+  required int page,
+  String? query,
+  String? status,
+  String? period,
+  DateTime? startDate, // ✅ 추가
+  DateTime? endDate, // ✅ 추가
+}) async {
+  const pageSize = 20;
+  final offset = page * pageSize;
+  var queryBuilder = _supabase.from('orders').select('''
+    order_number,
+    created_at,
+    user_id,
+    recipient_name,
+    total_amount,
+    status,
+    shipping_address,
+    recipient_phone,
+    order_type,
+    tracking_number,
+    users:admin_users!inner(username, email), 
+    order_items!inner(*, products(name))
+  ''');
 
-    if (query != null && query.isNotEmpty) {
-      queryBuilder = queryBuilder.or('order_number.ilike.%$query%,users.username.ilike.%$query%');
-    }
+  // 검색어 필터
+  if (query != null && query.isNotEmpty) {
+    queryBuilder = queryBuilder.or('order_number.ilike.%$query%,users.username.ilike.%$query%');
+  }
 
-    if (status != null && status != '전체') {
-       final statusInEnglish = OrderStatus.values.firstWhere((e) => e.displayName == status).name;
-       queryBuilder = queryBuilder.eq('status', statusInEnglish);
-    } else {
-      // '전체' 보기일 경우, 취소/취소요청 상태는 제외합니다.
-      queryBuilder = queryBuilder.not('status', 'in', '(cancelled, cancellationRequested)');
+  // 상태 필터
+  if (status != null && status != '전체') {
+    final statusInEnglish = OrderStatus.values.firstWhere((e) => e.displayName == status).name;
+    queryBuilder = queryBuilder.eq('status', statusInEnglish);
+  } else {
+    // '전체' 보기일 경우, 취소/취소요청 상태는 제외합니다.
+    queryBuilder = queryBuilder.not('status', 'in', '(cancelled, cancellationRequested)');
+  }
+  
+  // ✅ 빠른 기간 선택 필터
+  if (period != null && period != 'all' && period != 'custom') {
+    final now = DateTime.now();
+    DateTime periodStartDate;
+    
+    switch (period) {
+      case 'today':
+        // 오늘 00:00:00부터
+        periodStartDate = DateTime(now.year, now.month, now.day);
+        break;
+      case '1w':
+        // 7일 전부터
+        periodStartDate = now.subtract(const Duration(days: 7));
+        break;
+      case '1m':
+        // 30일 전부터
+        periodStartDate = now.subtract(const Duration(days: 30));
+        break;
+      case '3m':
+        // 90일 전부터
+        periodStartDate = now.subtract(const Duration(days: 90));
+        break;
+      case '1d': // 기존 호환성 유지
+        periodStartDate = now.subtract(const Duration(days: 1));
+        break;
+      default:
+        periodStartDate = DateTime(1970);
     }
     
-    if (period != null && period != 'all') {
-      final now = DateTime.now();
-      DateTime startDate;
-      switch (period) {
-        case '1d': startDate = now.subtract(const Duration(days: 1)); break;
-        case '1w': startDate = now.subtract(const Duration(days: 7)); break;
-        case '1m': startDate = now.subtract(const Duration(days: 30)); break;
-        default: startDate = DateTime(1970);
-      }
-      queryBuilder = queryBuilder.gte('created_at', startDate.toIso8601String());
-    }
+    queryBuilder = queryBuilder.gte('created_at', periodStartDate.toIso8601String());
+  }
 
-    final response = await queryBuilder
-        .order('created_at', ascending: false)
-        .range(offset, offset + pageSize - 1);
+  // ✅ 사용자 정의 시작일
+  if (startDate != null) {
+    queryBuilder = queryBuilder.gte('created_at', startDate.toIso8601String());
+  }
+  
+  // ✅ 사용자 정의 종료일 (23:59:59까지 포함)
+  if (endDate != null) {
+    final endOfDay = DateTime(
+      endDate.year,
+      endDate.month,
+      endDate.day,
+      23,
+      59,
+      59,
+    );
+    queryBuilder = queryBuilder.lte('created_at', endOfDay.toIso8601String());
+  }
 
-    final orders = (response as List).map((item) => OrderModel.fromJson(item)).toList();
-    
-    // 부분 취소 정보를 가져와서 주문 데이터에 반영하는 로직
-    if (orders.isNotEmpty) {
-      final orderNumbers = orders.map((o) => o.orderId).toList();
+  // 정렬 및 페이징
+  final response = await queryBuilder
+      .order('created_at', ascending: false)
+      .range(offset, offset + pageSize - 1);
 
-      final partialCancellationsResponse = await _supabase
-          .from('order_item_cancellations')
-          .select('*, order_items!inner(order_id, products!inner(*)), orders!inner(order_number)')
-          .inFilter('orders.order_number', orderNumbers)
-          .eq('status', 'approved'); // 승인된 부분취소만 가져옵니다.
+  final orders = (response as List).map((item) => OrderModel.fromJson(item)).toList();
+  
+  // 부분 취소 정보를 가져와서 주문 데이터에 반영하는 로직
+  if (orders.isNotEmpty) {
+    final orderNumbers = orders.map((o) => o.orderId).toList();
 
-      final partialCancellations = (partialCancellationsResponse as List)
-          .map((e) => OrderItemCancellation.fromJson(e))
-          .toList();
+    final partialCancellationsResponse = await _supabase
+        .from('order_item_cancellations')
+        .select('*, order_items!inner(order_id, products!inner(*)), orders!inner(order_number)')
+        .inFilter('orders.order_number', orderNumbers)
+        .eq('status', 'approved'); // 승인된 부분취소만 가져옵니다.
 
-      if (partialCancellations.isNotEmpty) {
-        for (var order in orders) {
-          final relevantCancellations = partialCancellations
-              .where((c) => c.order.orderId == order.orderId)
-              .toList();
+    final partialCancellations = (partialCancellationsResponse as List)
+        .map((e) => OrderItemCancellation.fromJson(e))
+        .toList();
 
-          if (relevantCancellations.isNotEmpty) {
-            int newTotalAmount = order.totalAmount;
-            List<OrderItem> newItems = List.from(order.items);
+    if (partialCancellations.isNotEmpty) {
+      for (var order in orders) {
+        final relevantCancellations = partialCancellations
+            .where((c) => c.order.orderId == order.orderId)
+            .toList();
 
-            for (var cancellation in relevantCancellations) {
-              final originalItemIndex = newItems.indexWhere((item) => item.productName == cancellation.orderItem.productName);
+        if (relevantCancellations.isNotEmpty) {
+          int newTotalAmount = order.totalAmount;
+          List<OrderItem> newItems = List.from(order.items);
 
-              if (originalItemIndex != -1) {
-                final originalItem = newItems[originalItemIndex];
-                final newQuantity = originalItem.quantity - cancellation.cancelledQuantity;
-                
-                newTotalAmount -= (cancellation.orderItem.price * cancellation.cancelledQuantity);
-                
-                if (newQuantity > 0) {
-                  newItems[originalItemIndex] = OrderItem(
-                    productName: originalItem.productName,
-                    quantity: newQuantity,
-                    price: originalItem.price,
-                  );
-                } else {
-                  newItems.removeAt(originalItemIndex);
-                }
+          for (var cancellation in relevantCancellations) {
+            final originalItemIndex = newItems.indexWhere(
+                (item) => item.productName == cancellation.orderItem.productName);
+
+            if (originalItemIndex != -1) {
+              final originalItem = newItems[originalItemIndex];
+              final newQuantity = originalItem.quantity - cancellation.cancelledQuantity;
+              
+              newTotalAmount -= (cancellation.orderItem.price * cancellation.cancelledQuantity);
+              
+              if (newQuantity > 0) {
+                newItems[originalItemIndex] = OrderItem(
+                  productName: originalItem.productName,
+                  quantity: newQuantity,
+                  price: originalItem.price,
+                );
+              } else {
+                newItems.removeAt(originalItemIndex);
               }
             }
-            final orderIndex = orders.indexOf(order);
-            orders[orderIndex] = order.copyWith(
-              totalAmount: newTotalAmount,
-              items: newItems,
-            );
           }
+          
+          final orderIndex = orders.indexOf(order);
+          orders[orderIndex] = order.copyWith(
+            totalAmount: newTotalAmount,
+            items: newItems,
+          );
         }
       }
     }
-    
-    return orders;
   }
+  
+  return orders;
+}
+
 
   Future<void> updateOrderStatus(String orderId, String newStatus) async {
     await _supabase

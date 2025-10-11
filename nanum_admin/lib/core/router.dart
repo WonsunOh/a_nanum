@@ -11,6 +11,7 @@ import '../features/cs_management.dart/templates/view/reply_template_screen.dart
 import '../features/dashboard/view/dashboard_screen.dart';
 import '../features/settings/view/settings_screen.dart';
 import '../features/shop_management/categories/view/category_management_screen.dart';
+import '../features/shop_management/inventory/view/inventory_dashboard_screen.dart';
 import '../features/shop_management/inventory/view/inventory_management_screen.dart';
 import '../features/shop_management/products/view/add_edit_product_screen.dart';
 import '../features/shop_management/products/view/discount_product_screen.dart';
@@ -120,9 +121,17 @@ final router = GoRouter(
               const OrderManagementScreen(),
         ),
 
-        GoRoute(
+       // ✅ 기존 재고 관리 경로
+GoRoute(
   path: '/shop/inventory',
   builder: (context, state) => const InventoryManagementScreen(),
+  routes: [
+    // ✅ 재고 대시보드 서브 경로 추가
+    GoRoute(
+      path: 'dashboard',
+      builder: (context, state) => const InventoryDashboardScreen(),
+    ),
+  ],
 ),
         
         // 회원 관리

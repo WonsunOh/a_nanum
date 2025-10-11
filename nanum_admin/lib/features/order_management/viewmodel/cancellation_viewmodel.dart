@@ -1,5 +1,6 @@
 // File: nanum_admin/lib/features/order_management/viewmodel/cancellation_viewmodel.dart
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_riverpod/legacy.dart';
 import '../../../data/models/cancellation_model.dart';
 import '../../../data/repositories/cancellation_repository.dart';
 

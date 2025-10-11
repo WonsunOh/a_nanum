@@ -6,189 +6,193 @@ part of 'user_viewmodel.dart';
 // RiverpodGenerator
 // **************************************************************************
 
-String _$userViewModelHash() => r'a2696db7d659248832c1a44c524d36adb6bac161';
+// GENERATED CODE - DO NOT MODIFY BY HAND
+// ignore_for_file: type=lint, type=warning
 
-/// See also [UserViewModel].
 @ProviderFor(UserViewModel)
-final userViewModelProvider =
-    AutoDisposeAsyncNotifierProvider<UserViewModel, List<AppUser>>.internal(
-      UserViewModel.new,
-      name: r'userViewModelProvider',
-      debugGetCreateSourceHash: const bool.fromEnvironment('dart.vm.product')
-          ? null
-          : _$userViewModelHash,
-      dependencies: null,
-      allTransitiveDependencies: null,
-    );
+const userViewModelProvider = UserViewModelProvider._();
 
-typedef _$UserViewModel = AutoDisposeAsyncNotifier<List<AppUser>>;
-String _$userSearchQueryHash() => r'acf1af1759516cd639f4c469251a1e8a34c6d55e';
-
-/// See also [UserSearchQuery].
-@ProviderFor(UserSearchQuery)
-final userSearchQueryProvider =
-    AutoDisposeNotifierProvider<UserSearchQuery, String>.internal(
-      UserSearchQuery.new,
-      name: r'userSearchQueryProvider',
-      debugGetCreateSourceHash: const bool.fromEnvironment('dart.vm.product')
-          ? null
-          : _$userSearchQueryHash,
-      dependencies: null,
-      allTransitiveDependencies: null,
-    );
-
-typedef _$UserSearchQuery = AutoDisposeNotifier<String>;
-String _$userDetailHash() => r'edaf666cd6e362d225a7b71acbf46dfac569738b';
-
-/// Copied from Dart SDK
-class _SystemHash {
-  _SystemHash._();
-
-  static int combine(int hash, int value) {
-    // ignore: parameter_assignments
-    hash = 0x1fffffff & (hash + value);
-    // ignore: parameter_assignments
-    hash = 0x1fffffff & (hash + ((0x0007ffff & hash) << 10));
-    return hash ^ (hash >> 6);
-  }
-
-  static int finish(int hash) {
-    // ignore: parameter_assignments
-    hash = 0x1fffffff & (hash + ((0x03ffffff & hash) << 3));
-    // ignore: parameter_assignments
-    hash = hash ^ (hash >> 11);
-    return 0x1fffffff & (hash + ((0x00003fff & hash) << 15));
-  }
-}
-
-abstract class _$UserDetail
-    extends BuildlessAutoDisposeAsyncNotifier<UserDetailModel> {
-  late final String userId;
-
-  FutureOr<UserDetailModel> build(String userId);
-}
-
-/// See also [UserDetail].
-@ProviderFor(UserDetail)
-const userDetailProvider = UserDetailFamily();
-
-/// See also [UserDetail].
-class UserDetailFamily extends Family<AsyncValue<UserDetailModel>> {
-  /// See also [UserDetail].
-  const UserDetailFamily();
-
-  /// See also [UserDetail].
-  UserDetailProvider call(String userId) {
-    return UserDetailProvider(userId);
-  }
-
-  @override
-  UserDetailProvider getProviderOverride(
-    covariant UserDetailProvider provider,
-  ) {
-    return call(provider.userId);
-  }
-
-  static const Iterable<ProviderOrFamily>? _dependencies = null;
-
-  @override
-  Iterable<ProviderOrFamily>? get dependencies => _dependencies;
-
-  static const Iterable<ProviderOrFamily>? _allTransitiveDependencies = null;
-
-  @override
-  Iterable<ProviderOrFamily>? get allTransitiveDependencies =>
-      _allTransitiveDependencies;
-
-  @override
-  String? get name => r'userDetailProvider';
-}
-
-/// See also [UserDetail].
-class UserDetailProvider
-    extends AutoDisposeAsyncNotifierProviderImpl<UserDetail, UserDetailModel> {
-  /// See also [UserDetail].
-  UserDetailProvider(String userId)
-    : this._internal(
-        () => UserDetail()..userId = userId,
-        from: userDetailProvider,
-        name: r'userDetailProvider',
-        debugGetCreateSourceHash: const bool.fromEnvironment('dart.vm.product')
-            ? null
-            : _$userDetailHash,
-        dependencies: UserDetailFamily._dependencies,
-        allTransitiveDependencies: UserDetailFamily._allTransitiveDependencies,
-        userId: userId,
+final class UserViewModelProvider
+    extends $AsyncNotifierProvider<UserViewModel, List<AppUser>> {
+  const UserViewModelProvider._()
+    : super(
+        from: null,
+        argument: null,
+        retry: null,
+        name: r'userViewModelProvider',
+        isAutoDispose: true,
+        dependencies: null,
+        $allTransitiveDependencies: null,
       );
 
-  UserDetailProvider._internal(
-    super._createNotifier, {
-    required super.name,
-    required super.dependencies,
-    required super.allTransitiveDependencies,
-    required super.debugGetCreateSourceHash,
-    required super.from,
-    required this.userId,
-  }) : super.internal();
-
-  final String userId;
-
   @override
-  FutureOr<UserDetailModel> runNotifierBuild(covariant UserDetail notifier) {
-    return notifier.build(userId);
+  String debugGetCreateSourceHash() => _$userViewModelHash();
+
+  @$internal
+  @override
+  UserViewModel create() => UserViewModel();
+}
+
+String _$userViewModelHash() => r'a2696db7d659248832c1a44c524d36adb6bac161';
+
+abstract class _$UserViewModel extends $AsyncNotifier<List<AppUser>> {
+  FutureOr<List<AppUser>> build();
+  @$mustCallSuper
+  @override
+  void runBuild() {
+    final created = build();
+    final ref = this.ref as $Ref<AsyncValue<List<AppUser>>, List<AppUser>>;
+    final element =
+        ref.element
+            as $ClassProviderElement<
+              AnyNotifier<AsyncValue<List<AppUser>>, List<AppUser>>,
+              AsyncValue<List<AppUser>>,
+              Object?,
+              Object?
+            >;
+    element.handleValue(ref, created);
   }
+}
+
+@ProviderFor(UserSearchQuery)
+const userSearchQueryProvider = UserSearchQueryProvider._();
+
+final class UserSearchQueryProvider
+    extends $NotifierProvider<UserSearchQuery, String> {
+  const UserSearchQueryProvider._()
+    : super(
+        from: null,
+        argument: null,
+        retry: null,
+        name: r'userSearchQueryProvider',
+        isAutoDispose: true,
+        dependencies: null,
+        $allTransitiveDependencies: null,
+      );
 
   @override
-  Override overrideWith(UserDetail Function() create) {
-    return ProviderOverride(
+  String debugGetCreateSourceHash() => _$userSearchQueryHash();
+
+  @$internal
+  @override
+  UserSearchQuery create() => UserSearchQuery();
+
+  /// {@macro riverpod.override_with_value}
+  Override overrideWithValue(String value) {
+    return $ProviderOverride(
       origin: this,
-      override: UserDetailProvider._internal(
-        () => create()..userId = userId,
-        from: from,
-        name: null,
-        dependencies: null,
-        allTransitiveDependencies: null,
-        debugGetCreateSourceHash: null,
-        userId: userId,
-      ),
+      providerOverride: $SyncValueProvider<String>(value),
     );
   }
+}
+
+String _$userSearchQueryHash() => r'acf1af1759516cd639f4c469251a1e8a34c6d55e';
+
+abstract class _$UserSearchQuery extends $Notifier<String> {
+  String build();
+  @$mustCallSuper
+  @override
+  void runBuild() {
+    final created = build();
+    final ref = this.ref as $Ref<String, String>;
+    final element =
+        ref.element
+            as $ClassProviderElement<
+              AnyNotifier<String, String>,
+              String,
+              Object?,
+              Object?
+            >;
+    element.handleValue(ref, created);
+  }
+}
+
+@ProviderFor(UserDetail)
+const userDetailProvider = UserDetailFamily._();
+
+final class UserDetailProvider
+    extends $AsyncNotifierProvider<UserDetail, UserDetailModel> {
+  const UserDetailProvider._({
+    required UserDetailFamily super.from,
+    required String super.argument,
+  }) : super(
+         retry: null,
+         name: r'userDetailProvider',
+         isAutoDispose: true,
+         dependencies: null,
+         $allTransitiveDependencies: null,
+       );
 
   @override
-  AutoDisposeAsyncNotifierProviderElement<UserDetail, UserDetailModel>
-  createElement() {
-    return _UserDetailProviderElement(this);
+  String debugGetCreateSourceHash() => _$userDetailHash();
+
+  @override
+  String toString() {
+    return r'userDetailProvider'
+        ''
+        '($argument)';
   }
+
+  @$internal
+  @override
+  UserDetail create() => UserDetail();
 
   @override
   bool operator ==(Object other) {
-    return other is UserDetailProvider && other.userId == userId;
+    return other is UserDetailProvider && other.argument == argument;
   }
 
   @override
   int get hashCode {
-    var hash = _SystemHash.combine(0, runtimeType.hashCode);
-    hash = _SystemHash.combine(hash, userId.hashCode);
-
-    return _SystemHash.finish(hash);
+    return argument.hashCode;
   }
 }
 
-@Deprecated('Will be removed in 3.0. Use Ref instead')
-// ignore: unused_element
-mixin UserDetailRef on AutoDisposeAsyncNotifierProviderRef<UserDetailModel> {
-  /// The parameter `userId` of this provider.
-  String get userId;
-}
+String _$userDetailHash() => r'edaf666cd6e362d225a7b71acbf46dfac569738b';
 
-class _UserDetailProviderElement
-    extends AutoDisposeAsyncNotifierProviderElement<UserDetail, UserDetailModel>
-    with UserDetailRef {
-  _UserDetailProviderElement(super.provider);
+final class UserDetailFamily extends $Family
+    with
+        $ClassFamilyOverride<
+          UserDetail,
+          AsyncValue<UserDetailModel>,
+          UserDetailModel,
+          FutureOr<UserDetailModel>,
+          String
+        > {
+  const UserDetailFamily._()
+    : super(
+        retry: null,
+        name: r'userDetailProvider',
+        dependencies: null,
+        $allTransitiveDependencies: null,
+        isAutoDispose: true,
+      );
+
+  UserDetailProvider call(String userId) =>
+      UserDetailProvider._(argument: userId, from: this);
 
   @override
-  String get userId => (origin as UserDetailProvider).userId;
+  String toString() => r'userDetailProvider';
 }
 
-// ignore_for_file: type=lint
-// ignore_for_file: subtype_of_sealed_class, invalid_use_of_internal_member, invalid_use_of_visible_for_testing_member, deprecated_member_use_from_same_package
+abstract class _$UserDetail extends $AsyncNotifier<UserDetailModel> {
+  late final _$args = ref.$arg as String;
+  String get userId => _$args;
+
+  FutureOr<UserDetailModel> build(String userId);
+  @$mustCallSuper
+  @override
+  void runBuild() {
+    final created = build(_$args);
+    final ref = this.ref as $Ref<AsyncValue<UserDetailModel>, UserDetailModel>;
+    final element =
+        ref.element
+            as $ClassProviderElement<
+              AnyNotifier<AsyncValue<UserDetailModel>, UserDetailModel>,
+              AsyncValue<UserDetailModel>,
+              Object?,
+              Object?
+            >;
+    element.handleValue(ref, created);
+  }
+}

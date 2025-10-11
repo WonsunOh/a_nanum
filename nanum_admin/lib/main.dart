@@ -19,7 +19,11 @@ void main() async {
   await Supabase.initialize(
    url: dotenv.env['SUPABASE_URL']!,
    anonKey: dotenv.env['SUPABASE_ANON_KEY']!,
-   
+   authOptions: const FlutterAuthClientOptions(
+    authFlowType: AuthFlowType.pkce,
+    // ⭐️ 세션 만료 시간 설정 (초 단위, 30분 = 1800초)
+    autoRefreshToken: true,
+  ),
   );
 
   

@@ -1,6 +1,7 @@
 // nanum_admin/lib/features/shop_management.dart/inventory/viewmodel/inventory_viewmodel.dart
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_riverpod/legacy.dart';
 import '../../../../data/models/inventory_model.dart';
 import '../../../../data/repositories/inventory_repository.dart';
 

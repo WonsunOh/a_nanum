@@ -1,5 +1,6 @@
 // admin_web/lib/features/shop_management/products/viewmodel/product_viewmodel.dart (전체 교체)
 
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 

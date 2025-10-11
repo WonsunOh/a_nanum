@@ -9,7 +9,7 @@ part 'auth_provider.g.dart';
 
 // ✅ 간단한 Provider만 유지 (에러 없음)
 @riverpod
-Stream<AuthState> authStateChange(AuthStateChangeRef ref) {
+Stream<AuthState> authStateChange(Ref ref) {
   
   return Supabase.instance.client.auth.onAuthStateChange.map((authState) {
     return authState;

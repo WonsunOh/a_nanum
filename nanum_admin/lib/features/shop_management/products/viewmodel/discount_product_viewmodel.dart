@@ -1,6 +1,7 @@
 // nanum_admin/lib/features/shop_management.dart/products/viewmodel/discount_product_viewmodel.dart
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_riverpod/legacy.dart';
 
 import '../../../../data/models/product_model.dart';
 import '../../../../data/repositories/product_repository.dart';

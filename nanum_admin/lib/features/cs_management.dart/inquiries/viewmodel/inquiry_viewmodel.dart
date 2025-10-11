@@ -1,4 +1,5 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_riverpod/legacy.dart';
 
 import '../../../../data/models/inquiry_model.dart';
 import '../../../../data/repositories/inquiry_repository.dart';

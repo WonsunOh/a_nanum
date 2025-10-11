@@ -1,4 +1,4 @@
-// nanum_admin/lib/core/main_layout.dart (원본 구조 유지 + 에러만 수정)
+// nanum_admin/lib/core/main_layout.dart
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -19,32 +19,29 @@ class MainLayout extends ConsumerStatefulWidget {
 }
 
 class _MainLayoutState extends ConsumerState<MainLayout> {
- bool _isMenuExpanded = true;
+  bool _isMenuExpanded = true;
 
-  // ⭐️ 비활성 타이머 리스너 추가
   @override
   void initState() {
     super.initState();
     
-    // 초기 타이머 시작
+    // ✅ 초기 타이머 시작
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) {
         ref.read(inactivityTimerProvider.notifier).resetTimer();
+        debugPrint('✅ Inactivity timer started');
       }
     });
   }
 
-  // ⭐️ 쇼핑몰로 이동하는 메서드 추가
   Future<void> _openShoppingMall() async {
-    // TODO: 실제 쇼핑몰 URL로 변경해주세요
-    final Uri url = Uri.parse('http://localhost:6186'); // 개발 환경
-    // final Uri url = Uri.parse('https://yourdomain.com'); // 실제 배포 환경
+    final Uri url = Uri.parse('http://localhost:6186');
     
     try {
       if (await canLaunchUrl(url)) {
         await launchUrl(
           url,
-          mode: LaunchMode.externalApplication, // 새 탭/창에서 열기
+          mode: LaunchMode.externalApplication,
         );
       } else {
         if (mounted) {
@@ -116,15 +113,17 @@ class _MainLayoutState extends ConsumerState<MainLayout> {
 
   @override
   Widget build(BuildContext context) {
-    // ⭐️ 비활성 로그아웃 감지
+    // ✅ 비활성 로그아웃 감지 - previous와 next를 비교
     ref.listen(inactivityLogoutTriggerProvider, (previous, next) {
-      if (next && mounted) {
+      // ✅ Provider가 새로 생성되었을 때 (이전 값이 없을 때) 로그아웃 실행
+      if (previous != null && mounted) {
+        debugPrint('🔔 Logout listener triggered: previous=$previous, next=$next');
         _handleInactivityLogout();
       }
     });
-    // ✅ 기존 Provider 사용하되 에러 처리만 개선
+
+    // 기존 인증 상태 변경 감지
     ref.listen(authStateChangeProvider, (previous, next) {
-      // ✅ null 안전성 처리 추가
       next.whenData((authState) {
         if (authState.event == AuthChangeEvent.signedOut) {
           WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -136,14 +135,12 @@ class _MainLayoutState extends ConsumerState<MainLayout> {
       });
     });
 
-    // 중복 메뉴 방지 로직
     final hasOuterLayout =
         context.findAncestorWidgetOfExactType<MainLayout>() != null;
     if (hasOuterLayout) {
       return widget.child;
     }
 
-    // ✅ 원본 구조 그대로 유지
     final currentRoute = GoRouterState.of(context).matchedLocation;
 
     return Listener(
@@ -160,7 +157,6 @@ class _MainLayoutState extends ConsumerState<MainLayout> {
                 elevation: 1.0,
                 child: Column(
                   children: [
-                    // 햄버거 버튼
                     Padding(
                       padding: const EdgeInsets.fromLTRB(0, 8, 8, 0),
                       child: Align(
@@ -179,7 +175,6 @@ class _MainLayoutState extends ConsumerState<MainLayout> {
                       ),
                     ),
       
-                    // 로고/제목
                     Padding(
                       padding: const EdgeInsets.symmetric(vertical: 20),
                       child: Column(
@@ -203,7 +198,6 @@ class _MainLayoutState extends ConsumerState<MainLayout> {
                       ),
                     ),
 
-                    // ⭐️ 쇼핑몰 바로가기 버튼 추가
                     Padding(
                       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                       child: _isMenuExpanded
@@ -231,12 +225,10 @@ class _MainLayoutState extends ConsumerState<MainLayout> {
       
                     const Divider(),
       
-                    // 메뉴 아이템들
                     Expanded(
                       child: ListView(
                         padding: EdgeInsets.zero,
                         children: menuItems.map((item) {
-                          // ✅ null 안전성 문제 해결
                           final bool isSelected = item.children.isNotEmpty
                               ? item.children.any(
                                   (child) => currentRoute.startsWith(child.route),
@@ -328,12 +320,11 @@ class _MainLayoutState extends ConsumerState<MainLayout> {
       
                     const Divider(),
       
-                    // 로그아웃 버튼
                     ListTile(
                       leading: const Icon(Icons.logout),
                       title: _isMenuExpanded
                           ? const Text('로그아웃')
-                          : const SizedBox.shrink(), // ✅ null 대신 빈 위젯
+                          : const SizedBox.shrink(),
                       onTap: () {
                         ref.read(authViewModelProvider.notifier).signOut();
                       },
@@ -346,7 +337,6 @@ class _MainLayoutState extends ConsumerState<MainLayout> {
       
             const VerticalDivider(width: 1),
       
-            // ✅ 원본 구조 그대로 유지
             Expanded(
               child: PageStorage(
                 key: PageStorageKey(GoRouterState.of(context).matchedLocation),
@@ -360,20 +350,19 @@ class _MainLayoutState extends ConsumerState<MainLayout> {
     );
   }
 
-  // ⭐️ 사용자 활동 감지 메서드
+  // 사용자 활동 감지 메서드
   void _onUserActivity() {
     ref.read(inactivityTimerProvider.notifier).resetTimer();
   }
 
-  // ⭐️ 비활성으로 인한 로그아웃 처리
+  // 비활성으로 인한 로그아웃 처리
   void _handleInactivityLogout() {
+    debugPrint('🚪 Executing inactivity logout...');
+    
     // 타이머 취소
     ref.read(inactivityTimerProvider.notifier).cancelTimer();
     
-    // 로그아웃 실행
-    ref.read(authViewModelProvider.notifier).signOut();
-    
-    // 사용자에게 알림
+    // 사용자에게 알림 (로그아웃 전에 표시)
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -383,5 +372,8 @@ class _MainLayoutState extends ConsumerState<MainLayout> {
         ),
       );
     }
+    
+    // 로그아웃 실행
+    ref.read(authViewModelProvider.notifier).signOut();
   }
 }

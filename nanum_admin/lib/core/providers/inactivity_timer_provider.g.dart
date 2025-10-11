@@ -6,39 +6,100 @@ part of 'inactivity_timer_provider.dart';
 // RiverpodGenerator
 // **************************************************************************
 
-String _$inactivityLogoutTriggerHash() =>
-    r'08380edae8a8884f490716701fed247a915f39cc';
+// GENERATED CODE - DO NOT MODIFY BY HAND
+// ignore_for_file: type=lint, type=warning
 
-/// See also [inactivityLogoutTrigger].
-@ProviderFor(inactivityLogoutTrigger)
-final inactivityLogoutTriggerProvider = AutoDisposeProvider<bool>.internal(
-  inactivityLogoutTrigger,
-  name: r'inactivityLogoutTriggerProvider',
-  debugGetCreateSourceHash: const bool.fromEnvironment('dart.vm.product')
-      ? null
-      : _$inactivityLogoutTriggerHash,
-  dependencies: null,
-  allTransitiveDependencies: null,
-);
-
-@Deprecated('Will be removed in 3.0. Use Ref instead')
-// ignore: unused_element
-typedef InactivityLogoutTriggerRef = AutoDisposeProviderRef<bool>;
-String _$inactivityTimerHash() => r'86b026890e377220fe11a8ece595a7dcbcb1849d';
-
-/// See also [InactivityTimer].
 @ProviderFor(InactivityTimer)
-final inactivityTimerProvider =
-    AutoDisposeNotifierProvider<InactivityTimer, DateTime>.internal(
-      InactivityTimer.new,
-      name: r'inactivityTimerProvider',
-      debugGetCreateSourceHash: const bool.fromEnvironment('dart.vm.product')
-          ? null
-          : _$inactivityTimerHash,
-      dependencies: null,
-      allTransitiveDependencies: null,
-    );
+const inactivityTimerProvider = InactivityTimerProvider._();
 
-typedef _$InactivityTimer = AutoDisposeNotifier<DateTime>;
-// ignore_for_file: type=lint
-// ignore_for_file: subtype_of_sealed_class, invalid_use_of_internal_member, invalid_use_of_visible_for_testing_member, deprecated_member_use_from_same_package
+final class InactivityTimerProvider
+    extends $NotifierProvider<InactivityTimer, DateTime> {
+  const InactivityTimerProvider._()
+    : super(
+        from: null,
+        argument: null,
+        retry: null,
+        name: r'inactivityTimerProvider',
+        isAutoDispose: true,
+        dependencies: null,
+        $allTransitiveDependencies: null,
+      );
+
+  @override
+  String debugGetCreateSourceHash() => _$inactivityTimerHash();
+
+  @$internal
+  @override
+  InactivityTimer create() => InactivityTimer();
+
+  /// {@macro riverpod.override_with_value}
+  Override overrideWithValue(DateTime value) {
+    return $ProviderOverride(
+      origin: this,
+      providerOverride: $SyncValueProvider<DateTime>(value),
+    );
+  }
+}
+
+String _$inactivityTimerHash() => r'3ed882ace0a1f50035488e6c99050c345e24e0d5';
+
+abstract class _$InactivityTimer extends $Notifier<DateTime> {
+  DateTime build();
+  @$mustCallSuper
+  @override
+  void runBuild() {
+    final created = build();
+    final ref = this.ref as $Ref<DateTime, DateTime>;
+    final element =
+        ref.element
+            as $ClassProviderElement<
+              AnyNotifier<DateTime, DateTime>,
+              DateTime,
+              Object?,
+              Object?
+            >;
+    element.handleValue(ref, created);
+  }
+}
+
+@ProviderFor(inactivityLogoutTrigger)
+const inactivityLogoutTriggerProvider = InactivityLogoutTriggerProvider._();
+
+final class InactivityLogoutTriggerProvider
+    extends $FunctionalProvider<DateTime, DateTime, DateTime>
+    with $Provider<DateTime> {
+  const InactivityLogoutTriggerProvider._()
+    : super(
+        from: null,
+        argument: null,
+        retry: null,
+        name: r'inactivityLogoutTriggerProvider',
+        isAutoDispose: true,
+        dependencies: null,
+        $allTransitiveDependencies: null,
+      );
+
+  @override
+  String debugGetCreateSourceHash() => _$inactivityLogoutTriggerHash();
+
+  @$internal
+  @override
+  $ProviderElement<DateTime> $createElement($ProviderPointer pointer) =>
+      $ProviderElement(pointer);
+
+  @override
+  DateTime create(Ref ref) {
+    return inactivityLogoutTrigger(ref);
+  }
+
+  /// {@macro riverpod.override_with_value}
+  Override overrideWithValue(DateTime value) {
+    return $ProviderOverride(
+      origin: this,
+      providerOverride: $SyncValueProvider<DateTime>(value),
+    );
+  }
+}
+
+String _$inactivityLogoutTriggerHash() =>
+    r'0fa9d10091b3474fc54bb5444558a3c907999295';

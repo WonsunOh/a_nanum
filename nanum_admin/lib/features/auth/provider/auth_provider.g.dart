@@ -6,22 +6,39 @@ part of 'auth_provider.dart';
 // RiverpodGenerator
 // **************************************************************************
 
-String _$authStateChangeHash() => r'478d582529606108b56f1ab07b3db14d59f8b152';
+// GENERATED CODE - DO NOT MODIFY BY HAND
+// ignore_for_file: type=lint, type=warning
 
-/// See also [authStateChange].
 @ProviderFor(authStateChange)
-final authStateChangeProvider = AutoDisposeStreamProvider<AuthState>.internal(
-  authStateChange,
-  name: r'authStateChangeProvider',
-  debugGetCreateSourceHash: const bool.fromEnvironment('dart.vm.product')
-      ? null
-      : _$authStateChangeHash,
-  dependencies: null,
-  allTransitiveDependencies: null,
-);
+const authStateChangeProvider = AuthStateChangeProvider._();
 
-@Deprecated('Will be removed in 3.0. Use Ref instead')
-// ignore: unused_element
-typedef AuthStateChangeRef = AutoDisposeStreamProviderRef<AuthState>;
-// ignore_for_file: type=lint
-// ignore_for_file: subtype_of_sealed_class, invalid_use_of_internal_member, invalid_use_of_visible_for_testing_member, deprecated_member_use_from_same_package
+final class AuthStateChangeProvider
+    extends
+        $FunctionalProvider<AsyncValue<AuthState>, AuthState, Stream<AuthState>>
+    with $FutureModifier<AuthState>, $StreamProvider<AuthState> {
+  const AuthStateChangeProvider._()
+    : super(
+        from: null,
+        argument: null,
+        retry: null,
+        name: r'authStateChangeProvider',
+        isAutoDispose: true,
+        dependencies: null,
+        $allTransitiveDependencies: null,
+      );
+
+  @override
+  String debugGetCreateSourceHash() => _$authStateChangeHash();
+
+  @$internal
+  @override
+  $StreamProviderElement<AuthState> $createElement($ProviderPointer pointer) =>
+      $StreamProviderElement(pointer);
+
+  @override
+  Stream<AuthState> create(Ref ref) {
+    return authStateChange(ref);
+  }
+}
+
+String _$authStateChangeHash() => r'e0abed494dd07d9e4a99d498ff59d901cd22b47e';
