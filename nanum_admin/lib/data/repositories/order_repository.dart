@@ -1,4 +1,5 @@
 // File: nanum_admin/lib/data/repositories/order_repository.dart
+import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../models/order_cancellation_model.dart';
@@ -193,5 +194,43 @@ class OrderRepository {
   Future<void> rejectPartialCancellation(String itemCancellationId, String reason) async {
     await _supabase.from('order_item_cancellations').update({'status': 'rejected', 'rejection_reason': reason}).eq('item_cancellation_id', itemCancellationId);
   }
+
+
+  // 📌 개별 송장번호 업데이트
+Future<void> updateTrackingNumber({
+  required String orderId,
+  required String trackingNumber,
+  String? courierCompany,
+}) async {
+  try {
+    await _supabase.from('orders').update({
+      'tracking_number': trackingNumber,
+      'courier_company': courierCompany,
+      'status': OrderStatus.shipping.name, // 자동으로 배송중으로 변경
+    }).eq('order_number', orderId);
+    
+    debugPrint('✅ Tracking number updated: $orderId');
+  } catch (e) {
+    debugPrint('❌ Error updating tracking number: $e');
+    rethrow;
+  }
+}
+
+// 📌 일괄 송장번호 업데이트
+Future<void> batchUpdateTrackingNumbers(List<Map<String, dynamic>> updates) async {
+  try {
+    for (final update in updates) {
+      await updateTrackingNumber(
+        orderId: update['order_number'],
+        trackingNumber: update['tracking_number'],
+        courierCompany: update['courier_company'],
+      );
+    }
+    debugPrint('✅ Batch tracking numbers updated: ${updates.length} orders');
+  } catch (e) {
+    debugPrint('❌ Error in batch update: $e');
+    rethrow;
+  }
+}
 }
 

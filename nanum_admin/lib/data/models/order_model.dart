@@ -53,6 +53,8 @@ class OrderModel {
   final String recipientPhone;
   final List<OrderItem> items;
   final String orderType;
+  final String? trackingNumber; // ✅ 추가
+  final String? courierCompany; // ✅ 추가 (택배사)
 
   OrderModel({
     required this.orderId,
@@ -67,6 +69,8 @@ class OrderModel {
     required this.recipientPhone,
     required this.items,
     required this.orderType,
+    this.trackingNumber, // ✅ 추가
+    this.courierCompany, // ✅ 추가
   });
 
   OrderModel copyWith({
@@ -82,6 +86,8 @@ class OrderModel {
     String? recipientPhone,
     List<OrderItem>? items,
     String? orderType,
+    String? trackingNumber, // ✅ 추가
+    String? courierCompany, // ✅ 추가
   }) {
     return OrderModel(
       orderId: orderId ?? this.orderId,
@@ -96,6 +102,8 @@ class OrderModel {
       recipientPhone: recipientPhone ?? this.recipientPhone,
       items: items ?? this.items,
       orderType: orderType ?? this.orderType,
+      trackingNumber: trackingNumber ?? this.trackingNumber, // ✅ 추가
+      courierCompany: courierCompany ?? this.courierCompany, // ✅ 추가
     );
   }
 
@@ -123,6 +131,8 @@ class OrderModel {
               ?.map((item) => OrderItem.fromJson(item))
               .toList() ?? [],
       orderType: json['order_type'] as String? ?? 'shop',
+      trackingNumber: json['tracking_number'] as String?, // ✅ 추가
+      courierCompany: json['courier_company'] as String?, // ✅ 추가
     );
   }
 

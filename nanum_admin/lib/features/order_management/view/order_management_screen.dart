@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import 'package:collection/collection.dart';
@@ -9,6 +10,8 @@ import '../../../data/models/order_cancellation_model.dart';
 import '../../../data/models/order_item_cancellation_model.dart';
 import '../viewmodel/combined_cancellation_viewmodel.dart';
 import '../viewmodel/order_viewmodel.dart';
+import 'widgets/bulk_tracking_upload_dialog.dart';
+import 'widgets/order_detail_dialog.dart';
 
 class OrderManagementScreen extends ConsumerStatefulWidget {
   const OrderManagementScreen({super.key});
@@ -98,76 +101,118 @@ class _OrderManagementScreenState extends ConsumerState<OrderManagementScreen> w
   }
 
   Widget _buildFilterControls() {
-    final isOrderTab = _tabController.index == 0;
+  final isOrderTab = _tabController.index == 0;
 
-    return Row(
-      children: [
-        if (isOrderTab)
-          // Consumer를 사용하여 ViewModel 상태에 따라 Dropdown을 빌드합니다.
-          Consumer(builder: (context, ref, child) {
-            final notifier = ref.read(orderViewModelProvider.notifier);
-            // orderViewModelProvider의 상태를 직접 watch하지는 않고 notifier만 사용
-            return DropdownButton<String>(
-              value: notifier.selectedStatus, // Notifier에서 직접 상태를 가져옴
-              onChanged: (String? newValue) {
-                if (newValue == null) return;
-                notifier.setSelectedStatus(newValue);
-                notifier.fetchOrders(isRefresh: true);
-              },
-              // '교환/반품' 등 필요한 상태를 여기에 추가할 수 있습니다.
-              items: (OrderStatus.values.where((s) => s != OrderStatus.cancelled && s != OrderStatus.cancellationRequested).map((s) => s.displayName).toList()..insert(0, '전체'))
-                  .map<DropdownMenuItem<String>>((String value) => DropdownMenuItem<String>(value: value, child: Text(value)))
-                  .toList(),
-            );
-          })
-        else
-          Consumer(builder: (context, ref, child) {
-            final notifier = ref.read(combinedCancellationViewModelProvider.notifier);
-            final state = ref.watch(combinedCancellationViewModelProvider);
-            return DropdownButton<String>(
-              value: state.selectedStatus,
-              onChanged: (String? newValue) {
-                if (newValue == null) return;
-                notifier.filterByStatus(newValue);
-              },
-              items: ['전체', 'pending', 'approved', 'rejected']
-                  .map<DropdownMenuItem<String>>((String value) => DropdownMenuItem<String>(value: value, child: Text(value)))
-                  .toList(),
-            );
-          }),
-        const Spacer(),
-        if (isOrderTab && _selectedOrderIds.isNotEmpty)
-          ElevatedButton.icon(
-            icon: const Icon(Icons.check_circle_outline),
-            label: Text('${_selectedOrderIds.length}건 상품준비중으로 변경'),
-            style: ElevatedButton.styleFrom(backgroundColor: Colors.orange),
-            onPressed: () {
-              ref.read(orderViewModelProvider.notifier).changeOrdersToPreparing(_selectedOrderIds);
-              setState(() {
-                _selectedOrderIds.clear();
-                _isAllSelected = false;
-              });
+  return Row(
+    children: [
+      if (isOrderTab)
+        // Consumer를 사용하여 ViewModel 상태에 따라 Dropdown을 빌드합니다.
+        Consumer(builder: (context, ref, child) {
+          final notifier = ref.read(orderViewModelProvider.notifier);
+          // orderViewModelProvider의 상태를 직접 watch하지는 않고 notifier만 사용
+          return DropdownButton<String>(
+            value: notifier.selectedStatus, // Notifier에서 직접 상태를 가져옴
+            onChanged: (String? newValue) {
+              if (newValue == null) return;
+              notifier.setSelectedStatus(newValue);
+              notifier.fetchOrders(isRefresh: true);
             },
-          ),
-        const SizedBox(width: 16),
-        SizedBox(
-          width: 250,
-          child: TextField(
-            controller: _searchController,
-            decoration: const InputDecoration(labelText: '검색 (주문번호, 주문자)', border: OutlineInputBorder(), contentPadding: EdgeInsets.symmetric(horizontal: 10)),
-            onSubmitted: (_) => _applyFilters(),
+            // '교환/반품' 등 필요한 상태를 여기에 추가할 수 있습니다.
+            items: (OrderStatus.values
+                    .where((s) =>
+                        s != OrderStatus.cancelled &&
+                        s != OrderStatus.cancellationRequested)
+                    .map((s) => s.displayName)
+                    .toList()
+                  ..insert(0, '전체'))
+                .map<DropdownMenuItem<String>>(
+                    (String value) => DropdownMenuItem<String>(
+                          value: value,
+                          child: Text(value),
+                        ))
+                .toList(),
+          );
+        })
+      else
+        Consumer(builder: (context, ref, child) {
+          final notifier = ref.read(combinedCancellationViewModelProvider.notifier);
+          final state = ref.watch(combinedCancellationViewModelProvider);
+          return DropdownButton<String>(
+            value: state.selectedStatus,
+            onChanged: (String? newValue) {
+              if (newValue == null) return;
+              notifier.filterByStatus(newValue);
+            },
+            items: ['전체', 'pending', 'approved', 'rejected']
+                .map<DropdownMenuItem<String>>(
+                    (String value) => DropdownMenuItem<String>(
+                          value: value,
+                          child: Text(value),
+                        ))
+                .toList(),
+          );
+        }),
+      const Spacer(),
+      
+      // ✅ 송장번호 일괄등록 버튼 추가
+      if (isOrderTab)
+        OutlinedButton.icon(
+          onPressed: () {
+            showDialog(
+              context: context,
+              builder: (context) => const BulkTrackingUploadDialog(),
+            );
+          },
+          icon: const Icon(Icons.upload_file),
+          label: const Text('송장번호 일괄등록'),
+          style: OutlinedButton.styleFrom(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
           ),
         ),
-        const SizedBox(width: 16),
+      
+      if (isOrderTab) const SizedBox(width: 8),
+      
+      if (isOrderTab && _selectedOrderIds.isNotEmpty)
         ElevatedButton.icon(
-          icon: const Icon(Icons.search),
-          label: const Text('검색'),
-          onPressed: () => _applyFilters(),
-          style: ElevatedButton.styleFrom(padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 15)),
+          icon: const Icon(Icons.check_circle_outline),
+          label: Text('${_selectedOrderIds.length}건 상품준비중으로 변경'),
+          style: ElevatedButton.styleFrom(
+            backgroundColor: Colors.orange,
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+          ),
+          onPressed: () {
+            ref.read(orderViewModelProvider.notifier).changeOrdersToPreparing(_selectedOrderIds);
+            setState(() {
+              _selectedOrderIds.clear();
+              _isAllSelected = false;
+            });
+          },
         ),
-      ],
-    );
-  }
+      const SizedBox(width: 16),
+      SizedBox(
+        width: 250,
+        child: TextField(
+          controller: _searchController,
+          decoration: const InputDecoration(
+            labelText: '검색 (주문번호, 주문자)',
+            border: OutlineInputBorder(),
+            contentPadding: EdgeInsets.symmetric(horizontal: 10),
+          ),
+          onSubmitted: (_) => _applyFilters(),
+        ),
+      ),
+      const SizedBox(width: 16),
+      ElevatedButton.icon(
+        icon: const Icon(Icons.search),
+        label: const Text('검색'),
+        onPressed: () => _applyFilters(),
+        style: ElevatedButton.styleFrom(
+          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 15),
+        ),
+      ),
+    ],
+  );
+}
 
   // ============== 주문 관리 탭 ==============
   Widget _buildOrdersTab() {
@@ -211,72 +256,210 @@ class _OrderManagementScreenState extends ConsumerState<OrderManagementScreen> w
   }
   
   DataTable _buildOrderDataTable(List<OrderModel> orders) {
-    final confirmedOrders = orders.where((o) => o.status == OrderStatus.confirmed).toList();
-    return DataTable(
-      showCheckboxColumn: true,
-      columns: [
-        DataColumn(
-          label: Checkbox(
-            value: confirmedOrders.isNotEmpty && _selectedOrderIds.length == confirmedOrders.length,
-            onChanged: (bool? value) {
-              setState(() {
-                _isAllSelected = value ?? false;
-                _selectedOrderIds.clear();
-                if (_isAllSelected) {
-                  _selectedOrderIds.addAll(confirmedOrders.map((o) => o.orderId));
-                }
-              });
-            },
-          ),
-        ),
-        const DataColumn(label: Text('주문시간')),
-        const DataColumn(label: Text('주문ID')),
-        const DataColumn(label: Text('받는사람')),
-        const DataColumn(label: Text('결제금액')),
-        const DataColumn(label: Text('상태')),
-        const DataColumn(label: Text('상태변경')),
-      ],
-      rows: orders.map((order) {
-        final isSelected = _selectedOrderIds.contains(order.orderId);
-        return DataRow(
-          selected: isSelected,
-          cells: [
-            DataCell(
-              order.status == OrderStatus.confirmed
-                  ? Checkbox(
-                      value: isSelected,
-                      onChanged: (bool? value) {
-                        setState(() {
-                          if (value == true) {
-                            _selectedOrderIds.add(order.orderId);
-                          } else {
-                            _selectedOrderIds.remove(order.orderId);
-                          }
-                          _isAllSelected = confirmedOrders.isNotEmpty && _selectedOrderIds.length == confirmedOrders.length;
-                        });
-                      },
-                    )
-                  : const SizedBox.shrink(),
-            ),
-            DataCell(Text(DateFormat('HH:mm').format(order.orderDate))),
-            DataCell(SelectableText(order.orderId)),
-            DataCell(Text(order.recipientName)),
-            DataCell(Text('${NumberFormat('#,###').format(order.totalAmount)}원')),
-            DataCell(Chip(
-              label: Text(order.status.displayName, style: const TextStyle(color: Colors.white, fontSize: 12)),
-              backgroundColor: order.status.color,
-            )),
-            DataCell(PopupMenuButton<OrderStatus>(
-              onSelected: (newStatus) => ref.read(orderViewModelProvider.notifier).updateOrderStatus(order.orderId, newStatus),
-              itemBuilder: (context) => OrderStatus.values.map((s) => PopupMenuItem(value: s, child: Text(s.displayName))).toList(),
-              child: const Row(mainAxisSize: MainAxisSize.min, children: [Text('변경'), Icon(Icons.arrow_drop_down)]),
-            )),
-          ],
-        );
-      }).toList(),
-    );
-  }
+  final confirmedOrders = orders.where((o) => o.status == OrderStatus.confirmed).toList();
   
+  return DataTable(
+    showCheckboxColumn: false,
+    columns: [
+      DataColumn(
+        label: Checkbox(
+          value: confirmedOrders.isNotEmpty && 
+                 confirmedOrders.every((o) => _selectedOrderIds.contains(o.orderId)),
+          onChanged: confirmedOrders.isEmpty ? null : (bool? value) {
+            setState(() {
+              _isAllSelected = value ?? false;
+              _selectedOrderIds.clear();
+              if (_isAllSelected) {
+                _selectedOrderIds.addAll(confirmedOrders.map((o) => o.orderId));
+              }
+            });
+          },
+        ),
+      ),
+      const DataColumn(label: Text('주문시간')),
+      const DataColumn(label: Text('주문ID')),
+      const DataColumn(label: Text('받는사람')),
+      const DataColumn(label: Text('결제금액')),
+      const DataColumn(label: Text('상태')),
+      const DataColumn(label: Text('관리')),
+    ],
+    rows: orders.map((order) {
+      final isSelected = _selectedOrderIds.contains(order.orderId);
+      final isConfirmed = order.status == OrderStatus.confirmed;
+      
+      return DataRow(
+        // ✅ 행 클릭 시 상세 다이얼로그 표시 (복원)
+        onSelectChanged: (_) {
+          showDialog(
+            context: context,
+            builder: (context) => OrderDetailDialog(order: order),
+          );
+        },
+        selected: isSelected,
+        cells: [
+          // ✅ 체크박스 셀 - onTap으로 이벤트 전파 방지
+          DataCell(
+            isConfirmed
+                ? Checkbox(
+                    value: isSelected,
+                    onChanged: (bool? value) {
+                      setState(() {
+                        if (value == true) {
+                          _selectedOrderIds.add(order.orderId);
+                        } else {
+                          _selectedOrderIds.remove(order.orderId);
+                        }
+                        _isAllSelected = confirmedOrders.isNotEmpty && 
+                            confirmedOrders.every((o) => _selectedOrderIds.contains(o.orderId));
+                      });
+                    },
+                  )
+                : const SizedBox(width: 24),
+            // ✅ 체크박스 클릭 시 행 선택 이벤트 방지
+            onTap: isConfirmed ? () {
+              setState(() {
+                if (_selectedOrderIds.contains(order.orderId)) {
+                  _selectedOrderIds.remove(order.orderId);
+                } else {
+                  _selectedOrderIds.add(order.orderId);
+                }
+                _isAllSelected = confirmedOrders.isNotEmpty && 
+                    confirmedOrders.every((o) => _selectedOrderIds.contains(o.orderId));
+              });
+            } : null,
+          ),
+          
+          // 주문시간
+          DataCell(Text(DateFormat('HH:mm').format(order.orderDate))),
+          
+          // ✅ 주문ID - 복사 버튼만 이벤트 방지
+          DataCell(
+            Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  order.orderId,
+                  style: const TextStyle(fontSize: 13),
+                ),
+                const SizedBox(width: 4),
+                InkWell(
+                  onTap: () {
+                    Clipboard.setData(ClipboardData(text: order.orderId));
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text('주문번호 복사: ${order.orderId}'),
+                        duration: const Duration(seconds: 1),
+                        behavior: SnackBarBehavior.floating,
+                        width: 300,
+                      ),
+                    );
+                  },
+                  child: const Padding(
+                    padding: EdgeInsets.all(4),
+                    child: Icon(Icons.copy, size: 14, color: Colors.grey),
+                  ),
+                ),
+              ],
+            ),
+            // ✅ 복사 버튼 클릭 시 행 선택 방지
+            onTap: null, // 기본 행 클릭 동작 유지
+          ),
+          
+          // 받는사람
+          DataCell(Text(order.recipientName)),
+          
+          // 결제금액
+          DataCell(Text('${NumberFormat('#,###').format(order.totalAmount)}원')),
+          
+          // 상태
+          DataCell(
+            Chip(
+              label: Text(
+                order.status.displayName,
+                style: const TextStyle(color: Colors.white, fontSize: 12),
+              ),
+              backgroundColor: order.status.color,
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 0),
+            ),
+          ),
+          
+          // ✅ 관리 버튼들도 이벤트 전파 방지
+          DataCell(
+            Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                // 상세보기 버튼
+                OutlinedButton.icon(
+                  onPressed: () {
+                    showDialog(
+                      context: context,
+                      builder: (context) => OrderDetailDialog(order: order),
+                    );
+                  },
+                  icon: const Icon(Icons.visibility, size: 16),
+                  label: const Text('상세', style: TextStyle(fontSize: 12)),
+                  style: OutlinedButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    minimumSize: const Size(0, 32),
+                  ),
+                ),
+                const SizedBox(width: 4),
+                
+                // 상태변경 드롭다운
+                PopupMenuButton<OrderStatus>(
+                  tooltip: '상태 변경',
+                  onSelected: (newStatus) {
+                    ref.read(orderViewModelProvider.notifier).updateOrderStatus(
+                          order.orderId,
+                          newStatus,
+                        );
+                  },
+                  itemBuilder: (context) => OrderStatus.values
+                      .map((s) => PopupMenuItem(
+                            value: s,
+                            child: Row(
+                              children: [
+                                Container(
+                                  width: 12,
+                                  height: 12,
+                                  decoration: BoxDecoration(
+                                    color: s.color,
+                                    shape: BoxShape.circle,
+                                  ),
+                                ),
+                                const SizedBox(width: 8),
+                                Text(s.displayName),
+                              ],
+                            ),
+                          ))
+                      .toList(),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    decoration: BoxDecoration(
+                      border: Border.all(color: Colors.grey.shade400),
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                    child: const Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text('상태변경', style: TextStyle(fontSize: 12)),
+                        Icon(Icons.arrow_drop_down, size: 18),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            // ✅ 버튼 클릭 시 행 선택 방지
+            onTap: () {}, // 빈 함수로 이벤트 차단
+          ),
+        ],
+      );
+    }).toList(),
+  );
+}
+
+
   // ============== 취소/반품 관리 탭 (통합) ==============
   Widget _buildCombinedCancellationsTab() {
     final state = ref.watch(combinedCancellationViewModelProvider);

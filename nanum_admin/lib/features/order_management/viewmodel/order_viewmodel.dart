@@ -103,15 +103,34 @@ class OrderViewModel extends StateNotifier<AsyncValue<List<OrderModel>>> {
     }
   }
   
-  // ✅ 기존 송장번호 일괄 등록 기능 유지 (내부적으로 batchUpdateOrders 호출)
-  Future<void> batchUpdateTrackingNumbers(List<Map<String, dynamic>> updates) async {
-    state = const AsyncValue.loading();
-    try {
-      await _repository.batchUpdateOrders(updates);
-      await fetchOrders(isRefresh: true);
-    } catch(e, s) {
-      state = AsyncValue.error(e, s);
-    }
+  
+  // 📌 송장번호 업데이트
+Future<void> updateTrackingNumber({
+  required String orderId,
+  required String trackingNumber,
+  String? courierCompany,
+}) async {
+  try {
+    await _repository.updateTrackingNumber(
+      orderId: orderId,
+      trackingNumber: trackingNumber,
+      courierCompany: courierCompany,
+    );
+    await fetchOrders(isRefresh: true);
+  } catch (e) {
+    rethrow;
   }
+}
+
+// 📌 일괄 송장번호 업데이트 (기존 메서드 수정)
+Future<void> batchUpdateTrackingNumbers(List<Map<String, dynamic>> updates) async {
+  state = const AsyncValue.loading();
+  try {
+    await _repository.batchUpdateTrackingNumbers(updates);
+    await fetchOrders(isRefresh: true);
+  } catch(e, s) {
+    state = AsyncValue.error(e, s);
+  }
+}
 }
 
