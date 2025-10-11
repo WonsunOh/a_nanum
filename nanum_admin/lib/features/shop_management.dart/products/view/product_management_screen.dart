@@ -7,6 +7,7 @@ import 'package:intl/intl.dart';
 import '../../../../data/models/product_model.dart';
 import '../../../../data/repositories/product_repository.dart';
 import '../viewmodel/product_viewmodel.dart';
+import '../widgets/image_preview_dialog.dart';
 
 class ProductManagementScreen extends ConsumerStatefulWidget {
   const ProductManagementScreen({super.key});
@@ -21,6 +22,13 @@ class _ProductManagementScreenState
   final TextEditingController _searchController = TextEditingController();
   String _selectedFilter = 'all';
   bool _isGridView = false;
+
+  DateTime? _startDate;
+  DateTime? _endDate;
+  int? _minPrice;
+  int? _maxPrice;
+
+  bool _showAdvancedFilter = false;
 
   @override
   void dispose() {
@@ -37,7 +45,7 @@ class _ProductManagementScreenState
       appBar: _buildAppBar(),
       body: Column(
         children: [
-          _buildSearchAndFilters(),
+          _buildSearchAndFilter(),
           Expanded(
             child: RefreshIndicator(
               onRefresh: () => ref.refresh(productViewModelProvider.future),
@@ -53,38 +61,47 @@ class _ProductManagementScreenState
     );
   }
 
-  PreferredSizeWidget _buildAppBar() {
-    return AppBar(
-      elevation: 0,
-      backgroundColor: Colors.white,
-      foregroundColor: Colors.black87,
-      title: const Text('상품 관리', style: TextStyle(fontWeight: FontWeight.bold)),
-      actions: [
-        IconButton(
-          onPressed: () => setState(() => _isGridView = !_isGridView),
-          icon: Icon(_isGridView ? Icons.view_list : Icons.grid_view),
-          tooltip: _isGridView ? '목록 보기' : '격자 보기',
+ PreferredSizeWidget _buildAppBar() {
+  return AppBar(
+    elevation: 0,
+    backgroundColor: Colors.white,
+    foregroundColor: Colors.black87,
+    title: const Text('상품 관리', style: TextStyle(fontWeight: FontWeight.bold)),
+    actions: [
+      // 빠른 액션 버튼들
+      Tooltip(
+        message: '새로고침 (F5)',
+        child: IconButton(
+          onPressed: () => ref.refresh(productViewModelProvider.future),
+          icon: const Icon(Icons.refresh),
         ),
-        const SizedBox(width: 8),
-        ElevatedButton.icon(
-          onPressed: () => context.go('/shop/products/new'),
-          icon: const Icon(Icons.add, size: 18),
-          label: const Text('상품 추가'),
-          style: ElevatedButton.styleFrom(
-            backgroundColor: Colors.blue.shade600,
-            foregroundColor: Colors.white,
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(8),
-            ),
+      ),
+      const SizedBox(width: 8),
+      IconButton(
+        onPressed: () => setState(() => _isGridView = !_isGridView),
+        icon: Icon(_isGridView ? Icons.view_list : Icons.grid_view),
+        tooltip: _isGridView ? '목록 보기' : '격자 보기',
+      ),
+      const SizedBox(width: 8),
+      ElevatedButton.icon(
+        onPressed: () => context.go('/shop/products/new'),
+        icon: const Icon(Icons.add, size: 18),
+        label: const Text('상품 추가'),
+        style: ElevatedButton.styleFrom(
+          backgroundColor: Colors.blue.shade600,
+          foregroundColor: Colors.white,
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(8),
           ),
         ),
-        const SizedBox(width: 8),
-        _buildMoreMenu(),
-        const SizedBox(width: 16),
-      ],
-    );
-  }
+      ),
+      const SizedBox(width: 8),
+      _buildMoreMenu(),
+      const SizedBox(width: 16),
+    ],
+  );
+}
 
   Widget _buildMoreMenu() {
     return PopupMenuButton<String>(
@@ -112,85 +129,193 @@ class _ProductManagementScreenState
     );
   }
 
-  Widget _buildSearchAndFilters() {
-    return Container(
-      color: Colors.white,
-      padding: const EdgeInsets.all(16),
-      child: Column(
-        children: [
+  Widget _buildSearchAndFilter() {
+  return Container(
+    padding: const EdgeInsets.all(16),
+    decoration: BoxDecoration(
+      color: Colors.grey[50],
+      borderRadius: BorderRadius.circular(8),
+      border: Border.all(color: Colors.grey[300]!),
+    ),
+    child: Column(
+      children: [
+        // 기본 검색바
+        Row(
+          children: [
+            Expanded(
+              flex: 3,
+              child: TextField(
+                controller: _searchController,
+                decoration: const InputDecoration(
+                  hintText: '상품명으로 검색...',
+                  prefixIcon: Icon(Icons.search),
+                  border: OutlineInputBorder(),
+                  contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                ),
+                onSubmitted: (value) => _performSearch(value),
+              ),
+            ),
+            const SizedBox(width: 16),
+            ElevatedButton(
+              onPressed: () => _performSearch(_searchController.text),
+              child: const Text('검색'),
+            ),
+            const SizedBox(width: 8),
+            TextButton(
+              onPressed: _clearSearch,
+              child: const Text('초기화'),
+            ),
+            const SizedBox(width: 8),
+            // 고급 필터 토글 버튼
+            TextButton.icon(
+              onPressed: () {
+                setState(() {
+                  _showAdvancedFilter = !_showAdvancedFilter;
+                });
+              },
+              icon: Icon(_showAdvancedFilter ? Icons.expand_less : Icons.expand_more),
+              label: const Text('고급 필터'),
+            ),
+          ],
+        ),
+        
+        // 고급 필터 (확장 가능)
+        if (_showAdvancedFilter) ...[
+          const SizedBox(height: 16),
+          const Divider(),
+          const SizedBox(height: 16),
+          
+          // 가격 범위
           Row(
             children: [
               Expanded(
-                flex: 3,
                 child: TextField(
-                  controller: _searchController,
-                  decoration: InputDecoration(
-                    hintText: '상품명으로 검색...',
-                    prefixIcon: const Icon(Icons.search),
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(8),
-                      borderSide: BorderSide(color: Colors.grey.shade300),
-                    ),
-                    contentPadding: const EdgeInsets.symmetric(
-                      horizontal: 16,
-                      vertical: 12,
-                    ),
+                  decoration: const InputDecoration(
+                    labelText: '최소 가격',
+                    border: OutlineInputBorder(),
+                    suffixText: '원',
                   ),
-                  onSubmitted: (value) => _performSearch(value),
+                  keyboardType: TextInputType.number,
+                  onChanged: (value) {
+                    setState(() {
+                      _minPrice = int.tryParse(value);
+                    });
+                  },
                 ),
               ),
-              const SizedBox(width: 12),
-              ElevatedButton(
-                onPressed: () => _performSearch(_searchController.text),
-                style: ElevatedButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 24,
-                    vertical: 12,
+              const SizedBox(width: 16),
+              Expanded(
+                child: TextField(
+                  decoration: const InputDecoration(
+                    labelText: '최대 가격',
+                    border: OutlineInputBorder(),
+                    suffixText: '원',
                   ),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(8),
-                  ),
+                  keyboardType: TextInputType.number,
+                  onChanged: (value) {
+                    setState(() {
+                      _maxPrice = int.tryParse(value);
+                    });
+                  },
                 ),
-                child: const Text('검색'),
               ),
-              const SizedBox(width: 8),
-              TextButton(onPressed: _clearSearch, child: const Text('초기화')),
             ],
           ),
-          const SizedBox(height: 12),
+          
+          const SizedBox(height: 16),
+          
+          // 날짜 범위
           Row(
             children: [
-              const Text('필터: ', style: TextStyle(fontWeight: FontWeight.w500)),
-              const SizedBox(width: 8),
-              _buildFilterChip('all', '전체 상품'),
-              const SizedBox(width: 8),
-              _buildFilterChip('displayed', '진열중'),
-              const SizedBox(width: 8),
-              _buildFilterChip('hidden', '숨김'),
-              const SizedBox(width: 8),
-              _buildFilterChip('sold_out', '품절'),
-              const SizedBox(width: 8),
-              _buildFilterChip('low_stock', '재고부족'),
+              Expanded(
+                child: InkWell(
+                  onTap: () => _selectDate(true),
+                  child: InputDecorator(
+                    decoration: const InputDecoration(
+                      labelText: '등록일 시작',
+                      border: OutlineInputBorder(),
+                    ),
+                    child: Text(
+                      _startDate != null
+                          ? DateFormat('yyyy-MM-dd').format(_startDate!)
+                          : '선택',
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: InkWell(
+                  onTap: () => _selectDate(false),
+                  child: InputDecorator(
+                    decoration: const InputDecoration(
+                      labelText: '등록일 종료',
+                      border: OutlineInputBorder(),
+                    ),
+                    child: Text(
+                      _endDate != null
+                          ? DateFormat('yyyy-MM-dd').format(_endDate!)
+                          : '선택',
+                    ),
+                  ),
+                ),
+              ),
             ],
           ),
         ],
-      ),
-    );
-  }
+        
+        const SizedBox(height: 12),
+        
+        // 상태 필터 (기존 코드 스타일 유지)
+        Wrap(
+          spacing: 8,
+          children: [
+            _buildFilterChip('all', '전체 상품'),
+            _buildFilterChip('displayed', '진열중'),
+            _buildFilterChip('hidden', '숨김'),
+            _buildFilterChip('sold_out', '품절'),
+            _buildFilterChip('low_stock', '재고부족'),
+          ],
+        ),
+      ],
+    ),
+  );
+}
 
-  Widget _buildFilterChip(String value, String label) {
-    final isSelected = _selectedFilter == value;
-    return FilterChip(
-      selected: isSelected,
-      label: Text(label),
-      onSelected: (selected) {
-        setState(() => _selectedFilter = selected ? value : 'all');
-      },
-      backgroundColor: Colors.grey.shade100,
-      selectedColor: Colors.blue.shade100,
-      checkmarkColor: Colors.blue.shade700,
-    );
+// FilterChip 빌더 메서드 추가
+Widget _buildFilterChip(String value, String label) {
+  final isSelected = _selectedFilter == value;
+  return FilterChip(
+    selected: isSelected,
+    label: Text(label),
+    onSelected: (selected) {
+      setState(() => _selectedFilter = selected ? value : 'all');
+    },
+    backgroundColor: Colors.grey.shade100,
+    selectedColor: Colors.blue.shade100,
+    checkmarkColor: Colors.blue.shade700,
+  );
+}
+
+// 날짜 선택 메서드 추가
+Future<void> _selectDate(bool isStartDate) async {
+  final DateTime? picked = await showDatePicker(
+    context: context,
+    initialDate: (isStartDate ? _startDate : _endDate) ?? DateTime.now(),
+    firstDate: DateTime(2020),
+    lastDate: DateTime.now(),
+  );
+  
+  if (picked != null) {
+    setState(() {
+      if (isStartDate) {
+        _startDate = picked;
+      } else {
+        _endDate = picked;
+      }
+    });
   }
+}
 
   Widget _buildProductsView(List<ProductModel> products) {
     final filteredProducts = _filterProducts(products);
@@ -469,24 +594,38 @@ class _ProductManagementScreenState
       cells: [
         // Image
         DataCell(
-          Container(
-            width: 40,
-            height: 40,
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(6),
-              color: Colors.grey.shade100,
+          InkWell(
+    onTap: () {
+      final imageUrls = <String>[];
+      if (product.imageUrl != null) imageUrls.add(product.imageUrl!);
+      if (product.additionalImages != null) imageUrls.addAll(product.additionalImages!);
+      
+      if (imageUrls.isNotEmpty) {
+        showDialog(
+          context: context,
+          builder: (context) => ImagePreviewDialog(imageUrls: imageUrls),
+        );
+      }
+    },
+            child: Container(
+              width: 40,
+              height: 40,
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(6),
+                color: Colors.grey.shade100,
+              ),
+              child: product.imageUrl != null && product.imageUrl!.isNotEmpty
+                  ? ClipRRect(
+                      borderRadius: BorderRadius.circular(6),
+                      child: Image.network(
+                        product.imageUrl!,
+                        fit: BoxFit.cover,
+                        errorBuilder: (context, error, stackTrace) =>
+                            const Icon(Icons.image_not_supported, size: 20),
+                      ),
+                    )
+                  : const Icon(Icons.image_not_supported, size: 20),
             ),
-            child: product.imageUrl != null && product.imageUrl!.isNotEmpty
-                ? ClipRRect(
-                    borderRadius: BorderRadius.circular(6),
-                    child: Image.network(
-                      product.imageUrl!,
-                      fit: BoxFit.cover,
-                      errorBuilder: (context, error, stackTrace) =>
-                          const Icon(Icons.image_not_supported, size: 20),
-                    ),
-                  )
-                : const Icon(Icons.image_not_supported, size: 20),
           ),
         ),
 
@@ -886,37 +1025,61 @@ class _ProductManagementScreenState
   }
 
   void _clearSearch() {
-    _searchController.clear();
-    setState(() => _selectedFilter = 'all');
-    ref.read(productViewModelProvider.notifier).fetchAllProducts();
+  _searchController.clear();
+  setState(() {
+    _selectedFilter = 'all';
+    _showAdvancedFilter = false;  // ⭐️ 추가
+    _startDate = null;  // ⭐️ 추가
+    _endDate = null;  // ⭐️ 추가
+    _minPrice = null;  // ⭐️ 추가
+    _maxPrice = null;  // ⭐️ 추가
+  });
+  ref.read(productViewModelProvider.notifier).fetchAllProducts();
+}
+
+  // _filterProducts 메서드 업데이트
+List<ProductModel> _filterProducts(List<ProductModel> products) {
+  List<ProductModel> filtered;
+
+  // 상태 필터
+  switch (_selectedFilter) {
+    case 'displayed':
+      filtered = products.where((p) => p.isDisplayed).toList();
+      break;
+    case 'hidden':
+      filtered = products.where((p) => !p.isDisplayed).toList();
+      break;
+    case 'sold_out':
+      filtered = products.where((p) => p.isSoldOut).toList();
+      break;
+    case 'low_stock':
+      filtered = products
+          .where((p) => p.stockQuantity <= 10 && p.stockQuantity > 0)
+          .toList();
+      break;
+    default:
+      filtered = products;
   }
 
-  List<ProductModel> _filterProducts(List<ProductModel> products) {
-    List<ProductModel> filtered;
-
-    switch (_selectedFilter) {
-      case 'displayed':
-        filtered = products.where((p) => p.isDisplayed).toList();
-        break;
-      case 'hidden':
-        filtered = products.where((p) => !p.isDisplayed).toList();
-        break;
-      case 'sold_out':
-        filtered = products.where((p) => p.isSoldOut).toList();
-        break;
-      case 'low_stock':
-        filtered = products
-            .where((p) => p.stockQuantity <= 10 && p.stockQuantity > 0)
-            .toList();
-        break;
-      default:
-        filtered = products;
-    }
-
-    // ✅ 필터된 결과도 정렬
-    filtered.sort((a, b) => b.id.compareTo(a.id));
-    return filtered;
+  // 가격 필터
+  if (_minPrice != null) {
+    filtered = filtered.where((p) => p.price >= _minPrice!).toList();
   }
+  if (_maxPrice != null) {
+    filtered = filtered.where((p) => p.price <= _maxPrice!).toList();
+  }
+
+  // 날짜 필터
+  if (_startDate != null) {
+    filtered = filtered.where((p) => p.createdAt.isAfter(_startDate!)).toList();
+  }
+  if (_endDate != null) {
+    filtered = filtered.where((p) => p.createdAt.isBefore(_endDate!.add(const Duration(days: 1)))).toList();
+  }
+
+  filtered.sort((a, b) => b.id.compareTo(a.id));
+  return filtered;
+}
 
   void _toggleProductDisplay(ProductModel product, bool value) {
     final updatedProduct = product.copyWith(isDisplayed: value);

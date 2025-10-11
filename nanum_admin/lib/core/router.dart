@@ -5,7 +5,6 @@ import 'package:go_router/go_router.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../data/models/product_model.dart';
-import '../data/repositories/order_repository.dart';
 import '../features/auth/view/login_screen.dart';
 import '../features/cs_management.dart/inquiries/view/inquiry_management_screen.dart';
 import '../features/cs_management.dart/templates/view/reply_template_screen.dart';
