@@ -10,13 +10,14 @@ import '../features/cs_management.dart/inquiries/view/inquiry_management_screen.
 import '../features/cs_management.dart/templates/view/reply_template_screen.dart';
 import '../features/dashboard/view/dashboard_screen.dart';
 import '../features/settings/view/settings_screen.dart';
-import '../features/shop_management.dart/categories/view/category_management_screen.dart';
-import '../features/shop_management.dart/products/view/add_edit_product_screen.dart';
-import '../features/shop_management.dart/products/view/discount_product_screen.dart';
-import '../features/shop_management.dart/products/view/product_management_screen.dart';
+import '../features/shop_management/categories/view/category_management_screen.dart';
+import '../features/shop_management/inventory/view/inventory_management_screen.dart';
+import '../features/shop_management/products/view/add_edit_product_screen.dart';
+import '../features/shop_management/products/view/discount_product_screen.dart';
+import '../features/shop_management/products/view/product_management_screen.dart';
 import '../features/group_buy_management/view/group_buy_management_screen.dart';
 import '../features/order_management/view/order_management_screen.dart';
-import '../features/shop_management.dart/promotions/view/promotion_management_screen.dart';
+import '../features/shop_management/promotions/view/promotion_management_screen.dart';
 import '../features/user_management/view/user_management_screen.dart';
 import '../features/user_management/view/user_detail_screen.dart';
 import 'main_layout.dart';
@@ -118,6 +119,11 @@ final router = GoRouter(
           builder: (context, state) =>
               const OrderManagementScreen(),
         ),
+
+        GoRoute(
+  path: '/shop/inventory',
+  builder: (context, state) => const InventoryManagementScreen(),
+),
         
         // 회원 관리
         GoRoute(

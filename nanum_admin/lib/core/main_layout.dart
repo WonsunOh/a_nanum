@@ -80,6 +80,7 @@ class _MainLayoutState extends ConsumerState<MainLayout> {
       children: [
         AdminMenuItem(title: '상품 관리', route: '/shop/products'),
         AdminMenuItem(title: '할인상품 관리', route: '/shop/discount_products'),
+        AdminMenuItem(title: '재고 관리', route: '/shop/inventory'),
         AdminMenuItem(title: '프로모션 관리', route: '/shop/promotions'),
         AdminMenuItem(title: '카테고리 관리', route: '/shop/categories'),
       ],
