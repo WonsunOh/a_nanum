@@ -6,6 +6,9 @@ import 'package:intl/intl.dart';
 import '../../../../core/main_layout.dart';
 import '../../../../data/models/inventory_model.dart';
 import '../viewmodel/inventory_viewmodel.dart';
+import 'widgets/bulk_upload_dialog.dart';
+import 'widgets/inventory_filter_bar.dart';
+import 'widgets/stock_adjust_dialog.dart';
 
 class InventoryManagementScreen extends ConsumerWidget {
   const InventoryManagementScreen({super.key});
@@ -14,6 +17,7 @@ class InventoryManagementScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final logsAsync = ref.watch(inventoryLogsProvider);
     final alertsAsync = ref.watch(stockAlertsProvider);
+    final filter = ref.watch(inventoryFilterProvider);
 
     return MainLayout(
       child: Padding(
@@ -25,13 +29,28 @@ class InventoryManagementScreen extends ConsumerWidget {
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 Text('재고 관리', style: Theme.of(context).textTheme.headlineSmall),
-                ElevatedButton.icon(
-                  onPressed: () => _showStockAdjustDialog(context, ref),
-                  icon: const Icon(Icons.add),
-                  label: const Text('재고 조정'),
-                ),
-              ],
-            ),
+                Row(
+      children: [
+        OutlinedButton.icon(
+          onPressed: () {
+            showDialog(
+              context: context,
+              builder: (context) => const BulkUploadDialog(),
+            );
+          },
+          icon: const Icon(Icons.upload_file),
+          label: const Text('일괄 업로드'),
+        ),
+        const SizedBox(width: 8),
+        ElevatedButton.icon(
+          onPressed: () => _showStockAdjustDialog(context, ref),
+          icon: const Icon(Icons.add),
+          label: const Text('재고 조정'),
+        ),
+      ],
+    ),
+  ],
+),
             const SizedBox(height: 16),
 
             // 재고 부족 알림
@@ -47,6 +66,10 @@ class InventoryManagementScreen extends ConsumerWidget {
             ),
 
             const SizedBox(height: 16),
+             // 📌 필터바 추가
+          const InventoryFilterBar(),
+          
+          const SizedBox(height: 16),
 
             // 재고 변경 내역
             Expanded(
@@ -252,20 +275,83 @@ class InventoryManagementScreen extends ConsumerWidget {
   }
 
   Widget _buildLogsList(List<InventoryLog> logs) {
-    if (logs.isEmpty) {
-      return const Center(child: Text('재고 변경 내역이 없습니다.'));
-    }
-
-    return ListView.separated(
-      padding: const EdgeInsets.all(16),
-      itemCount: logs.length,
-      separatorBuilder: (context, index) => const Divider(),
-      itemBuilder: (context, index) {
-        final log = logs[index];
-        return _buildLogItem(log);
-      },
+  if (logs.isEmpty) {
+    return const Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(Icons.inventory_2_outlined, size: 64, color: Colors.grey),
+          SizedBox(height: 16),
+          Text(
+            '재고 변경 내역이 없습니다.',
+            style: TextStyle(fontSize: 16, color: Colors.grey),
+          ),
+        ],
+      ),
     );
   }
+
+  // 📌 통계 계산
+  final inCount = logs.where((log) => log.type == 'in').length;
+  final outCount = logs.where((log) => log.type == 'out').length;
+  final adjustCount = logs.where((log) => log.type == 'adjust').length;
+
+  return Column(
+    children: [
+      // 통계 요약
+      Container(
+        padding: const EdgeInsets.all(16),
+        color: Colors.grey.shade50,
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceAround,
+          children: [
+            _buildStatItem('전체', logs.length, Colors.grey),
+            _buildStatItem('입고', inCount, Colors.green),
+            _buildStatItem('출고', outCount, Colors.red),
+            _buildStatItem('조정', adjustCount, Colors.blue),
+          ],
+        ),
+      ),
+      const Divider(height: 1),
+      
+      // 로그 리스트
+      Expanded(
+        child: ListView.separated(
+          padding: const EdgeInsets.all(16),
+          itemCount: logs.length,
+          separatorBuilder: (context, index) => const Divider(),
+          itemBuilder: (context, index) {
+            final log = logs[index];
+            return _buildLogItem(log);
+          },
+        ),
+      ),
+    ],
+  );
+}
+
+Widget _buildStatItem(String label, int count, Color color) {
+  return Column(
+    children: [
+      Text(
+        label,
+        style: TextStyle(
+          fontSize: 12,
+          color: Colors.grey.shade600,
+        ),
+      ),
+      const SizedBox(height: 4),
+      Text(
+        count.toString(),
+        style: TextStyle(
+          fontSize: 20,
+          fontWeight: FontWeight.bold,
+          color: color,
+        ),
+      ),
+    ],
+  );
+}
 
   Widget _buildLogItem(InventoryLog log) {
     IconData icon;
@@ -328,17 +414,8 @@ class InventoryManagementScreen extends ConsumerWidget {
   void _showStockAdjustDialog(BuildContext context, WidgetRef ref) {
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('재고 조정'),
-        content: const Text('상품 검색 및 재고 조정 기능은 곧 추가됩니다.'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('닫기'),
-          ),
-        ],
-      ),
-    );
+      builder: (context) => const StockAdjustDialog(),
+  );
   }
 
   // ✅ _showQuickAdjustDialog 수정 - dialogContext 제거
