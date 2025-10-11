@@ -8,52 +8,68 @@ part 'order_history_viewmodel.g.dart';
 
 @riverpod
 class OrderHistoryViewModel extends _$OrderHistoryViewModel {
-  // ✅ late final 제거하고 getter로 변경
   OrderRepository get _repository => ref.watch(orderRepositoryProvider);
 
   @override
   Future<List<OrderHistoryModel>> build() async {
-    // ✅ 초기화 코드 제거하고 직접 호출
     return await _fetchOrderHistory();
   }
 
-  /// 주문내역을 조회합니다.
   Future<List<OrderHistoryModel>> _fetchOrderHistory() async {
+  try {
+    // 캐시 무시하고 강제로 새 데이터 가져오기
+    final result = await _repository.fetchOrderHistory();
+    print('✅ 주문내역 조회 성공: ${result.length}개');
+    return result;
+  } catch (e) {
+    print('❌ 주문내역 조회 실패: $e');
+    rethrow;
+  }
+}
+
+  // refresh 메서드 수정
+Future<void> refresh() async {
+  // 강제로 로딩 상태로 변경
+  state = const AsyncValue.loading();
+  
+  // 약간의 딜레이를 주어 UI가 업데이트되도록 함
+  await Future.delayed(const Duration(milliseconds: 100));
+  
+  try {
+    final newData = await _fetchOrderHistory();
+    state = AsyncValue.data(newData);
+    print('✅ 주문내역 새로고침 완료: ${newData.length}개 주문');
+  } catch (e, stackTrace) {
+    state = AsyncValue.error(e, stackTrace);
+    print('❌ 주문내역 새로고침 실패: $e');
+  }
+}
+
+  // 🔥🔥🔥 전체 수정: 함수 이름 및 로직 변경
+  Future<void> requestCancellation({
+    required String orderNumber,
+    required String reason,
+    required int totalAmount,
+  }) async {
+    final previousState = state;
+    state = const AsyncValue.loading();
+
     try {
-      return await _repository.fetchOrderHistory();
-    } catch (e) {
-      // 에러 발생 시 빈 리스트 반환
-      print('주문내역 조회 실패: $e');
+      // 🔥🔥🔥 수정: 올바른 함수 이름으로 호출
+      await _repository.requestCancellation(
+        orderNumber: orderNumber,
+        reason: reason,
+        totalAmount: totalAmount,
+      );
+      // 성공 시 목록 새로고침
+      await refresh();
+    } catch (e, s) {
+      // 에러가 발생하면 이전 상태로 되돌림
+      state = AsyncValue<List<OrderHistoryModel>>.error(e, s)
+          .copyWithPrevious(previousState);
+      // 에러를 다시 던져서 UI단에서 처리할 수 있도록 함
       rethrow;
     }
   }
-
- // refresh 메서드에 디버깅 추가
-  Future<void> refresh() async {
-    print('🔄 OrderHistoryViewModel refresh 시작');
-    state = const AsyncValue.loading();
-    try {
-      final newData = await _fetchOrderHistory();
-      state = AsyncValue.data(newData);
-      print('✅ OrderHistoryViewModel refresh 성공 - ${newData.length}개 주문');
-    } catch (e, stackTrace) {
-      print('❌ OrderHistoryViewModel refresh 실패: $e');
-      state = AsyncValue.error(e, stackTrace);
-    }
-  }
-
-  /// 주문을 취소합니다.
-  Future<bool> cancelOrder(int orderId) async {
-    try {
-      final success = await _repository.cancelOrder(orderId);
-      if (success) {
-        // 주문 취소 성공 시 목록 새로고침
-        await refresh();
-      }
-      return success;
-    } catch (e) {
-      print('주문 취소 실패: $e');
-      return false;
-    }
-  }
 }
+

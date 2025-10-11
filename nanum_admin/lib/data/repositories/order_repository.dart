@@ -1,645 +1,197 @@
-// nanum_admin/lib/data/repositories/order_repository.dart (전체 수정)
-
-import 'package:flutter/material.dart';
+// File: nanum_admin/lib/data/repositories/order_repository.dart
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-
 import '../models/order_cancellation_model.dart';
 import '../models/order_item_cancellation_model.dart';
 import '../models/order_model.dart';
 
-// ⭐️ 1. 주문 타입을 구분하기 위한 Enum을 만듭니다.
-enum OrderType { shop, groupBuy }
+final orderRepositoryProvider = Provider<OrderRepository>((ref) {
+  final supabase = Supabase.instance.client;
+  return OrderRepository(supabase);
+});
 
 class OrderRepository {
-  final SupabaseClient _client;
+  final SupabaseClient _supabase;
 
-  OrderRepository(this._client);
-     
+  OrderRepository(this._supabase);
 
-  // ⭐️ 2. 기존 함수를 '공동구매' 주문 전용으로 변경합니다.
-  Future<List<Order>> fetchGroupBuyOrders() async {
-    try {
-      final response = await _client
-          .from('participants')
-          .select('''
-            id,
-            quantity,
-            delivery_address,
-            profiles (username, phone),
-            group_buys!inner (
-              status,
-              products (name)
-            )
-          ''')
-          // 공동구매 주문 중 '성공' 이후 단계의 주문들만 가져옵니다.
-          .inFilter('group_buys.status', ['success', 'preparing', 'shipped', 'completed']);
+  Future<List<OrderModel>> getOrders({
+    required int page,
+    String? query,
+    String? status,
+    String? period,
+  }) async {
+    const pageSize = 20;
+    final offset = page * pageSize;
 
-      return (response as List).map((data) => Order.fromJson(data)).toList();
-    } catch (e) {
-      debugPrint('Error fetching successful group buy orders: $e');
-      rethrow;
+    var queryBuilder = _supabase.from('orders').select('''
+      order_number,
+      created_at,
+      user_id,
+      recipient_name,
+      total_amount,
+      status,
+      shipping_address,
+      recipient_phone,
+      order_type,
+      users:admin_users!inner(username, email), 
+      order_items!inner(*, products(name))
+    ''');
+
+    if (query != null && query.isNotEmpty) {
+      queryBuilder = queryBuilder.or('order_number.ilike.%$query%,users.username.ilike.%$query%');
     }
-  }
 
-  Future<List<Order>> fetchShopOrders() async {
-  try {
-    debugPrint('🔍 Fetching shop orders...');
+    if (status != null && status != '전체') {
+       final statusInEnglish = OrderStatus.values.firstWhere((e) => e.displayName == status).name;
+       queryBuilder = queryBuilder.eq('status', statusInEnglish);
+    } else {
+      // '전체' 보기일 경우, 취소/취소요청 상태는 제외합니다.
+      queryBuilder = queryBuilder.not('status', 'in', '(cancelled, cancellationRequested)');
+    }
+    
+    if (period != null && period != 'all') {
+      final now = DateTime.now();
+      DateTime startDate;
+      switch (period) {
+        case '1d': startDate = now.subtract(const Duration(days: 1)); break;
+        case '1w': startDate = now.subtract(const Duration(days: 7)); break;
+        case '1m': startDate = now.subtract(const Duration(days: 30)); break;
+        default: startDate = DateTime(1970);
+      }
+      queryBuilder = queryBuilder.gte('created_at', startDate.toIso8601String());
+    }
 
-    final response = await _client
-        .from('orders')
-        .select('''
-          id,
-          status,
-          recipient_name,
-          recipient_phone,
-          shipping_address,
-          total_amount,
-          order_items (
-            id,
-            product_id,
-            quantity,
-            products (name)
-          )
-        ''')
-        .order('created_at', ascending: false);
+    final response = await queryBuilder
+        .order('created_at', ascending: false)
+        .range(offset, offset + pageSize - 1);
 
-    debugPrint('📦 Raw shop orders response: $response');
+    final orders = (response as List).map((item) => OrderModel.fromJson(item)).toList();
+    
+    // 부분 취소 정보를 가져와서 주문 데이터에 반영하는 로직
+    if (orders.isNotEmpty) {
+      final orderNumbers = orders.map((o) => o.orderId).toList();
 
-    List<Order> orders = [];
+      final partialCancellationsResponse = await _supabase
+          .from('order_item_cancellations')
+          .select('*, order_items!inner(order_id, products!inner(*)), orders!inner(order_number)')
+          .inFilter('orders.order_number', orderNumbers)
+          .eq('status', 'approved'); // 승인된 부분취소만 가져옵니다.
 
-    for (final orderData in response) {
-      final orderId = orderData['id']; // 실제 주문 ID (44, 45, 46, 47)
-      final orderItems = orderData['order_items'] as List? ?? [];
+      final partialCancellations = (partialCancellationsResponse as List)
+          .map((e) => OrderItemCancellation.fromJson(e))
+          .toList();
 
-      if (orderItems.isEmpty) {
-        orders.add(Order(
-          participantId: orderId, // ⭐️ 주문 ID를 participantId로 사용
-          orderId: orderId, // ⭐️ orderId도 동일하게 설정
-          productName: '상품 정보 없음',
-          quantity: 1,
-          userName: orderData['recipient_name'],
-          userPhone: orderData['recipient_phone'],
-          deliveryAddress: orderData['shipping_address'] ?? '',
-        ));
-      } else {
-        for (final item in orderItems) {
-          orders.add(Order(
-            participantId: item['id'], // order_item의 id (18, 19, 20, 21)
-            orderId: orderId, // ⭐️ 실제 주문 ID (44, 45, 46, 47)
-            productName: item['products']?['name'] ?? 'Product ${item['product_id']}',
-            quantity: item['quantity'] ?? 1,
-            userName: orderData['recipient_name'],
-            userPhone: orderData['recipient_phone'],
-            deliveryAddress: orderData['shipping_address'] ?? '',
-          ));
+      if (partialCancellations.isNotEmpty) {
+        for (var order in orders) {
+          final relevantCancellations = partialCancellations
+              .where((c) => c.order.orderId == order.orderId)
+              .toList();
+
+          if (relevantCancellations.isNotEmpty) {
+            int newTotalAmount = order.totalAmount;
+            List<OrderItem> newItems = List.from(order.items);
+
+            for (var cancellation in relevantCancellations) {
+              final originalItemIndex = newItems.indexWhere((item) => item.productName == cancellation.orderItem.productName);
+
+              if (originalItemIndex != -1) {
+                final originalItem = newItems[originalItemIndex];
+                final newQuantity = originalItem.quantity - cancellation.cancelledQuantity;
+                
+                newTotalAmount -= (cancellation.orderItem.price * cancellation.cancelledQuantity);
+                
+                if (newQuantity > 0) {
+                  newItems[originalItemIndex] = OrderItem(
+                    productName: originalItem.productName,
+                    quantity: newQuantity,
+                    price: originalItem.price,
+                  );
+                } else {
+                  newItems.removeAt(originalItemIndex);
+                }
+              }
+            }
+            final orderIndex = orders.indexOf(order);
+            orders[orderIndex] = order.copyWith(
+              totalAmount: newTotalAmount,
+              items: newItems,
+            );
+          }
         }
       }
     }
-
-    debugPrint('✅ Successfully processed ${orders.length} shop orders');
+    
     return orders;
-  } catch (e, stackTrace) {
-    debugPrint('💥 Error in fetchShopOrders: $e');
-    debugPrint('📚 Stack trace: $stackTrace');
-    rethrow;
-  }
-}
-
-  // 송장 번호 일괄 업데이트 RPC를 호출하는 메소드 (기존 코드 유지)
-  Future<void> batchUpdateTrackingNumbers(List<Map<String, dynamic>> updates) async {
-    try {
-      await _client.rpc('batch_update_tracking_numbers', params: {'updates': updates});
-    } catch (e) {
-      debugPrint('Error batch updating tracking numbers: $e');
-      rethrow;
-    }
   }
 
-  Future<void> debugTablesInfo() async {
-  try {
-    debugPrint('=== 🔍 DB Tables Debug Info ===');
-    
-    // 1. 각 테이블 존재 여부 및 데이터 확인
-    final tables = ['orders', 'order_items', 'products'];
-    
-    for (final table in tables) {
-      try {
-        final response = await _client.from(table).select('*').limit(1);
-        debugPrint('✅ $table: exists, sample data: $response');
-      } catch (e) {
-        debugPrint('❌ $table: error - $e');
-      }
-    }
-    
-    // 2. 테이블 스키마 정보 (가능하다면)
-    final schemaInfo = await _client
-        .rpc('get_table_info', params: {'table_names': ['orders', 'order_items', 'products']});
-    debugPrint('📋 Schema info: $schemaInfo');
-    
-  } catch (e) {
-    debugPrint('💥 Debug error: $e');
-  }
-}
-
-
-// 주문 상태 업데이트 함수
-Future<void> updateOrderStatus(int orderId, String newStatus) async {
-  try {
-    await _client
+  Future<void> updateOrderStatus(String orderId, String newStatus) async {
+    await _supabase
         .from('orders')
-        .update({'status': newStatus})
-        .eq('id', orderId);
-    
-    debugPrint('✅ Order $orderId status updated to $newStatus');
-  } catch (e) {
-    debugPrint('💥 Error updating order status: $e');
-    rethrow;
+        .update({'status': newStatus}).eq('order_number', orderId);
   }
-}
 
-// 주문과 취소 요청을 함께 조회하는 함수
-Future<Map<int, OrderCancellation?>> fetchOrderCancellations() async {
-  try {
-    final cancellations = await fetchAllCancellations();
-    
-    // 주문 ID를 키로 하는 맵 생성
-    Map<int, OrderCancellation?> cancellationMap = {};
-    for (final cancellation in cancellations) {
-      cancellationMap[cancellation.orderId] = cancellation;
-    }
-    
-    return cancellationMap;
-  } catch (e) {
-    debugPrint('Error fetching order cancellations: $e');
-    return {};
+  Future<void> batchUpdateOrders(List<Map<String, dynamic>> updates) async {
+    await _supabase.from('orders').upsert(updates);
   }
-}
 
-// 기존 fetchPendingCancellations를 fetchAllCancellations로 변경
-Future<List<OrderCancellation>> fetchAllCancellations() async {
-  try {
-    debugPrint('🔍 Fetching all cancellations...');
-    
-    final response = await _client
-        .from('order_cancellations')
-        .select('*')
-        .order('created_at', ascending: false);
-    
-    debugPrint('🔗 All cancellations result: $response');
-    
-    return (response as List)
-        .map((data) => OrderCancellation.fromJson(data))
-        .toList();
-  } catch (e) {
-    debugPrint('💥 Error fetching all cancellations: $e');
-    rethrow;
-  }
-}
-
-
-// 취소 승인
-Future<void> approveCancellation(int cancellationId, String adminNote) async {
-  try {
-    debugPrint('✅ Approving cancellation $cancellationId');
-    
-    final currentUser = _client.auth.currentUser;
-    
-    // 취소 요청 정보 조회
-    final cancellation = await _client
-        .from('order_cancellations')
-        .select('order_id, user_id')
-        .eq('id', cancellationId)
-        .single();
-    
-    // 상태 업데이트
-    await _client
-        .from('order_cancellations')
-        .update({
-          'status': 'approved',
-          'admin_id': currentUser?.id,
-          'admin_note': adminNote,
-          'processed_at': DateTime.now().toIso8601String(),
-        })
-        .eq('id', cancellationId);
-    
-    await updateOrderStatus(cancellation['order_id'], 'cancelled');
-    
-    // ⭐️ 승인 알림 발송
-    await _sendCancellationApprovedNotification(
-      cancellation['user_id'], 
-      cancellation['order_id'],
-      adminNote,
-    );
-    
-  } catch (e) {
-    debugPrint('💥 Error approving cancellation: $e');
-    rethrow;
-  }
-}
-
-Future<void> _sendCancellationApprovedNotification(
-  String userId, 
-  int orderId, 
-  String adminNote
-) async {
-  try {
-    await _client.from('notifications').insert({
-      'user_id': userId,
-      'type': 'order_cancellation_approved',
-      'title': '주문 취소가 승인되었습니다',
-      'message': '주문번호 ORD-$orderId의 취소가 승인되었습니다.\n환불 처리가 진행됩니다.',
-      'data': {
-        'order_id': orderId,
-        'admin_note': adminNote,
-        'action_type': 'cancellation_approved'
-      },
-      'is_read': false,
-      'created_at': DateTime.now().toIso8601String(),
-    });
-  } catch (e) {
-    debugPrint('💥 Error sending approval notification: $e');
-  }
-}
-
-// 추소 거부
-Future<void> rejectCancellation(int cancellationId, String adminNote) async {
-  try {
-    debugPrint('❌ Rejecting cancellation $cancellationId');
-    
-    final currentUser = _client.auth.currentUser;
-    
-    // 1. 취소 요청 정보 먼저 조회
-    final cancellation = await _client
-        .from('order_cancellations')
-        .select('order_id, user_id')
-        .eq('id', cancellationId)
-        .single();
-    
-    // 2. 취소 요청 상태 업데이트
-    await _client
-        .from('order_cancellations')
-        .update({
-          'status': 'rejected',
-          'admin_id': currentUser?.id,
-          'admin_note': adminNote,
-          'processed_at': DateTime.now().toIso8601String(),
-        })
-        .eq('id', cancellationId);
-    
-    // 3. 주문 상태를 confirmed로 변경
-    await updateOrderStatus(cancellation['order_id'], 'confirmed');
-    
-    // 4. ⭐️ 사용자에게 알림 발송
-    await _sendCancellationRejectedNotification(
-      cancellation['user_id'], 
-      cancellation['order_id'],
-      adminNote,
-    );
-    
-  } catch (e) {
-    debugPrint('💥 Error rejecting cancellation: $e');
-    rethrow;
-  }
-}
-
-// 알림 발송 함수
-Future<void> _sendCancellationRejectedNotification(
-  String userId, 
-  int orderId, 
-  String adminNote
-) async {
-  try {
-    await _client.from('notifications').insert({
-      'user_id': userId,
-      'type': 'order_cancellation_rejected',
-      'title': '주문 취소 요청이 거부되었습니다',
-      'message': '주문번호 ORD-$orderId의 취소 요청이 거부되었습니다.\n사유: $adminNote',
-      'data': {
-        'order_id': orderId,
-        'admin_note': adminNote,
-        'action_type': 'cancellation_rejected'
-      },
-      'is_read': false,
-      'created_at': DateTime.now().toIso8601String(),
-    });
-    
-    debugPrint('✅ Notification sent to user $userId for rejected cancellation');
-  } catch (e) {
-    debugPrint('💥 Error sending notification: $e');
-  }
-}
-
-Future<Map<int, Map<String, dynamic>>> fetchOrdersWithCancellations() async {
-  try {
-    debugPrint('🔍 Fetching orders with cancellations...');
-
-    // 1. 먼저 orders만 조회
-    final ordersResponse = await _client
+  Future<OrderModel> getOrderById(String orderId) async {
+    final response = await _supabase
         .from('orders')
-        .select('id, status, total_amount, recipient_name, recipient_phone, shipping_address')
-        .order('created_at', ascending: false);
-    
-    debugPrint('📦 Orders response: ${ordersResponse.length} orders');
-
-    // 2. order_cancellations 따로 조회
-    final cancellationsResponse = await _client
-        .from('order_cancellations')
-        .select('*')
-        .order('requested_at', ascending: false);
-    
-    debugPrint('📦 Cancellations response: ${cancellationsResponse.length} cancellations');
-
-    Map<int, Map<String, dynamic>> result = {};
-
-    // 3. orders 먼저 처리
-    for (final order in ordersResponse) {
-      final orderId = order['id'] as int;
-      result[orderId] = {
-        'order_status': order['status'],
-        'total_amount': order['total_amount'],
-        'recipient_name': order['recipient_name'],
-        'recipient_phone': order['recipient_phone'],
-        'shipping_address': order['shipping_address'],
-        'cancellation': null,
-        // 부분취소는 별도로 처리
-      };
-    }
-
-    // 4. cancellations 매핑
-    for (final cancellationData in cancellationsResponse) {
-      try {
-        final orderId = cancellationData['order_id'] as int;
-        
-        debugPrint('Processing cancellation for order $orderId: ${cancellationData['status']}');
-        
-        if (result.containsKey(orderId)) {
-          final cancellation = OrderCancellation(
-            id: cancellationData['id'] as int,
-            orderId: orderId,
-            userId: cancellationData['user_id'] as String,
-            cancelReason: cancellationData['cancel_reason'] as String? ?? '사유없음',
-            cancelDetail: cancellationData['cancel_detail'] as String?,
-            status: cancellationData['status'] as String? ?? 'pending',
-            adminNote: cancellationData['admin_note'] as String?,
-            processedAt: cancellationData['processed_at'] != null 
-                ? DateTime.parse(cancellationData['processed_at'] as String)
-                : null,
-            requestedAt: cancellationData['requested_at'] != null 
-                ? DateTime.parse(cancellationData['requested_at'] as String)
-                : DateTime.now(),
-            createdAt: cancellationData['created_at'] != null 
-                ? DateTime.parse(cancellationData['created_at'] as String)
-                : DateTime.now(),
-          );
-          
-          result[orderId]!['cancellation'] = cancellation;
-          debugPrint('✅ Added cancellation for order $orderId');
-        }
-      } catch (e) {
-        debugPrint('❌ Error processing cancellation: $e');
-        debugPrint('Cancellation data: $cancellationData');
-      }
-    }
-
-    debugPrint('✅ Final result: ${result.keys.toList()}');
-    result.forEach((orderId, data) {
-      final cancellation = data['cancellation'] as OrderCancellation?;
-      debugPrint('Order $orderId: status=${data['order_status']}, has_cancellation=${cancellation != null}, cancel_status=${cancellation?.status}');
-    });
-
-    return result;
-  } catch (e) {
-    debugPrint('❌ Error in fetchOrdersWithCancellations: $e');
-    return {};
-  }
-}
-
-// 부분취소 요청 목록 조회 (수정된 버전)
-Future<List<OrderItemCancellation>> fetchPartialCancellations() async {
-  try {
-    // 현재 사용자 정보 확인
-    final currentUser = _client.auth.currentUser;
-    debugPrint('🔍 Current user: ${currentUser?.id}');
-    debugPrint('🔍 User email: ${currentUser?.email}');
-    
-    debugPrint('🔍 Fetching partial cancellations (simple version)...');
-    
-    // 기본 쿼리 시도
-    final response = await _client
-        .from('order_item_cancellations')
-        .select('*')
-        .order('created_at', ascending: false);
-    
-    debugPrint('📦 Partial cancellations response: ${response.length} items');
-    debugPrint('📦 Raw response type: ${response.runtimeType}');
-    debugPrint('📦 Raw response data: $response');
-    
-    if (response.isEmpty) {
-      debugPrint('✅ No partial cancellations found');
-      return [];
-    }
-
-    final List<OrderItemCancellation> cancellations = [];
-    
-    for (final data in response) {
-      try {
-        debugPrint('🔍 Processing raw data: $data');
-        
-        // 간단한 방식으로 생성 (JOIN 없이)
-        final cancellation = OrderItemCancellation(
-          id: data['id'] as int,
-          orderItemId: data['order_item_id'] as int,
-          orderId: data['order_id'] as int,
-          userId: data['user_id'] as String,
-          cancelReason: data['cancel_reason'] as String? ?? '',
-          cancelDetail: data['cancel_detail'] as String?,
-          cancelQuantity: data['cancel_quantity'] as int,
-          refundAmount: data['refund_amount'] as int,
-          status: data['status'] as String? ?? 'pending',
-          adminId: data['admin_id'] as String?,
-          adminNote: data['admin_note'] as String?,
-          processedAt: data['processed_at'] != null 
-              ? DateTime.tryParse(data['processed_at'].toString())
-              : null,
-          requestedAt: data['requested_at'] != null 
-              ? DateTime.tryParse(data['requested_at'].toString()) ?? DateTime.now()
-              : DateTime.now(),
-          createdAt: data['created_at'] != null 
-              ? DateTime.tryParse(data['created_at'].toString()) ?? DateTime.now()
-              : DateTime.now(),
-          productName: '주문아이템 ID: ${data['order_item_id']}',
-          userName: null,
-          userPhone: null,
-          pricePerItem: null,
-        );
-        
-        cancellations.add(cancellation);
-        debugPrint('✅ Added partial cancellation ${cancellation.id} for order ${cancellation.orderId}');
-        
-      } catch (e) {
-        debugPrint('❌ Failed to parse partial cancellation: $e');
-        debugPrint('❌ Raw data: $data');
-      }
-    }
-    
-    debugPrint('✅ Successfully processed ${cancellations.length} partial cancellations');
-    return cancellations;
-    
-  } catch (e) {
-    debugPrint('💥 Error fetching partial cancellations: $e');
-    debugPrint('💥 Error type: ${e.runtimeType}');
-    debugPrint('💥 Error details: ${e.toString()}');
-    return [];
-  }
-}
-
-
-// 부분취소 승인 메서드에 디버깅 강화
-Future<void> approvePartialCancellation(int cancellationId, String adminNote) async {
-  try {
-    debugPrint('✅ Approving partial cancellation $cancellationId');
-    
-    final currentUser = _client.auth.currentUser;
-    
-    // 1. 현재 상태 확인
-    final beforeUpdate = await _client
-        .from('order_item_cancellations')
-        .select('status')
-        .eq('id', cancellationId)
+        .select('*, users:admin_users!inner(*), order_items(*, products(*))')
+        .eq('order_number', orderId)
         .single();
-    
-    debugPrint('🔍 Before update status: ${beforeUpdate['status']}');
-    
-    // 2. 상태 업데이트
-    await _client
-        .from('order_item_cancellations')
-        .update({
-          'status': 'approved',
-          'admin_id': currentUser?.id,
-          'admin_note': adminNote,
-          'processed_at': DateTime.now().toIso8601String(),
-        })
-        .eq('id', cancellationId);
-    
-    // 3. 업데이트 후 상태 확인
-    final afterUpdate = await _client
-        .from('order_item_cancellations')
-        .select('status')
-        .eq('id', cancellationId)
-        .single();
-    
-    debugPrint('🔍 After update status: ${afterUpdate['status']}');
-    
-    // ... 나머지 로직
-    
-    debugPrint('✅ Partial cancellation approved');
-    
-  } catch (e) {
-    debugPrint('💥 Error approving partial cancellation: $e');
-    rethrow;
+    return OrderModel.fromJson(response);
   }
-}
 
-// 부분취소 거부
-Future<void> rejectPartialCancellation(int cancellationId, String adminNote) async {
-  try {
-    debugPrint('❌ Rejecting partial cancellation $cancellationId');
-    
-    final currentUser = _client.auth.currentUser;
-    
-    await _client
-        .from('order_item_cancellations')
-        .update({
-          'status': 'rejected',
-          'admin_id': currentUser?.id,
-          'admin_note': adminNote,
-          'processed_at': DateTime.now().toIso8601String(),
-        })
-        .eq('id', cancellationId);
-    
-    debugPrint('✅ Partial cancellation rejected');
-    
-  } catch (e) {
-    debugPrint('💥 Error rejecting partial cancellation: $e');
-    rethrow;
+  Future<List<OrderCancellation>> getOrderCancellations({String? status, String? searchQuery}) async {
+    var query = _supabase.from('order_cancellations').select('*, orders!inner(*, users:admin_users!inner(username, email))');
+
+    if (status != null && status != '전체') {
+      query = query.eq('status', status);
+    }
+
+    if (searchQuery != null && searchQuery.isNotEmpty) {
+      query = query.or('orders.order_number.ilike.%$searchQuery%,orders.users.username.ilike.%$searchQuery%');
+    }
+
+    final response = await query.order('requested_at', ascending: false);
+    return (response as List).map((e) => OrderCancellation.fromJson(e)).toList();
   }
-}
 
-// ✅ 배송 정보 업데이트 메서드 추가
-Future<void> updateShippingInfo(int orderId, String carrier, String trackingNumber) async {
-  try {
-    debugPrint('🚚 Updating shipping info for order $orderId');
+  Future<List<OrderItemCancellation>> getOrderItemCancellations({String? status, String? searchQuery}) async {
+    var query = _supabase.from('order_item_cancellations').select('''
+      *, 
+      order_items!inner(*, products!inner(*)), 
+      orders!inner(*, users:admin_users!inner(username, email))
+    ''');
     
-    // 1. 주문이 존재하고 배송 정보 업데이트가 가능한 상태인지 확인
-    final order = await _client
-        .from('orders')
-        .select('status')
-        .eq('id', orderId)
-        .single();
-    
-    if (order['status'] != 'confirmed') {
-      throw Exception('배송 정보는 주문확인 상태에서만 등록할 수 있습니다.');
+    if (status != null && status != '전체') {
+      query = query.eq('status', status);
+    }
+
+    if (searchQuery != null && searchQuery.isNotEmpty) {
+       query = query.or('orders.order_number.ilike.%$searchQuery%,orders.users.username.ilike.%$searchQuery%');
     }
     
-    // 2. 배송 정보 업데이트 및 상태 변경
-    await _client
-        .from('orders')
-        .update({
-          'shipping_carrier': carrier,
-          'tracking_number': trackingNumber,
-          'status': 'shipped',
-          'shipped_at': DateTime.now().toIso8601String(),
-        })
-        .eq('id', orderId);
-    
-    debugPrint('✅ Shipping info updated successfully');
-    
-    // 3. 사용자에게 배송 시작 알림 발송
-    await _sendShippingNotification(orderId, carrier, trackingNumber);
-    
-  } catch (e) {
-    debugPrint('💥 Error updating shipping info: $e');
-    rethrow;
+    final response = await query.order('requested_at', ascending: false);
+    return (response as List).map((e) => OrderItemCancellation.fromJson(e)).toList();
+  }
+
+  Future<void> approveCancellation(String cancellationId) async {
+    await _supabase.rpc('approve_order_cancellation', params: {'p_cancellation_id': cancellationId});
+  }
+
+  Future<void> rejectCancellation(String cancellationId, String reason) async {
+    await _supabase.from('order_cancellations').update({'status': 'rejected', 'rejection_reason': reason}).eq('cancellation_id', cancellationId);
+  }
+
+  Future<void> approvePartialCancellation(String itemCancellationId) async {
+    await _supabase.rpc('approve_item_cancellation', params: {'p_item_cancellation_id': itemCancellationId});
+  }
+
+  Future<void> rejectPartialCancellation(String itemCancellationId, String reason) async {
+    await _supabase.from('order_item_cancellations').update({'status': 'rejected', 'rejection_reason': reason}).eq('item_cancellation_id', itemCancellationId);
   }
 }
 
-// ✅ 배송 시작 알림 발송 메서드
-Future<void> _sendShippingNotification(int orderId, String carrier, String trackingNumber) async {
-  try {
-    // 주문의 사용자 ID 조회
-    final order = await _client
-        .from('orders')
-        .select('user_id')
-        .eq('id', orderId)
-        .single();
-    
-    final userId = order['user_id'];
-    
-    // 알림 생성
-    await _client.from('notifications').insert({
-      'user_id': userId,
-      'type': 'order_shipped',
-      'title': '상품이 발송되었습니다',
-      'message': '주문번호 ORD-$orderId 상품이 배송을 시작했습니다.\n택배사: $carrier\n송장번호: $trackingNumber',
-      'data': {
-        'order_id': orderId,
-        'carrier': carrier,
-        'tracking_number': trackingNumber,
-        'action_type': 'order_shipped'
-      },
-      'is_read': false,
-      'created_at': DateTime.now().toIso8601String(),
-    });
-    
-    debugPrint('✅ Shipping notification sent to user $userId');
-  } catch (e) {
-    debugPrint('💥 Error sending shipping notification: $e');
-  }
-}
-
-}
-
-final orderRepositoryProvider = Provider((ref) {
-  return OrderRepository(Supabase.instance.client);
-});

@@ -1,55 +1,40 @@
-// nanum_admin/lib/data/models/order_cancellation_model.dart (새 파일)
-
-import 'package:flutter/foundation.dart';
+// File: nanum_admin/lib/data/models/order_cancellation_model.dart
+import 'order_model.dart';
 
 class OrderCancellation {
-  final int id;
-  final int orderId;
-  final String userId;
-  final String cancelReason;
-  final String? cancelDetail;
-  final String status;
-  final String? adminId;
-  final String? adminNote;
-  final DateTime? processedAt;
+  final String cancellationId;
+  // ✅ final String orderId; // 중복 필드 제거
   final DateTime requestedAt;
-  final DateTime createdAt;
+  final String reason;
+  final int refundedAmount;
+  final String status;
+  final OrderModel order; 
+
+  // ✅ orderId getter 추가
+  String get orderId => order.orderId;
 
   OrderCancellation({
-    required this.id,
-    required this.orderId,
-    required this.userId,
-    required this.cancelReason,
-    this.cancelDetail,
-    required this.status,
-    this.adminId,
-    this.adminNote,
-    this.processedAt,
+    required this.cancellationId,
     required this.requestedAt,
-    required this.createdAt,
+    required this.reason,
+    required this.refundedAmount,
+    required this.status,
+    required this.order,
   });
 
   factory OrderCancellation.fromJson(Map<String, dynamic> json) {
-    try {
-      return OrderCancellation(
-        id: json['id'],
-        orderId: json['order_id'],
-        userId: json['user_id'],
-        cancelReason: json['cancel_reason'] ?? '',
-        cancelDetail: json['cancel_detail'],
-        status: json['status'],
-        adminId: json['admin_id'],
-        adminNote: json['admin_note'],
-        processedAt: json['processed_at'] != null
-            ? DateTime.parse(json['processed_at'])
-            : null,
-        requestedAt: DateTime.parse(json['requested_at']),
-        createdAt: DateTime.parse(json['created_at']),
-      );
-    } catch (e) {
-      debugPrint('❌ OrderCancellation.fromJson error: $e');
-      debugPrint('Json data: $json');
-      rethrow;
-    }
+    // 🔥🔥🔥 수정: orders 데이터가 null일 경우를 대비
+    final orderData = json['orders'] as Map<String, dynamic>?;
+
+    return OrderCancellation(
+      cancellationId: json['cancellation_id'] as String? ?? '',
+      requestedAt: DateTime.tryParse(json['requested_at'] as String? ?? '') ?? DateTime.now(),
+      reason: json['reason'] as String? ?? '',
+      refundedAmount: json['refunded_amount'] as int? ?? 0,
+      status: json['status'] as String? ?? 'unknown',
+      // 🔥🔥🔥 수정: orderData가 null일 경우 빈 Map을 전달하여 앱 비정상 종료 방지
+      order: OrderModel.fromJson(orderData ?? {}),
+    );
   }
 }
+

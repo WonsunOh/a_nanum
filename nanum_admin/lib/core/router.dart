@@ -117,12 +117,7 @@ final router = GoRouter(
         GoRoute(
           path: '/orders/shop',
           builder: (context, state) =>
-              const OrderManagementScreen(orderType: OrderType.shop),
-        ),
-        GoRoute(
-          path: '/orders/group-buy',
-          builder: (context, state) =>
-              const OrderManagementScreen(orderType: OrderType.groupBuy),
+              const OrderManagementScreen(),
         ),
         
         // 회원 관리

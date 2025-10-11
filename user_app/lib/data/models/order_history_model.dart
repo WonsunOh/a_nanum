@@ -28,7 +28,7 @@ class OrderHistoryModel {
   factory OrderHistoryModel.fromJson(Map<String, dynamic> json) {
     return OrderHistoryModel(
       orderId: json['id'],
-      orderNumber: json['order_number'] ?? 'ORD-${json['id'].toString().padLeft(6, '0')}',
+      orderNumber: json['order_number'] as String? ?? '',
       createdAt: DateTime.parse(json['created_at']),
       status: json['status'] ?? 'pending',
       totalAmount: json['total_amount'],

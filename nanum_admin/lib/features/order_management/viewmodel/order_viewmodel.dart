@@ -1,71 +1,117 @@
-// nanum_admin/lib/features/order_management/viewmodel/order_viewmodel.dart (전체 수정)
-
-import 'package:excel/excel.dart';
-import 'package:flutter/foundation.dart';
+// File: nanum_admin/lib/features/order_management/viewmodel/order_viewmodel.dart
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-
 import '../../../data/models/order_model.dart';
 import '../../../data/repositories/order_repository.dart';
 
-// ⭐️ 1. StateNotifierProvider를 .family로 변경하여 OrderType을 인자로 받습니다.
-final orderViewModelProvider = StateNotifierProvider.autoDispose
-    .family<OrderViewModel, AsyncValue<List<Order>>, OrderType>((ref, orderType) {
-  return OrderViewModel(ref.read(orderRepositoryProvider), orderType: orderType);
+final orderViewModelProvider =
+    StateNotifierProvider<OrderViewModel, AsyncValue<List<OrderModel>>>((ref) {
+  return OrderViewModel(ref.watch(orderRepositoryProvider));
 });
 
-class OrderViewModel extends StateNotifier<AsyncValue<List<Order>>> {
+class OrderViewModel extends StateNotifier<AsyncValue<List<OrderModel>>> {
   final OrderRepository _repository;
-  final OrderType orderType; // ⭐️ 어떤 타입의 주문을 관리할지 저장
+  int _page = 0;
+  bool _hasMore = true;
+  String _searchQuery = '';
+  String _selectedStatus = '전체';
+  String _selectedPeriod = 'all';
+  bool isLoadingMore = false;
 
-  OrderViewModel(this._repository, {required this.orderType})
-      : super(const AsyncValue.loading()) {
-    fetchOrders();
+  OrderViewModel(this._repository) : super(const AsyncValue.loading());
+
+  // 🔥🔥🔥 수정: 외부에서 접근할 수 있도록 public getter 추가
+  String get selectedStatus => _selectedStatus;
+
+  void setSearchQuery(String query) {
+    _searchQuery = query;
   }
 
-  Future<void> fetchOrders() async {
-  state = const AsyncValue.loading();
+  void setSelectedStatus(String status) {
+    _selectedStatus = status;
+  }
+
+  void setSelectedPeriod(String period) {
+    _selectedPeriod = period;
+  }
+
+  Future<void> fetchOrders({bool isRefresh = false}) async {
+    if (isRefresh) {
+      _page = 0;
+      _hasMore = true;
+      state = const AsyncValue.loading();
+    }
+
+    if (isLoadingMore || !_hasMore) return;
+    isLoadingMore = true;
+
+    try {
+      final newOrders = await _repository.getOrders(
+        page: _page,
+        query: _searchQuery,
+        status: _selectedStatus,
+        period: _selectedPeriod,
+      );
+
+      if (newOrders.isEmpty) {
+        _hasMore = false;
+      }
+
+      if (isRefresh) {
+        state = AsyncValue.data(newOrders);
+      } else {
+        state = AsyncValue.data([...(state.value ?? []), ...newOrders]);
+      }
+      _page++;
+    } catch (e, s) {
+      state = AsyncValue.error(e, s);
+    } finally {
+      isLoadingMore = false;
+    }
+  }
+
+  Future<void> updateOrderStatus(String orderId, OrderStatus newStatus) async {
+    try {
+      await _repository.updateOrderStatus(orderId, newStatus.name);
+      await fetchOrders(isRefresh: true);
+    } catch (e) {
+      // 에러 처리
+    }
+  }
+
+  // ✅ 선택된 '결제완료' 주문들을 '상품준비중'으로 일괄 변경하는 함수
+  Future<void> changeOrdersToPreparing(List<String> orderIds) async {
+    final currentState = state.value;
+    if (currentState == null || orderIds.isEmpty) return;
+
+    final targetOrderIds = currentState
+        .where((order) => orderIds.contains(order.orderId) && order.status == OrderStatus.confirmed)
+        .map((order) => order.orderId)
+        .toList();
+
+    if (targetOrderIds.isEmpty) return;
+
+    final updates = targetOrderIds.map((id) => {
+      'order_number': id,
+      'status': OrderStatus.preparing.name,
+    }).toList();
+
+    try {
+      await _repository.batchUpdateOrders(updates);
+      await fetchOrders(isRefresh: true);
+    } catch(e, s) {
+      state = AsyncValue.error(e, s);
+    }
+  }
   
-  try {
-    // ⭐️ 디버그 정보 먼저 출력
-    if (orderType == OrderType.shop) {
-      await _repository.debugTablesInfo(); // 위에서 만든 함수 호출
-    }
-    
-    // 기존 로직
-    if (orderType == OrderType.groupBuy) {
-      state = await AsyncValue.guard(() => _repository.fetchGroupBuyOrders());
-    } else {
-      state = await AsyncValue.guard(() => _repository.fetchShopOrders());
-    }
-  } catch (e, s) {
-    debugPrint('ViewModel error: $e');
-    state = AsyncValue.error(e, s);
-  }
-}
-
-  // 엑셀 파일 업로드 및 처리를 위한 메소드
-  Future<void> uploadAndProcessExcel(List<int> fileBytes) async {
-    // 주의: 이 기능은 현재 공동구매 주문(participants)에만 적용됩니다.
-    // 쇼핑몰 주문에 대한 송장 업데이트는 별도 로직이 필요합니다.
+  // ✅ 기존 송장번호 일괄 등록 기능 유지 (내부적으로 batchUpdateOrders 호출)
+  Future<void> batchUpdateTrackingNumbers(List<Map<String, dynamic>> updates) async {
     state = const AsyncValue.loading();
     try {
-      final excel = Excel.decodeBytes(fileBytes);
-      final sheet = excel.tables[excel.tables.keys.first]!;
-      
-      final List<Map<String, dynamic>> updates = sheet.rows.skip(1).map((row) {
-        return {
-          'p_id': row[0]?.value,
-          't_num': row[6]?.value,
-        };
-      }).where((item) => item['p_id'] != null && item['t_num'] != null).toList();
-
-      if (updates.isNotEmpty) {
-        await _repository.batchUpdateTrackingNumbers(updates);
-      }
-      // 성공 후 주문 목록 새로고침
-      await fetchOrders();
-    } catch (e, s) {
+      await _repository.batchUpdateOrders(updates);
+      await fetchOrders(isRefresh: true);
+    } catch(e, s) {
       state = AsyncValue.error(e, s);
     }
   }
 }
+

@@ -23,4 +23,5 @@ class RouteConstants {
   static const String categoryManagement = '/shop/categories';
   static const String userManagement = '/users';
   static const String orderManagement = '/orders';
+  static const String orderCancellation = '/orders/cancelled'; // 추가
 }

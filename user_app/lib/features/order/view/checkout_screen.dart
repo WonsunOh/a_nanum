@@ -1,4 +1,4 @@
-// user_app/lib/features/order/view/checkout_screen.dart (기존 파일 기반 개선)
+// user_app/lib/features/order/view/checkout_screen.dart (전체 교체)
 
 import 'dart:convert';
 import 'package:flutter/material.dart';
@@ -26,23 +26,20 @@ class CheckoutScreen extends ConsumerStatefulWidget {
 class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
   final _formKey = GlobalKey<FormState>();
   
-  // ✅ 기존 변수명을 recipient로 변경 (수령인 정보)
-  final _recipientNameController = TextEditingController(); // 기존: _nameController
-  final _recipientPhoneController = TextEditingController(); // 기존: _phoneController
+  final _recipientNameController = TextEditingController();
+  final _recipientPhoneController = TextEditingController();
   final _postcodeController = TextEditingController();
   final _addressController = TextEditingController();
   final _detailAddressController = TextEditingController();
   final _deliveryRequestController = TextEditingController();
 
-  // ✅ 새로 추가된 상태 변수
-  bool _sameAsOrderer = false; // 주문자와 동일 여부
-  String _ordererName = '';   // 주문자 이름
-  String _ordererPhone = '';  // 주문자 전화번호
+  bool _sameAsOrderer = false;
+  String _ordererName = '';
+  String _ordererPhone = '';
 
   bool _isAutoFilled = false;
   bool _isEditMode = false;
 
-  // 바로구매 관련 변수
   Map<String, dynamic>? directPurchaseData;
   bool get isDirectPurchase => directPurchaseData != null;
 
@@ -53,7 +50,6 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _checkDirectPurchaseMode();
       
-      // ✅ 기존 _tryAutoFillUserInfo를 _loadOrdererAndRecipientInfo로 대체
       Future.delayed(const Duration(milliseconds: 300), () {
         if (mounted) {
           _loadOrdererAndRecipientInfo();
@@ -73,7 +69,6 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
     super.dispose();
   }
 
-  // ✅ 새로운 메서드: 주문자 정보 로드 + 수령인 정보 자동 채움 (기존 _tryAutoFillUserInfo 포함)
   void _loadOrdererAndRecipientInfo() {
     final userProfileAsync = ref.read(userProvider);
     
@@ -81,11 +76,9 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
       data: (userProfile) {
         if (userProfile != null && mounted) {
           setState(() {
-            // 1. 주문자 정보 저장
             _ordererName = userProfile.fullName ?? userProfile.nickname ?? '사용자';
             _ordererPhone = userProfile.phoneNumber ?? '';
             
-            // 2. 주문자와 동일한 경우 수령인 정보도 자동 채움 (레벨 2 이상)
             if (_sameAsOrderer && userProfile.level >= 2) {
               _fillRecipientWithOrdererInfo(userProfile);
             }
@@ -93,7 +86,6 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
         }
       },
       loading: () {
-        // 로딩 중일 때 재시도
         Future.delayed(const Duration(milliseconds: 500), () {
           if (mounted) {
             _loadOrdererAndRecipientInfo();
@@ -106,46 +98,40 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
     );
   }
 
-  // ✅ 주문자 정보로 수령인 정보 채우기 (기존 _tryAutoFillUserInfo 로직 활용)
   void _fillRecipientWithOrdererInfo(dynamic userProfile) {
-  _recipientNameController.text = userProfile.fullName ?? userProfile.nickname ?? '';
-  _recipientPhoneController.text = userProfile.phoneNumber ?? '';
-  
-  if (userProfile.postcode != null && userProfile.postcode!.isNotEmpty) {
-    _postcodeController.text = userProfile.postcode!;
+    _recipientNameController.text = userProfile.fullName ?? userProfile.nickname ?? '';
+    _recipientPhoneController.text = userProfile.phoneNumber ?? '';
+    
+    if (userProfile.postcode != null && userProfile.postcode!.isNotEmpty) {
+      _postcodeController.text = userProfile.postcode!;
+    }
+    
+    if (userProfile.address != null && userProfile.address!.isNotEmpty) {
+      _addressController.text = userProfile.address!;
+    }
+    
+    if (userProfile.detailAddress != null && userProfile.detailAddress!.isNotEmpty) {
+      _detailAddressController.text = userProfile.detailAddress!;
+    }
+    
+    _isAutoFilled = true;
   }
-  
-  // ✅ 파싱 없이 직접 할당
-  if (userProfile.address != null && userProfile.address!.isNotEmpty) {
-    _addressController.text = userProfile.address!;
-  }
-  
-  if (userProfile.detailAddress != null && userProfile.detailAddress!.isNotEmpty) {
-    _detailAddressController.text = userProfile.detailAddress!;
-  }
-  
-  _isAutoFilled = true;
-}
 
-  // ✅ "주문자와 동일" 체크박스 토글
   void _toggleSameAsOrderer(bool? value) {
     setState(() {
       _sameAsOrderer = value ?? false;
       
       if (_sameAsOrderer) {
-        // 주문자 정보로 채우기
         final userProfileAsync = ref.read(userProvider);
         userProfileAsync.whenData((profile) {
           if (profile != null && profile.level >= 2) {
             _fillRecipientWithOrdererInfo(profile);
           } else if (profile != null) {
-            // 레벨 2 미만인 경우 기본 정보만 채우기
             _recipientNameController.text = profile.fullName ?? profile.nickname ?? '';
             _recipientPhoneController.text = profile.phoneNumber ?? '';
           }
         });
       } else {
-        // 수령인 정보 초기화
         _recipientNameController.clear();
         _recipientPhoneController.clear();
         _postcodeController.clear();
@@ -157,16 +143,13 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
     });
   }
 
-  // 바로구매 모드 확인 (기존 코드 유지)
   void _checkDirectPurchaseMode() {
     final directData = ref.read(directPurchaseProvider);
     
     if (directData != null) {
       directPurchaseData = directData.toJson();
       
-      if (mounted) {
-        setState(() {});
-      }
+      if (mounted) setState(() {});
 
       final items = directPurchaseData!['items'] as List?;
       if (items == null || items.isEmpty) {
@@ -176,37 +159,6 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
         );
       } else {
         ref.read(directPurchaseProvider.notifier).state = null;
-      }
-    } else {
-      final uri = GoRouterState.of(context).uri;
-      final directParam = uri.queryParameters['direct'];
-      
-      if (directParam != null) {
-        try {
-          final decodedString = Uri.decodeComponent(directParam);
-          directPurchaseData = jsonDecode(decodedString);
-          
-          if (mounted) {
-            setState(() {});
-          }
-          
-          final items = directPurchaseData!['items'] as List?;
-          if (items == null || items.isEmpty) {
-            context.go('/shop/cart');
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('주문할 상품이 없습니다.')),
-            );
-          }
-        } catch (e) {
-          WidgetsBinding.instance.addPostFrameCallback((_) {
-            if (mounted) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(content: Text('주문 정보를 불러올 수 없습니다: $e')),
-              );
-              context.go('/shop/cart');
-            }
-          });
-        }
       }
     }
   }
@@ -276,8 +228,8 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
     return '($postcode) $address $detailAddress'.trim();
   }
 
-  // 기존 계산 메서드들 유지
   int _calculateDirectPurchaseSubtotal() {
+    if (directPurchaseData == null) return 0;
     final basePrice =
         directPurchaseData!['productDiscountPrice'] ??
         directPurchaseData!['productPrice'];
@@ -300,7 +252,6 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
     });
   }
 
-  // 주문 제출 메서드 (변수명만 recipient로 변경)
   Future<void> _submitOrder() async {
     if (!_formKey.currentState!.validate()) return;
 
@@ -394,7 +345,7 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
               color: Colors.white,
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withValues(alpha:0.1),
+                  color: Colors.black.withOpacity(0.1),
                   blurRadius: 10,
                   offset: const Offset(0, -2),
                 ),
@@ -420,21 +371,14 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
                         if (isDirectPurchase) ...[
                           const Icon(Icons.flash_on, size: 20),
                           const SizedBox(width: 8),
-                          const Text(
-                            '바로결제',
-                            style: TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.bold,
-                            ),
+                        ],
+                        Text(
+                          isDirectPurchase ? '바로결제' : '결제하기',
+                          style: const TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
                           ),
-                        ] else
-                          const Text(
-                            '결제하기',
-                            style: TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
+                        ),
                       ],
                     ),
             ),
@@ -448,7 +392,6 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
     return SingleChildScrollView(
       child: Column(
         children: [
-          // ✅ 주문자 정보 섹션 추가
           _buildOrdererInfoSection(),
           const SizedBox(height: 8),
           _buildShippingForm(),
@@ -468,7 +411,6 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
           child: SingleChildScrollView(
             child: Column(
               children: [
-                // ✅ 주문자 정보 섹션 추가
                 _buildOrdererInfoSection(),
                 const SizedBox(height: 8),
                 _buildShippingForm(),
@@ -525,7 +467,6 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
     );
   }
 
-  // ✅ 새로 추가: 주문자 정보 섹션
   Widget _buildOrdererInfoSection() {
     return Container(
       margin: const EdgeInsets.all(16),
@@ -534,7 +475,7 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha:0.05),
+            color: Colors.black.withOpacity(0.05),
             blurRadius: 10,
             offset: const Offset(0, 2),
           ),
@@ -594,7 +535,6 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
     );
   }
 
-  // ✅ 개선된 배송지 정보 폼 (주문자와 동일 체크박스 추가)
   Widget _buildShippingForm() {
     final userProfileAsync = ref.watch(userProvider);
 
@@ -605,7 +545,7 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha:0.05),
+            color: Colors.black.withOpacity(0.05),
             blurRadius: 10,
             offset: const Offset(0, 2),
           ),
@@ -618,7 +558,6 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // 헤더
               Row(
                 children: [
                   Container(
@@ -694,7 +633,6 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
 
               const SizedBox(height: 20),
 
-              // ✅ "주문자와 동일" 체크박스 추가
               Container(
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
@@ -740,7 +678,6 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
 
               const SizedBox(height: 24),
 
-              // ✅ 받는 사람 (변수명 변경)
               _buildTextField(
                 controller: _recipientNameController,
                 label: '받는 사람',
@@ -752,7 +689,6 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
 
               const SizedBox(height: 16),
 
-              // ✅ 연락처 (변수명 변경)
               _buildTextField(
                 controller: _recipientPhoneController,
                 label: '연락처',
@@ -765,7 +701,6 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
 
               const SizedBox(height: 24),
 
-              // 기존 주소 입력 필드들 (동일하게 유지)
               const Text(
                 '배송 주소',
                 style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
@@ -851,7 +786,6 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
     );
   }
 
-  // 기존 텍스트 필드, 주문 요약 등 나머지 메서드들은 동일하게 유지
   Widget _buildTextField({
     required TextEditingController controller,
     required String label,
@@ -889,9 +823,9 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
         ),
         filled: readOnly,
         fillColor: readOnly ? Colors.grey.shade50 : null,
-        contentPadding: EdgeInsets.symmetric(
+        contentPadding: const EdgeInsets.symmetric(
           horizontal: 16,
-          vertical: maxLines > 1 ? 16 : 16,
+          vertical: 16,
         ),
       ),
       keyboardType: keyboardType,
@@ -899,9 +833,6 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
       validator: isRequired ? validator : null,
     );
   }
-
-  // ✅ 나머지 메서드들 (결제 확인, 주문 요약 등)은 기존 코드와 동일하게 유지
-  // (기존 파일의 _buildPaymentConfirmationScreen, _buildOrderSummary 등 그대로 사용)
 
   Widget _buildPaymentConfirmationScreen(int totalAmount, List<dynamic> items) {
     return Scaffold(
@@ -930,7 +861,7 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
               color: Colors.white,
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withValues(alpha:0.1),
+                  color: Colors.black.withOpacity(0.1),
                   blurRadius: 10,
                   offset: const Offset(0, -2),
                 ),
@@ -1000,8 +931,8 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
             ),
             const Divider(height: 24),
             _buildPaymentInfoRow('선택 상품', '${items.length}개'),
-            _buildPaymentInfoRow('받는 분', _recipientNameController.text), // ✅ 변경됨
-            _buildPaymentInfoRow('연락처', _recipientPhoneController.text), // ✅ 변경됨
+            _buildPaymentInfoRow('받는 분', _recipientNameController.text),
+            _buildPaymentInfoRow('연락처', _recipientPhoneController.text),
             _buildPaymentInfoRow(
               '배송지',
               '${_addressController.text} ${_detailAddressController.text}',
@@ -1038,10 +969,10 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
                 children: [
                   Icon(Icons.info_outline, color: Colors.amber.shade700),
                   const SizedBox(width: 12),
-                  Expanded(
+                  const Expanded(
                     child: Text(
                       '테스트 환경으로 실제 결제는 발생하지 않습니다.',
-                      style: TextStyle(color: Colors.amber.shade700),
+                      style: TextStyle(color: Colors.amber),
                     ),
                   ),
                 ],
@@ -1072,17 +1003,14 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
     );
   }
 
-  // ✅ 나머지 메서드들 (_processPayment, _buildOrderSummary 등)은 
-  // 기존 파일의 코드를 그대로 사용하되 _nameController -> _recipientNameController, 
-  // _phoneController -> _recipientPhoneController로만 변경
-
+  // 🔥🔥🔥 전체 수정: _processPayment에서 올바른 함수를 호출하도록 변경
   Future<void> _processPayment(
     List<dynamic> items,
     int totalAmount,
     int currentShippingFee,
   ) async {
     try {
-      final userEmail = "${_recipientPhoneController.text}@temp.com"; // ✅ 변경됨
+      final userEmail = "${_recipientPhoneController.text}@temp.com";
 
       Map<String, dynamic>? paymentResult;
 
@@ -1093,10 +1021,10 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
           child: PortOneWebHtmlScreen(
             totalAmount: totalAmount,
             orderName: isDirectPurchase
-                ? '바로구매 ${items.length}건'
+                ? '바로구매 ${directPurchaseData?['productName'] ?? ''}'
                 : '소분쇼핑몰 주문 ${items.length}건',
-            customerName: _recipientNameController.text, // ✅ 변경됨
-            customerPhone: _recipientPhoneController.text, // ✅ 변경됨
+            customerName: _recipientNameController.text,
+            customerPhone: _recipientPhoneController.text,
             customerEmail: userEmail,
             customerAddress: _addressController.text,
           ),
@@ -1107,13 +1035,14 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
         bool orderSuccess = false;
         
         if (isDirectPurchase) {
+          // 🔥🔥🔥 수정: 바로구매 전용 ViewModel 함수 호출
           orderSuccess = await _createDirectPurchaseOrder(
-            items: items,
             totalAmount: totalAmount,
             currentShippingFee: currentShippingFee,
             paymentId: paymentResult['paymentId'],
           );
         } else {
+          // 기존 장바구니 주문
           orderSuccess = await _createCartOrder(
             items: items.cast<CartItemModel>(),
             totalAmount: totalAmount,
@@ -1123,8 +1052,7 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
         }
 
         if (mounted && orderSuccess) {
-          // ✅ 주문 성공 후 자동 레벨업 체크
-        await _checkAndUpgradeLevel();
+          await _checkAndUpgradeLevel();
 
           context.go('/shop');
           ScaffoldMessenger.of(context).showSnackBar(
@@ -1193,90 +1121,76 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
     }
   }
 
-  // 3. ✅ 새로 추가: 레벨1 회원 자동 레벨업 메서드
-  // checkout_screen.dart - 수정된 _checkAndUpgradeLevel 메서드
-
-// ✅ 수정된 레벨업 메서드: 입력된 수령인 정보를 프로필에 저장
-Future<void> _checkAndUpgradeLevel() async {
-  try {
-    final userProfileAsync = ref.read(userProvider);
-    await userProfileAsync.when(
-      data: (userProfile) async {
-        if (userProfile != null && userProfile.level == 1) {
-          // 레벨 1 회원인 경우 자동으로 레벨 2로 업그레이드 + 입력 정보 저장
-          final profileRepository = ref.read(profileRepositoryProvider);
-          
-          // 현재 입력된 수령인 정보 수집
-          final recipientName = _recipientNameController.text.trim();
-          final recipientPhone = _recipientPhoneController.text.trim();
-          final postcode = _postcodeController.text.trim();
-          final address = _addressController.text.trim();
-          final detailAddress = _detailAddressController.text.trim();
-          
-                    
-          // ✅ 별도 필드로 저장
-          await profileRepository.updateProfileAndLevel(
-            fullName: recipientName.isNotEmpty ? recipientName : null,
-            phoneNumber: recipientPhone.isNotEmpty ? recipientPhone : null,
-            address: address.isNotEmpty ? address : null,
-            detailAddress: detailAddress.isNotEmpty ? detailAddress : null, // ✅ 추가
-            postcode: postcode.isNotEmpty ? postcode : null,
-            newLevel: 2,
-          );
-          
-          // 사용자 정보 새로고침
-          ref.invalidate(userProvider);
-          
-          // 레벨업 성공 메시지 표시
-          if (mounted) {
-            // 기존 SnackBar를 덮어쓰지 않도록 잠시 지연
-            Future.delayed(const Duration(seconds: 1), () {
-              if (mounted) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Row(
-                      children: [
-                        Icon(Icons.celebration, color: Colors.white),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: Column(
-                            mainAxisSize: MainAxisSize.min,
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              const Text(
-                                '🎉 레벨업 완료!',
-                                style: TextStyle(fontWeight: FontWeight.bold),
-                              ),
-                              const Text('레벨 1 → 레벨 2로 승급! 배송정보가 저장되었습니다.'),
-                            ],
+  Future<void> _checkAndUpgradeLevel() async {
+    try {
+      final userProfileAsync = ref.read(userProvider);
+      await userProfileAsync.when(
+        data: (userProfile) async {
+          if (userProfile != null && userProfile.level == 1) {
+            final profileRepository = ref.read(profileRepositoryProvider);
+            
+            final recipientName = _recipientNameController.text.trim();
+            final recipientPhone = _recipientPhoneController.text.trim();
+            final postcode = _postcodeController.text.trim();
+            final address = _addressController.text.trim();
+            final detailAddress = _detailAddressController.text.trim();
+            
+            await profileRepository.updateProfileAndLevel(
+              fullName: recipientName.isNotEmpty ? recipientName : null,
+              phoneNumber: recipientPhone.isNotEmpty ? recipientPhone : null,
+              address: address.isNotEmpty ? address : null,
+              detailAddress: detailAddress.isNotEmpty ? detailAddress : null,
+              postcode: postcode.isNotEmpty ? postcode : null,
+              newLevel: 2,
+            );
+            
+            ref.invalidate(userProvider);
+            
+            if (mounted) {
+              Future.delayed(const Duration(seconds: 1), () {
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: const Row(
+                        children: [
+                          Icon(Icons.celebration, color: Colors.white),
+                          SizedBox(width: 12),
+                          Expanded(
+                            child: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  '🎉 레벨업 완료!',
+                                  style: TextStyle(fontWeight: FontWeight.bold),
+                                ),
+                                Text('레벨 1 → 레벨 2로 승급! 배송정보가 저장되었습니다.'),
+                              ],
+                            ),
                           ),
-                        ),
-                      ],
+                        ],
+                      ),
+                      backgroundColor: Colors.purple,
+                      duration: const Duration(seconds: 5),
                     ),
-                    backgroundColor: Colors.purple,
-                    duration: const Duration(seconds: 5),
-                  ),
-                );
-              }
-            });
+                  );
+                }
+              });
+            }
           }
-          
-        
-        }
-      },
-      loading: () async {
-        // 로딩 중이면 잠시 대기 후 재시도
-        await Future.delayed(const Duration(milliseconds: 500));
-        await _checkAndUpgradeLevel();
-      },
-      error: (error, stackTrace) async {
-        print('❌ 레벨업 체크 중 에러: $error');
-      },
-    );
-  } catch (e) {
-    print('❌ 자동 레벨업 처리 중 에러: $e');
+        },
+        loading: () async {
+          await Future.delayed(const Duration(milliseconds: 500));
+          await _checkAndUpgradeLevel();
+        },
+        error: (error, stackTrace) async {
+          print('❌ 레벨업 체크 중 에러: $error');
+        },
+      );
+    } catch (e) {
+      print('❌ 자동 레벨업 처리 중 에러: $e');
+    }
   }
-}
 
   Future<bool> _createCartOrder({
     required List<CartItemModel> items,
@@ -1289,8 +1203,8 @@ Future<void> _checkAndUpgradeLevel() async {
         cartItems: items,
         totalAmount: totalAmount,
         shippingFee: currentShippingFee,
-        recipientName: _recipientNameController.text, // ✅ 변경됨
-        recipientPhone: _recipientPhoneController.text, // ✅ 변경됨
+        recipientName: _recipientNameController.text,
+        recipientPhone: _recipientPhoneController.text,
         shippingAddress: _fullAddress,
         paymentId: paymentId,
       );
@@ -1306,21 +1220,33 @@ Future<void> _checkAndUpgradeLevel() async {
     }
   }
 
+  // 🔥🔥🔥 수정: 바로구매 전용 주문 생성 헬퍼 함수
   Future<bool> _createDirectPurchaseOrder({
-    required List<dynamic> items,
     required int totalAmount,
     required int currentShippingFee,
     required String paymentId,
   }) async {
+    if (directPurchaseData == null) {
+      print('❌ 바로구매 데이터가 없습니다.');
+      return false;
+    }
     try {
-      final cartItems = await _convertDirectPurchaseToCartItems(items);
-      
-      final success = await ref.read(orderViewModelProvider.notifier).createOrder(
-        cartItems: cartItems,
+      // 바로구매 데이터에서 필요한 정보 추출
+      final productId = directPurchaseData!['productId'] as int;
+      final items = directPurchaseData!['items'] as List;
+      // 바로구매는 상품이 하나이므로, 첫번째 아이템의 수량을 대표로 사용
+      final quantity = items.first['quantity'] as int? ?? 1;
+      final productPrice = (directPurchaseData!['productDiscountPrice'] ?? directPurchaseData!['productPrice']) as int;
+
+      // ViewModel 함수 호출
+      final success = await ref.read(orderViewModelProvider.notifier).createDirectOrder(
+        productId: productId,
+        quantity: quantity,
+        productPrice: productPrice,
         totalAmount: totalAmount,
         shippingFee: currentShippingFee,
-        recipientName: _recipientNameController.text, // ✅ 변경됨
-        recipientPhone: _recipientPhoneController.text, // ✅ 변경됨
+        recipientName: _recipientNameController.text,
+        recipientPhone: _recipientPhoneController.text,
         shippingAddress: _fullAddress,
         paymentId: paymentId, 
       );
@@ -1336,166 +1262,304 @@ Future<void> _checkAndUpgradeLevel() async {
     }
   }
 
-  // ✅ 바로주문 데이터를 CartItemModel로 변환 (수정된 버전)
-Future<List<CartItemModel>> _convertDirectPurchaseToCartItems(List<dynamic> items) async {
-  final userId = Supabase.instance.client.auth.currentUser?.id;
-  if (userId == null || directPurchaseData == null) {
-    print('❌ 사용자 ID 또는 바로주문 데이터가 없음');
-    return [];
-  }
-
-  try {
-    print('바로주문 데이터 변환 시작: ${items.length}개 아이템');
-    
-    final List<CartItemModel> cartItems = [];
-    
-    // 바로주문 기본 정보 추출
-    final productId = directPurchaseData!['productId'] as int;
-    
-    // 각 바로주문 아이템을 CartItemModel로 변환
-    for (int index = 0; index < items.length; index++) {
-      final item = items[index];
-      
-      final quantity = item['quantity'] as int? ?? 1;
-      final variantName = item['variantName'] as String?;
-      final additionalPrice = item['additionalPrice'] as int? ?? 0;
-      
-      // CartItemModel 생성 (임시 ID 사용)
-      final cartItem = CartItemModel(
-        id: -(index + 1), // 음수 임시 ID (실제 DB ID와 구분)
-        userId: userId,
-        productId: productId,
-        quantity: quantity,
-        createdAt: DateTime.now(),
-        product: null, // 주문 생성 시 product 정보는 productId로 조회됨
-        variantId: null,
-        variantName: variantName,
-        variantAdditionalPrice: additionalPrice,
-      );
-      
-      cartItems.add(cartItem);
-      print('CartItem 생성: 상품ID=$productId, 변형=$variantName, 수량=$quantity');
-    }
-    
-    print('바로주문 데이터 변환 완료: ${cartItems.length}개 CartItem 생성');
-    return cartItems;
-    
-  } catch (e) {
-    print('바로주문 데이터 변환 실패: $e');
-    print('DirectPurchaseData: $directPurchaseData');
-    return [];
-  }
-}
-
   String _formatAmount(int amount) {
-    return amount.toString().replaceAllMapped(
-      RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'),
-      (Match m) => '${m[1]},',
-    );
+    return NumberFormat('#,###').format(amount);
   }
 
-  // checkout_screen.dart에 추가할 누락된 메서드들 (변수명만 수정됨)
+  Widget _buildOrderSummary() {
+    if (isDirectPurchase && directPurchaseData != null) {
+      return _buildDirectPurchaseOrderSummary();
+    }
 
-// 주문 요약 (기존 코드 + 변수명 변경)
-Widget _buildOrderSummary() {
-  // 바로구매 모드인 경우
-  if (isDirectPurchase && directPurchaseData != null) {
-    return _buildDirectPurchaseOrderSummary();
-  }
+    final cartAsync = ref.watch(cartViewModelProvider);
+    final currencyFormat = NumberFormat.currency(locale: 'ko_KR', symbol: '₩');
 
-  // 장바구니 모드 (기존 로직)
-  final cartAsync = ref.watch(cartViewModelProvider);
-  final currencyFormat = NumberFormat.currency(locale: 'ko_KR', symbol: '₩');
+    return Container(
+      margin: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 10,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: cartAsync.when(
+        data: (cartState) {
+          final selectedItems = cartState.items
+              .where((item) => cartState.selectedItemIds.contains(item.id))
+              .toList();
+          if (selectedItems.isEmpty) {
+            return const Padding(
+              padding: EdgeInsets.all(24),
+              child: Text('주문할 상품이 없습니다.'),
+            );
+          }
 
-  return Container(
-    margin: const EdgeInsets.all(16),
-    decoration: BoxDecoration(
-      color: Colors.white,
-      borderRadius: BorderRadius.circular(16),
-      boxShadow: [
-        BoxShadow(
-          color: Colors.black.withValues(alpha:0.05),
-          blurRadius: 10,
-          offset: const Offset(0, 2),
-        ),
-      ],
-    ),
-    child: cartAsync.when(
-      data: (cartState) {
-        final selectedItems = cartState.items
-            .where((item) => cartState.selectedItemIds.contains(item.id))
-            .toList();
-        if (selectedItems.isEmpty) {
-          return const Padding(
-            padding: EdgeInsets.all(24),
-            child: Text('주문할 상품이 없습니다.'),
-          );
-        }
+          const int shippingFee = 3000;
+          const int freeShippingThreshold = 50000;
 
-        const int shippingFee = 3000;
-        const int freeShippingThreshold = 50000;
+          final int subtotal = _calculateCartSubtotal(selectedItems);
+          final int currentShippingFee = (subtotal >= freeShippingThreshold)
+              ? 0
+              : shippingFee;
+          final int totalAmount = subtotal + currentShippingFee;
 
-        final int subtotal = _calculateCartSubtotal(selectedItems);
-        final int currentShippingFee = (subtotal >= freeShippingThreshold)
-            ? 0
-            : shippingFee;
-        final int totalAmount = subtotal + currentShippingFee;
+          return Padding(
+            padding: const EdgeInsets.all(24),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: Colors.green.shade50,
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Icon(
+                        Icons.receipt_long,
+                        color: Colors.green.shade600,
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    const Text(
+                      '주문 요약',
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ],
+                ),
 
-        return Padding(
-          padding: const EdgeInsets.all(24),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // 헤더
-              Row(
-                children: [
+                const SizedBox(height: 20),
+
+                ...selectedItems.map((item) {
+                  final product = item.product;
+                  if (product == null) return const SizedBox.shrink();
+
+                  final basePrice = product.discountPrice ?? product.price;
+                  final variantPrice = item.variantAdditionalPrice ?? 0;
+                  final finalPrice = basePrice + variantPrice;
+
+                  return Container(
+                    margin: const EdgeInsets.only(bottom: 16),
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: Colors.grey.shade50,
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: Colors.grey.shade200),
+                    ),
+                    child: Row(
+                      children: [
+                        ClipRRect(
+                          borderRadius: BorderRadius.circular(8),
+                          child: Image.network(
+                            product.imageUrl ?? '',
+                            width: 50,
+                            height: 50,
+                            fit: BoxFit.cover,
+                            errorBuilder: (_, __, ___) => Container(
+                              width: 50,
+                              height: 50,
+                              color: Colors.grey.shade200,
+                              child: const Icon(
+                                Icons.image_not_supported,
+                                size: 20,
+                              ),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                product.name,
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.w500,
+                                  fontSize: 14,
+                                ),
+                                maxLines: 2,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                              if (item.variantName != null) ...[
+                                const SizedBox(height: 4),
+                                Container(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 6,
+                                    vertical: 2,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: Colors.blue.shade50,
+                                    borderRadius: BorderRadius.circular(8),
+                                  ),
+                                  child: Text(
+                                    item.variantName!,
+                                    style: TextStyle(
+                                      fontSize: 10,
+                                      color: Colors.blue.shade700,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                              const SizedBox(height: 4),
+                              Text(
+                                '${currencyFormat.format(finalPrice)} × ${item.quantity}개',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: Colors.grey.shade600,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        Text(
+                          currencyFormat.format(finalPrice * item.quantity),
+                          style: const TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 14,
+                          ),
+                        ),
+                      ],
+                    ),
+                  );
+                }).toList(),
+
+                const Divider(height: 32),
+                _buildPriceRow('총 상품 금액', currencyFormat.format(subtotal)),
+                const SizedBox(height: 8),
+                _buildPriceRow(
+                  '배송비',
+                  currencyFormat.format(currentShippingFee),
+                ),
+                const Divider(height: 24),
+                _buildPriceRow(
+                  '최종 결제 금액',
+                  currencyFormat.format(totalAmount),
+                  isTotal: true,
+                ),
+
+                if (subtotal >= freeShippingThreshold) ...[
+                  const SizedBox(height: 16),
                   Container(
-                    padding: const EdgeInsets.all(8),
+                    padding: const EdgeInsets.all(12),
                     decoration: BoxDecoration(
                       color: Colors.green.shade50,
                       borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: Colors.green.shade200),
                     ),
-                    child: Icon(
-                      Icons.receipt_long,
-                      color: Colors.green.shade600,
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  const Text(
-                    '주문 요약',
-                    style: TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
+                    child: Row(
+                      children: [
+                        Icon(
+                          Icons.local_shipping,
+                          color: Colors.green.shade600,
+                          size: 16,
+                        ),
+                        const SizedBox(width: 8),
+                        Text(
+                          '무료배송 혜택 적용',
+                          style: TextStyle(
+                            color: Colors.green.shade700,
+                            fontWeight: FontWeight.w500,
+                            fontSize: 12,
+                          ),
+                        ),
+                      ],
                     ),
                   ),
                 ],
-              ),
+              ],
+            ),
+          );
+        },
+        loading: () => const Padding(
+          padding: EdgeInsets.all(24),
+          child: Center(child: CircularProgressIndicator()),
+        ),
+        error: (e, st) => const Padding(
+          padding: EdgeInsets.all(24),
+          child: Text('장바구니 정보를 불러올 수 없습니다.'),
+        ),
+      ),
+    );
+  }
 
-              const SizedBox(height: 20),
+  Widget _buildDirectPurchaseOrderSummary() {
+    final currencyFormat = NumberFormat.currency(locale: 'ko_KR', symbol: '₩');
+    final items = directPurchaseData!['items'] as List;
+    final basePrice =
+        directPurchaseData!['productDiscountPrice'] ??
+        directPurchaseData!['productPrice'];
 
-              // 상품 리스트
-              ...selectedItems.map((item) {
-                final product = item.product;
-                if (product == null) return const SizedBox.shrink();
+    const int shippingFee = 3000;
+    const int freeShippingThreshold = 50000;
+    final int subtotal = _calculateDirectPurchaseSubtotal();
+    final int currentShippingFee = (subtotal >= freeShippingThreshold)
+        ? 0
+        : shippingFee;
+    final int totalAmount = subtotal + currentShippingFee;
 
-                final basePrice = product.discountPrice ?? product.price;
-                final variantPrice = item.variantAdditionalPrice ?? 0;
-                final finalPrice = basePrice + variantPrice;
-
-                return Container(
-                  margin: const EdgeInsets.only(bottom: 16),
-                  padding: const EdgeInsets.all(12),
+    return Container(
+      margin: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 10,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(8),
                   decoration: BoxDecoration(
-                    color: Colors.grey.shade50,
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: Colors.grey.shade200),
+                    color: Colors.orange.shade50,
+                    borderRadius: BorderRadius.circular(8),
                   ),
-                  child: Row(
+                  child: Icon(Icons.flash_on, color: Colors.orange.shade600),
+                ),
+                const SizedBox(width: 12),
+                const Text(
+                  '바로구매 주문',
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                ),
+              ],
+            ),
+
+            const SizedBox(height: 20),
+
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Colors.grey.shade50,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: Colors.grey.shade200),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
                     children: [
                       ClipRRect(
                         borderRadius: BorderRadius.circular(8),
                         child: Image.network(
-                          product.imageUrl ?? '',
+                          directPurchaseData!['productImage'] ?? '',
                           width: 50,
                           height: 50,
                           fit: BoxFit.cover,
@@ -1512,316 +1576,112 @@ Widget _buildOrderSummary() {
                       ),
                       const SizedBox(width: 12),
                       Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              product.name,
-                              style: const TextStyle(
-                                fontWeight: FontWeight.w500,
-                                fontSize: 14,
-                              ),
-                              maxLines: 2,
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                            if (item.variantName != null) ...[
-                              const SizedBox(height: 4),
-                              Container(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 6,
-                                  vertical: 2,
-                                ),
-                                decoration: BoxDecoration(
-                                  color: Colors.blue.shade50,
-                                  borderRadius: BorderRadius.circular(8),
-                                ),
-                                child: Text(
-                                  item.variantName!,
-                                  style: TextStyle(
-                                    fontSize: 10,
-                                    color: Colors.blue.shade700,
+                        child: Text(
+                          directPurchaseData!['productName'],
+                          style: const TextStyle(
+                            fontWeight: FontWeight.w500,
+                            fontSize: 16,
+                          ),
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                    ],
+                  ),
+
+                  const SizedBox(height: 12),
+
+                  ...items.map((item) {
+                    final variantPrice = item['additionalPrice'] ?? 0;
+                    final quantity = item['quantity'];
+                    final itemTotal = (basePrice + variantPrice) * quantity;
+
+                    return Padding(
+                      padding: const EdgeInsets.only(bottom: 8),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  item['variantName'],
+                                  style: const TextStyle(
+                                    fontWeight: FontWeight.w500,
+                                    fontSize: 14,
                                   ),
                                 ),
-                              ),
-                            ],
-                            const SizedBox(height: 4),
-                            Text(
-                              '${currencyFormat.format(finalPrice)} × ${item.quantity}개',
-                              style: TextStyle(
-                                fontSize: 12,
-                                color: Colors.grey.shade600,
-                              ),
+                                Text(
+                                  '${currencyFormat.format(basePrice + variantPrice)} × $quantity개',
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    color: Colors.grey.shade600,
+                                  ),
+                                ),
+                              ],
                             ),
-                          ],
-                        ),
-                      ),
-                      Text(
-                        currencyFormat.format(finalPrice * item.quantity),
-                        style: const TextStyle(
-                          fontWeight: FontWeight.bold,
-                          fontSize: 14,
-                        ),
-                      ),
-                    ],
-                  ),
-                );
-              }).toList(),
-
-              const Divider(height: 32),
-              _buildPriceRow('총 상품 금액', currencyFormat.format(subtotal)),
-              const SizedBox(height: 8),
-              _buildPriceRow(
-                '배송비',
-                currencyFormat.format(currentShippingFee),
-              ),
-              const Divider(height: 24),
-              _buildPriceRow(
-                '최종 결제 금액',
-                currencyFormat.format(totalAmount),
-                isTotal: true,
-              ),
-
-              if (subtotal >= freeShippingThreshold) ...[
-                const SizedBox(height: 16),
-                Container(
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: Colors.green.shade50,
-                    borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: Colors.green.shade200),
-                  ),
-                  child: Row(
-                    children: [
-                      Icon(
-                        Icons.local_shipping,
-                        color: Colors.green.shade600,
-                        size: 16,
-                      ),
-                      const SizedBox(width: 8),
-                      Text(
-                        '무료배송 혜택 적용',
-                        style: TextStyle(
-                          color: Colors.green.shade700,
-                          fontWeight: FontWeight.w500,
-                          fontSize: 12,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ],
-          ),
-        );
-      },
-      loading: () => const Padding(
-        padding: EdgeInsets.all(24),
-        child: Center(child: CircularProgressIndicator()),
-      ),
-      error: (e, st) => const Padding(
-        padding: EdgeInsets.all(24),
-        child: Text('장바구니 정보를 불러올 수 없습니다.'),
-      ),
-    ),
-  );
-}
-
-// 바로구매 주문 요약 (기존 코드 유지)
-Widget _buildDirectPurchaseOrderSummary() {
-  final currencyFormat = NumberFormat.currency(locale: 'ko_KR', symbol: '₩');
-  final items = directPurchaseData!['items'] as List;
-  final basePrice =
-      directPurchaseData!['productDiscountPrice'] ??
-      directPurchaseData!['productPrice'];
-
-  const int shippingFee = 3000;
-  const int freeShippingThreshold = 50000;
-  final int subtotal = _calculateDirectPurchaseSubtotal();
-  final int currentShippingFee = (subtotal >= freeShippingThreshold)
-      ? 0
-      : shippingFee;
-  final int totalAmount = subtotal + currentShippingFee;
-
-  return Container(
-    margin: const EdgeInsets.all(16),
-    decoration: BoxDecoration(
-      color: Colors.white,
-      borderRadius: BorderRadius.circular(16),
-      boxShadow: [
-        BoxShadow(
-          color: Colors.black.withValues(alpha:0.05),
-          blurRadius: 10,
-          offset: const Offset(0, 2),
-        ),
-      ],
-    ),
-    child: Padding(
-      padding: const EdgeInsets.all(24),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // 헤더 (바로구매 표시)
-          Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                  color: Colors.orange.shade50,
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Icon(Icons.flash_on, color: Colors.orange.shade600),
-              ),
-              const SizedBox(width: 12),
-              const Text(
-                '바로구매 주문',
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-              ),
-            ],
-          ),
-
-          const SizedBox(height: 20),
-
-          // 상품 정보
-          Container(
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: Colors.grey.shade50,
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: Colors.grey.shade200),
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    // 상품 이미지
-                    ClipRRect(
-                      borderRadius: BorderRadius.circular(8),
-                      child: Image.network(
-                        directPurchaseData!['productImage'] ?? '',
-                        width: 50,
-                        height: 50,
-                        fit: BoxFit.cover,
-                        errorBuilder: (_, __, ___) => Container(
-                          width: 50,
-                          height: 50,
-                          color: Colors.grey.shade200,
-                          child: const Icon(
-                            Icons.image_not_supported,
-                            size: 20,
                           ),
-                        ),
+                          Text(
+                            currencyFormat.format(itemTotal),
+                            style: const TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 14,
+                            ),
+                          ),
+                        ],
                       ),
+                    );
+                  }).toList(),
+                ],
+              ),
+            ),
+
+            const Divider(height: 32),
+            _buildPriceRow('총 상품 금액', currencyFormat.format(subtotal)),
+            const SizedBox(height: 8),
+            _buildPriceRow('배송비', currencyFormat.format(currentShippingFee)),
+            const Divider(height: 24),
+            _buildPriceRow(
+              '최종 결제 금액',
+              currencyFormat.format(totalAmount),
+              isTotal: true,
+            ),
+
+            if (subtotal >= freeShippingThreshold) ...[
+              const SizedBox(height: 16),
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Colors.green.shade50,
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: Colors.green.shade200),
+                ),
+                child: Row(
+                  children: [
+                    Icon(
+                      Icons.local_shipping,
+                      color: Colors.green.shade600,
+                      size: 16,
                     ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Text(
-                        directPurchaseData!['productName'],
-                        style: const TextStyle(
-                          fontWeight: FontWeight.w500,
-                          fontSize: 16,
-                        ),
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
+                    const SizedBox(width: 8),
+                    Text(
+                      '무료배송 혜택 적용',
+                      style: TextStyle(
+                        color: Colors.green.shade700,
+                        fontWeight: FontWeight.w500,
+                        fontSize: 12,
                       ),
                     ),
                   ],
                 ),
-
-                const SizedBox(height: 12),
-
-                // 선택된 옵션들
-                ...items.map((item) {
-                  final variantPrice = item['additionalPrice'] ?? 0;
-                  final quantity = item['quantity'];
-                  final itemTotal = (basePrice + variantPrice) * quantity;
-
-                  return Padding(
-                    padding: const EdgeInsets.only(bottom: 8),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                item['variantName'],
-                                style: const TextStyle(
-                                  fontWeight: FontWeight.w500,
-                                  fontSize: 14,
-                                ),
-                              ),
-                              Text(
-                                '${currencyFormat.format(basePrice + variantPrice)} × ${quantity}개',
-                                style: TextStyle(
-                                  fontSize: 12,
-                                  color: Colors.grey.shade600,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                        Text(
-                          currencyFormat.format(itemTotal),
-                          style: const TextStyle(
-                            fontWeight: FontWeight.bold,
-                            fontSize: 14,
-                          ),
-                        ),
-                      ],
-                    ),
-                  );
-                }).toList(),
-              ],
-            ),
-          ),
-
-          const Divider(height: 32),
-          _buildPriceRow('총 상품 금액', currencyFormat.format(subtotal)),
-          const SizedBox(height: 8),
-          _buildPriceRow('배송비', currencyFormat.format(currentShippingFee)),
-          const Divider(height: 24),
-          _buildPriceRow(
-            '최종 결제 금액',
-            currencyFormat.format(totalAmount),
-            isTotal: true,
-          ),
-
-          if (subtotal >= freeShippingThreshold) ...[
-            const SizedBox(height: 16),
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: Colors.green.shade50,
-                borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: Colors.green.shade200),
               ),
-              child: Row(
-                children: [
-                  Icon(
-                    Icons.local_shipping,
-                    color: Colors.green.shade600,
-                    size: 16,
-                  ),
-                  const SizedBox(width: 8),
-                  Text(
-                    '무료배송 혜택 적용',
-                    style: TextStyle(
-                      color: Colors.green.shade700,
-                      fontWeight: FontWeight.w500,
-                      fontSize: 12,
-                    ),
-                  ),
-                ],
-              ),
-            ),
+            ],
           ],
-        ],
+        ),
       ),
-    ),
-  );
-}
+    );
+  }
 
   Widget _buildPriceRow(String title, String price, {bool isTotal = false}) {
     final style = TextStyle(
